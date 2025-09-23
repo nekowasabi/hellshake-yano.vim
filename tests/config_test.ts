@@ -5,7 +5,8 @@
 
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { getDefaultConfig, validateConfig } from "../denops/hellshake-yano/main.ts";
+import { getDefaultConfig } from "../denops/hellshake-yano/validation/index.ts";
+import { validateConfig } from "../denops/hellshake-yano/validation/index.ts";
 
 // 設定のマージ
 function mergeConfig(defaults: any, userConfig: any) {

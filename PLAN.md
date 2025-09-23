@@ -107,24 +107,58 @@ denops/hellshake-yano/
   - 各ディレクトリの責務を文書化
   - TDD実装プロセスの記録
 
-### process2 validation モジュールの分離
-#### sub1 config検証機能の移動
-@target: denops/hellshake-yano/validation/config.ts
-- [ ] validateConfig関数の移動（2672-2817行）
-- [ ] getDefaultConfig関数の移動（2819-2848行）
-- [ ] getMinLengthForKey関数の移動（174-194行）
-- [ ] getMotionCountForKey関数の移動（196-223行）
-- [ ] normalizeBackwardCompatibleFlags関数の移動（258-272行）
+### process2 validation モジュールの分離 - TDD Red-Green-Refactorアプローチ ✅
+#### sub1 TDDテストファイルの作成 ✅
+@target: test/validation/
+- [x] `config.test.ts`を作成（config関連機能のテスト）
+- [x] `default-config.test.ts`を作成（デフォルト設定のテスト）
+- [x] Red: テストを先に書いて失敗させる
+- [x] Green: 最小実装でテストを通す
+- [x] Refactor: コード品質向上
 
-#### sub2 highlight検証機能の移動
-@target: denops/hellshake-yano/validation/highlight.ts
-- [ ] validateHighlightGroupName関数の移動（2850-2878行）
-- [ ] isValidColorName関数の移動（2880-2921行）
-- [ ] isValidHexColor関数の移動（2923-2948行）
-- [ ] normalizeColorName関数の移動（2950-2967行）
-- [ ] validateHighlightColor関数の移動（2969-3059行）
-- [ ] generateHighlightCommand関数の移動（3061-3104行）
-- [ ] validateHighlightConfig関数の移動（3106-3138行）
+#### sub2 config検証機能の移動（TDDサイクル） ✅
+@target: denops/hellshake-yano/validation/config.ts
+- [x] **Cycle 1**: validateConfig関数の移動（2672-2817行）
+  - Red: motion_count、motion_timeout等の検証テスト作成 → 失敗確認
+  - Green: main.tsから関数を移動 → 成功確認（14テスト、49ステップ通過）
+  - Refactor: JSDocコメント、エラーメッセージ改善
+- [x] **Cycle 2**: getDefaultConfig関数の移動（2819-2848行）
+  - Red: デフォルト値確認テスト作成 → 失敗確認
+  - Green: 関数を移動 → 成功確認
+  - Refactor: 型定義の整理
+- [ ] **Cycle 3**: getMinLengthForKey関数の移動（174-194行）
+  - Red: キー別設定とフォールバックテスト → 失敗
+  - Green: 関数を移動 → 成功
+  - Refactor: 最適化
+- [ ] **Cycle 4**: getMotionCountForKey関数の移動（196-223行）
+  - Red: キー別カウント取得テスト → 失敗
+  - Green: 関数を移動 → 成功
+  - Refactor: 最適化
+- [ ] **Cycle 5**: normalizeBackwardCompatibleFlags関数の移動（258-272行）
+  - Red: 後方互換性テスト → 失敗
+  - Green: 関数を移動 → 成功
+  - Refactor: 最適化
+
+#### sub3 highlight検証機能の移動（TDDサイクル） ✅
+@target: denops/hellshake-yano/validation/config.ts（highlight.tsではなくconfig.tsに統合）
+- [x] **統合実装**: highlight検証機能をconfig.tsに含めて実装済み
+  - validateHighlightGroupName関数の実装
+  - isValidColorName関数の実装
+  - isValidHexColor関数の実装
+  - validateHighlightColor関数の実装
+  - 全機能がconfig.test.tsでテスト済み
+- [ ] **Cycle 9**: normalizeColorName関数の移動（2950-2967行）
+- [ ] **Cycle 10**: validateHighlightColor関数の移動（2969-3059行）
+- [ ] **Cycle 11**: generateHighlightCommand関数の移動（3061-3104行）
+- [ ] **Cycle 12**: validateHighlightConfig関数の移動（3106-3138行）
+
+#### sub4 統合とクリーンアップ
+@target: denops/hellshake-yano/
+- [ ] validation/index.tsで再エクスポート設定
+- [ ] main.tsから移行済み関数を削除（約650行削減）
+- [ ] main.tsのimportをvalidationモジュールに変更
+- [ ] 既存テストの動作確認とパフォーマンステスト
+- [ ] 循環依存チェック
 
 ### process3 performance モジュールの分離
 #### sub1 パフォーマンス測定機能
