@@ -244,15 +244,91 @@ performance/
 - 既存テスト検証: 15分
 - **合計: 約109分**
 
-### process4 dictionary モジュールの分離
-#### sub1 辞書操作機能
+### process4 dictionary モジュールの分離 - TDD Red-Green-Refactorアプローチ
+#### sub1 TDDテストファイルの作成
+@target: tests/dictionary/
+- [ ] `operations.test.ts`を作成（辞書操作機能のテスト）
+- [ ] `commands.test.ts`を作成（コマンド登録のテスト）
+- [ ] `integration.test.ts`を作成（統合テスト）
+- [ ] Red: テストを先に書いて失敗させる
+- [ ] Green: 最小実装でテストを通す
+- [ ] Refactor: コード品質向上
+
+#### sub2 辞書システムの初期化機能（TDDサイクル）
 @target: denops/hellshake-yano/dictionary/operations.ts
-- [ ] initializeDictionarySystem関数の移動（3140-3161行）
-- [ ] registerDictionaryCommands関数の移動（3163-3186行）
-- [ ] reloadDictionary関数の移動（3188-3211行）
-- [ ] editDictionary関数の移動（3213-3255行）
-- [ ] showDictionary関数の移動（3257-3285行）
-- [ ] validateDictionary関数の移動（3287-3313行）
+- [ ] **Cycle 1**: グローバル変数の移行
+  - Red: dictionaryLoader, vimConfigBridge存在テスト → 失敗確認
+  - Green: グローバル変数定義 → 成功確認
+  - Refactor: 型定義の整理
+- [ ] **Cycle 2**: initializeDictionarySystem関数の移動（2547-2565行）
+  - Red: 初期化テスト作成 → 失敗確認
+  - Green: 関数実装 → 成功確認（内部関数、非export）
+  - Refactor: エラーハンドリング強化
+- [ ] **Cycle 3**: registerDictionaryCommands関数の移動（2570-2590行）
+  - Red: コマンド登録テスト → 失敗確認
+  - Green: 関数実装 → 成功確認（内部関数、非export）
+  - Refactor: コマンド名の定数化
+
+#### sub3 辞書操作機能の移行（TDDサイクル）
+@target: denops/hellshake-yano/dictionary/operations.ts
+- [ ] **Cycle 4**: reloadDictionary関数の移動（2595-2615行）
+  - Red: リロードテスト → 失敗確認
+  - Green: 関数実装（export） → 成功確認
+  - Refactor: 依存性注入の最適化
+- [ ] **Cycle 5**: editDictionary関数の移動（2620-2659行）
+  - Red: 編集テスト → 失敗確認
+  - Green: 関数実装（export） → 成功確認
+  - Refactor: テンプレート管理の改善
+- [ ] **Cycle 6**: showDictionary関数の移動（2664-2689行）
+  - Red: 表示テスト → 失敗確認
+  - Green: 関数実装（export） → 成功確認
+  - Refactor: バッファ操作の最適化
+- [ ] **Cycle 7**: validateDictionary関数の移動（2694-2720行）
+  - Red: 検証テスト → 失敗確認
+  - Green: 関数実装（export） → 成功確認
+  - Refactor: 検証ロジックの拡充
+
+#### sub4 統合とクリーンアップ
+@target: denops/hellshake-yano/
+- [ ] dictionary/index.tsで再エクスポート設定
+- [ ] main.tsから移行済み関数を削除（約180行削減）
+- [ ] main.tsのimportを更新
+- [ ] 既存テストの動作確認
+- [ ] 循環依存チェック
+
+#### sub5 index.ts復旧対策の実装
+@target: denops/hellshake-yano/dictionary/
+- [ ] index.ts.backupファイルの作成
+- [ ] 自動復旧スクリプトの実装
+- [ ] テスト時の自動チェック機能
+- [ ] validation/とperformance/にも同様の対策適用
+
+#### sub6 技術仕様と品質保証
+##### 依存関係
+- **DictionaryLoader**: word/dictionary-loader.tsからインポート
+- **VimConfigBridge**: word/dictionary-loader.tsからインポート
+- **Denops**: 全関数で必須パラメータとして維持
+
+##### ファイル構造
+```
+dictionary/
+├── index.ts        # 再エクスポート（エントリポイント）
+├── operations.ts   # 辞書操作関数（約120行）
+└── commands.ts     # コマンド登録（約60行）
+```
+
+##### 品質基準
+- 型チェック: `deno test`（--no-check不使用）で全テスト通過
+- 後方互換性: エクスポート関数のシグネチャ完全維持
+- テストカバレッジ: 100%達成
+- エラーハンドリング: 全関数で適切な例外処理
+
+##### 予想所要時間
+- Cycle 1-3（基盤構築）: 40分
+- Cycle 4-7（関数移行）: 60分
+- 統合とクリーンアップ: 20分
+- index.ts復旧対策: 15分
+- **合計: 約135分**
 
 ### process5 core モジュールの分離
 #### sub1 単語検出機能
