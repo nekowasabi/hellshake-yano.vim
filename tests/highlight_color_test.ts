@@ -260,7 +260,7 @@ Deno.test("ハイライト色設定: 長すぎる名前のテスト", () => {
   const validation = validateConfig(config);
   assertEquals(validation.valid, false);
   assertEquals(
-    validation.errors.some((e) =>
+    validation.errors.some((e: string) =>
       e.includes("highlight_hint_marker must be 100 characters or less")
     ),
     true,

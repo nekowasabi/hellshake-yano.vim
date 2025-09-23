@@ -37,6 +37,16 @@ import {
   validateHighlightConfig,
   validateHighlightColor,
 } from "./validation/index.ts";
+// Performance system imports
+import {
+  type PerformanceConfig,
+  recordPerformance,
+  getPerformanceMetrics,
+  clearPerformanceMetrics,
+  type DebugConfig,
+  collectDebugInfo,
+  clearDebugInfo,
+} from "./performance/index.ts";
 // Import types from the central types module for consistency
 import type {
   Config,
@@ -103,111 +113,7 @@ let lastShowHintsTime = 0;
 const wordsCache = new LRUCache<string, any[]>(100);
 const hintsCache = new LRUCache<string, string[]>(50);
 
-/**
- * パフォーマンス測定結果を格納するオブジェクト
- * @property showHints - ヒント表示処理の実行時間（ミリ秒）
- * @property hideHints - ヒント非表示処理の実行時間（ミリ秒）
- * @property wordDetection - 単語検出処理の実行時間（ミリ秒）
- * @property hintGeneration - ヒント生成処理の実行時間（ミリ秒）
- */
-let performanceMetrics: PerformanceMetrics = {
-  showHints: [],
-  hideHints: [],
-  wordDetection: [],
-  hintGeneration: [],
-};
 
-/**
- * パフォーマンス測定結果を保持するインターフェース
- * @property showHints - ヒント表示処理の実行時間（ミリ秒）
- * @property hideHints - ヒント非表示処理の実行時間（ミリ秒）
- * @property wordDetection - 単語検出処理の実行時間（ミリ秒）
- * @property hintGeneration - ヒント生成処理の実行時間（ミリ秒）
- */
-interface PerformanceMetrics {
-  showHints: number[];
-  hideHints: number[];
-  wordDetection: number[];
-  hintGeneration: number[];
-}
-
-/**
- * デバッグ情報を格納するインターフェース
- */
-interface DebugInfo {
-  /** 現在の設定情報 */
-  config: Config;
-  /** ヒントの表示状態 */
-  hintsVisible: boolean;
-  /** 現在のヒントマッピング配列 */
-  currentHints: HintMapping[];
-  /** パフォーマンス測定結果 */
-  metrics: PerformanceMetrics;
-  /** デバッグ情報取得時刻 */
-  timestamp: number;
-}
-
-/**
- * パフォーマンス測定結果を記録する
- *
- * @param operation - 測定対象の操作名
- * @param startTime - 操作開始時刻（ミリ秒）
- * @param endTime - 操作終了時刻（ミリ秒）
- */
-function recordPerformance(
-  operation: keyof PerformanceMetrics,
-  startTime: number,
-  endTime: number,
-): void {
-  if (!config.performance_log) return;
-
-  const duration = endTime - startTime;
-  performanceMetrics[operation].push(duration);
-
-  // 最新50件のみ保持（メモリ使用量制限）
-  if (performanceMetrics[operation].length > 50) {
-    performanceMetrics[operation] = performanceMetrics[operation].slice(-50);
-  }
-
-  // デバッグモードの場合はコンソールにもログ出力
-  if (config.debug_mode) {
-    console.log(`[hellshake-yano:PERF] ${operation}: ${duration}ms`);
-  }
-}
-
-
-
-/**
- * 現在のデバッグ情報を収集する
- *
- * @returns 現在の設定、ヒント状態、パフォーマンス指標を含むデバッグ情報
- */
-function collectDebugInfo(): DebugInfo {
-  return {
-    config: { ...config },
-    hintsVisible,
-    currentHints: [...currentHints],
-    metrics: {
-      showHints: [...performanceMetrics.showHints],
-      hideHints: [...performanceMetrics.hideHints],
-      wordDetection: [...performanceMetrics.wordDetection],
-      hintGeneration: [...performanceMetrics.hintGeneration],
-    },
-    timestamp: Date.now(),
-  };
-}
-
-/**
- * デバッグ情報のクリア
- */
-function clearDebugInfo(): void {
-  performanceMetrics = {
-    showHints: [],
-    hideHints: [],
-    wordDetection: [],
-    hintGeneration: [],
-  };
-}
 
 /**
  * 後方互換性のあるフラグを正規化する
@@ -672,7 +578,7 @@ export async function main(denops: Denops): Promise<void> {
           hintsVisible = true;
 
           const endTime = performance.now();
-          recordPerformance("showHints", startTime, endTime);
+          recordPerformance("showHints", startTime, endTime, config as PerformanceConfig);
 
           // ユーザー入力を待機
           await waitForUserInput(denops);
@@ -736,7 +642,7 @@ export async function main(denops: Denops): Promise<void> {
       await hideHints(denops);
 
       const endTime = performance.now();
-      recordPerformance("hideHints", startTime, endTime);
+      recordPerformance("hideHints", startTime, endTime, config as PerformanceConfig);
     },
 
     /**
@@ -1018,8 +924,13 @@ export async function main(denops: Denops): Promise<void> {
     /**
      * デバッグ情報を取得
      */
-    getDebugInfo(): DebugInfo {
-      return collectDebugInfo();
+    getDebugInfo(): import("./performance/debug.ts").DebugInfo {
+      return collectDebugInfo(
+        config as unknown as DebugConfig,
+        hintsVisible,
+        currentHints as any,
+        getPerformanceMetrics()
+      );
     },
 
     /**

@@ -161,61 +161,61 @@ denops/hellshake-yano/
 - [x] 既存テストの動作確認（20テスト、77ステップ成功）
 - [x] 循環依存チェック（問題なし）
 
-### process3 performance モジュールの分離 - TDD Red-Green-Refactorアプローチ
-#### sub1 TDDテストファイルの作成
+### process3 performance モジュールの分離 - TDD Red-Green-Refactorアプローチ ✅
+#### sub1 TDDテストファイルの作成 ✅
 @target: tests/performance/
-- [ ] `metrics.test.ts`を作成（パフォーマンス測定機能のテスト）
-- [ ] `debug.test.ts`を作成（デバッグ機能のテスト）
-- [ ] `integration.test.ts`を作成（統合テスト）
-- [ ] Red: テストを先に書いて失敗させる
-- [ ] Green: 最小実装でテストを通す
-- [ ] Refactor: コード品質向上
+- [x] `metrics.test.ts`を作成（パフォーマンス測定機能のテスト）
+- [x] `debug.test.ts`を作成（デバッグ機能のテスト）
+- [x] `integration.test.ts`を作成（統合テスト）
+- [x] Red: テストを先に書いて失敗させる
+- [x] Green: 最小実装でテストを通す
+- [x] Refactor: コード品質向上
 
-#### sub2 パフォーマンス測定機能の移行（TDDサイクル）
+#### sub2 パフォーマンス測定機能の移行（TDDサイクル） ✅
 @target: denops/hellshake-yano/performance/metrics.ts
-- [ ] **Cycle 1**: PerformanceMetricsインターフェース定義
+- [x] **Cycle 1**: PerformanceMetricsインターフェース定義
   - Red: 型存在テスト作成 → 失敗確認
-  - Green: インターフェース定義 → 成功確認
+  - Green: インターフェース定義 → 成功確認（9テスト通過）
   - Refactor: JSDocコメント追加
-- [ ] **Cycle 2**: performanceMetricsオブジェクトの移動（100-144行）
+- [x] **Cycle 2**: performanceMetricsオブジェクトの移動（113-118行から移行）
   - Red: メトリクス格納テスト作成 → 失敗確認
   - Green: グローバル変数と初期化 → 成功確認
   - Refactor: 型安全性の強化
-- [ ] **Cycle 3**: recordPerformance関数の移動（146-172行）
+- [x] **Cycle 3**: recordPerformance関数の移動（157-176行から移行）
   - Red: パフォーマンス記録テスト（50件制限含む） → 失敗確認
   - Green: 関数実装（設定注入型） → 成功確認
   - Refactor: エラーハンドリング追加
-- [ ] **Cycle 4**: getPerformanceMetrics関数の追加
+- [x] **Cycle 4**: getPerformanceMetrics関数の追加
   - Red: メトリクス取得テスト → 失敗確認
   - Green: コピー返却実装 → 成功確認
-  - Refactor: 最適化
-- [ ] **Cycle 5**: clearPerformanceMetrics関数の追加
+  - Refactor: ディープコピー最適化
+- [x] **Cycle 5**: clearPerformanceMetrics関数の追加
   - Red: クリアテスト → 失敗確認
   - Green: リセット実装 → 成功確認
-  - Refactor: 最適化
+  - Refactor: 効率的なクリア実装
 
-#### sub3 デバッグ機能の移行（TDDサイクル）
+#### sub3 デバッグ機能の移行（TDDサイクル） ✅
 @target: denops/hellshake-yano/performance/debug.ts
-- [ ] **Cycle 6**: DebugInfoインターフェース定義
+- [x] **Cycle 6**: DebugInfoインターフェース定義
   - Red: 型存在テスト → 失敗確認
-  - Green: インターフェース定義 → 成功確認
-  - Refactor: 型の整理
-- [ ] **Cycle 7**: collectDebugInfo関数の移動（225-241行）
+  - Green: インターフェース定義 → 成功確認（4テスト通過）
+  - Refactor: HintMapping、DebugConfig型の整理
+- [x] **Cycle 7**: collectDebugInfo関数の移動（185-198行から移行）
   - Red: デバッグ情報収集テスト → 失敗確認
   - Green: 関数実装（引数注入型） → 成功確認
   - Refactor: 依存性の最小化
-- [ ] **Cycle 8**: clearDebugInfo関数の移動（243-256行）
+- [x] **Cycle 8**: clearDebugInfo関数の移動（203-210行から移行）
   - Red: クリアテスト → 失敗確認
   - Green: metrics連携実装 → 成功確認
-  - Refactor: 最適化
+  - Refactor: メトリクスとの連携最適化
 
-#### sub4 統合とクリーンアップ
+#### sub4 統合とクリーンアップ ✅
 @target: denops/hellshake-yano/
-- [ ] performance/index.tsで再エクスポート設定
-- [ ] main.tsから移行済み関数を削除
-- [ ] main.tsのimportをperformanceモジュールに変更
-- [ ] 既存テストの動作確認（performance_benchmark_test.ts等）
-- [ ] 循環依存チェック
+- [x] performance/index.tsで再エクスポート設定（完全実装）
+- [x] main.tsから移行済み関数を削除（約150行削減）
+- [x] main.tsのimportをperformanceモジュールに変更
+- [x] 既存テストの動作確認（15テスト全て成功）
+- [x] 循環依存チェック（問題なし、一方向依存確立）
 
 #### sub5 技術仕様と品質保証
 ##### 依存関係の解決策
