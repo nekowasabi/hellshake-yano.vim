@@ -25,6 +25,18 @@ import {
 // Dictionary system imports
 import { DictionaryLoader } from "./word/dictionary-loader.ts";
 import { VimConfigBridge } from "./word/dictionary-loader.ts";
+// Validation system imports
+import {
+  validateConfig,
+  getDefaultConfig,
+  getMinLengthForKey,
+  getMotionCountForKey,
+  normalizeBackwardCompatibleFlags,
+  normalizeColorName,
+  generateHighlightCommand,
+  validateHighlightConfig,
+  validateHighlightColor,
+} from "./validation/index.ts";
 // Import types from the central types module for consistency
 import type {
   Config,
@@ -37,14 +49,6 @@ import type {
 // Re-export types for backward compatibility
 export type { Config, HighlightColor };
 import { getPerKeyValue, mergeConfig } from "./config.ts";
-import {
-  validateConfig,
-  validateHighlightColor,
-  validateHighlightGroupName,
-  isValidColorName,
-  isValidHexColor,
-  getDefaultConfig,
-} from "./validation/index.ts";
 import {
   CommandFactory,
   disable,
@@ -171,58 +175,7 @@ function recordPerformance(
   }
 }
 
-/**
- * 指定されたキーに対する最小文字数を取得する（process1追加）
- *
- * @param config - 設定オブジェクト
- * @param key - 対象のキー文字
- * @returns キーに対応する最小文字数
- */
-export function getMinLengthForKey(config: Config, key: string): number {
-  // キー別設定が存在し、そのキーの設定があれば使用
-  if (config.per_key_min_length && config.per_key_min_length[key] !== undefined) {
-    return config.per_key_min_length[key];
-  }
 
-  // default_min_word_length が設定されていれば使用
-  if (config.default_min_word_length !== undefined) {
-    return config.default_min_word_length;
-  }
-
-  // 後方互換性：旧形式のmin_word_lengthを使用（デフォルト: 2）
-  return config.min_word_length ?? 2;
-}
-
-/**
- * キー別motion_count設定を取得する関数（process1実装）
- *
- * @param key - 対象のキー
- * @param config - 設定オブジェクト
- * @returns そのキーに対するmotion_count値
- */
-export function getMotionCountForKey(key: string, config: Config): number {
-  // キー別設定が存在し、そのキーの設定があれば使用
-  if (config.per_key_motion_count && config.per_key_motion_count[key] !== undefined) {
-    const value = config.per_key_motion_count[key];
-    // 1以上の整数値のみ有効とみなす
-    if (value >= 1 && Number.isInteger(value)) {
-      return value;
-    }
-  }
-
-  // default_motion_count が設定されていれば使用
-  if (config.default_motion_count !== undefined && config.default_motion_count >= 1) {
-    return config.default_motion_count;
-  }
-
-  // 後方互換性：既存のmotion_countを使用
-  if (config.motion_count !== undefined && config.motion_count >= 1) {
-    return config.motion_count;
-  }
-
-  // 最終的なデフォルト値
-  return 3;
-}
 
 /**
  * 現在のデバッグ情報を収集する
@@ -262,15 +215,6 @@ function clearDebugInfo(): void {
  * @param cfg - 正規化する設定オブジェクト
  * @returns 後方互換性を保ちつつ正規化された設定
  */
-function normalizeBackwardCompatibleFlags(cfg: Partial<Config>): Partial<Config> {
-  const normalized = { ...cfg };
-
-  if ("use_improved_detection" in normalized) {
-    delete normalized.use_improved_detection;
-  }
-
-  return normalized;
-}
 
 /**
  * メイン設定を単語検出マネージャー用設定に変換する
@@ -2678,103 +2622,9 @@ async function waitForUserInput(denops: Denops): Promise<void> {
 
 
 
-/**
- * 色値を正規化する（大文字小文字を統一）
- * @param color 正規化する色値
- * @returns 正規化された色値
- */
-export function normalizeColorName(color: string): string {
-  if (!color || typeof color !== "string") {
-    return color;
-  }
-
-  // 16進数色の場合はそのまま返す
-  if (color.startsWith("#")) {
-    return color;
-  }
-
-  // 色名の場合は最初の文字を大文字、残りを小文字にする
-  return color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
-}
 
 
-/**
- * ハイライトコマンドを生成する
- * @param hlGroupName ハイライトグループ名
- * @param colorConfig 色設定
- * @returns 生成されたハイライトコマンド
- */
-export function generateHighlightCommand(
-  hlGroupName: string,
-  colorConfig: string | HighlightColor,
-): string {
-  // 文字列の場合（従来のハイライトグループ名）
-  if (typeof colorConfig === "string") {
-    return `highlight default link ${hlGroupName} ${colorConfig}`;
-  }
 
-  // オブジェクトの場合（fg/bg個別指定）
-  const { fg, bg } = colorConfig;
-  const parts = [`highlight ${hlGroupName}`];
-
-  if (fg !== undefined) {
-    const normalizedFg = normalizeColorName(fg);
-    if (fg.startsWith("#")) {
-      // 16進数色の場合はguifgのみ
-      parts.push(`guifg=${fg}`);
-    } else {
-      // 色名の場合はctermfgとguifgの両方
-      parts.push(`ctermfg=${normalizedFg}`);
-      parts.push(`guifg=${normalizedFg}`);
-    }
-  }
-
-  if (bg !== undefined) {
-    const normalizedBg = normalizeColorName(bg);
-    if (bg.startsWith("#")) {
-      // 16進数色の場合はguibgのみ
-      parts.push(`guibg=${bg}`);
-    } else {
-      // 色名の場合はctermbgとguibgの両方
-      parts.push(`ctermbg=${normalizedBg}`);
-      parts.push(`guibg=${normalizedBg}`);
-    }
-  }
-
-  return parts.join(" ");
-}
-
-/**
- * ハイライト設定を検証する（設定更新時に使用）
- * @param config 検証する設定オブジェクト
- * @returns 検証結果
- */
-export function validateHighlightConfig(
-  config: {
-    highlight_hint_marker?: string | HighlightColor;
-    highlight_hint_marker_current?: string | HighlightColor;
-  },
-): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-
-  // highlight_hint_markerの検証
-  if (config.highlight_hint_marker !== undefined) {
-    const markerResult = validateHighlightColor(config.highlight_hint_marker);
-    if (!markerResult.valid) {
-      errors.push(...markerResult.errors.map((e) => `highlight_hint_marker: ${e}`));
-    }
-  }
-
-  // highlight_hint_marker_currentの検証
-  if (config.highlight_hint_marker_current !== undefined) {
-    const currentResult = validateHighlightColor(config.highlight_hint_marker_current);
-    if (!currentResult.valid) {
-      errors.push(...currentResult.errors.map((e) => `highlight_hint_marker_current: ${e}`));
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
 
 // Dictionary system variables
 let dictionaryLoader: DictionaryLoader | null = null;
@@ -2964,6 +2814,12 @@ export async function validateDictionary(denops: Denops): Promise<void> {
 export {
   validateConfig,
   getDefaultConfig,
+  getMinLengthForKey,
+  getMotionCountForKey,
+  normalizeBackwardCompatibleFlags,
+  normalizeColorName,
+  generateHighlightCommand,
+  validateHighlightConfig,
   validateHighlightColor,
   validateHighlightGroupName,
   isValidColorName,

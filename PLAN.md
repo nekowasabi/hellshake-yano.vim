@@ -14,6 +14,7 @@
 - 後方互換性を完全に維持する
 - 既存のエクスポートされた関数はすべて維持する
 - テストが壊れないよう慎重に作業を進める
+- ユニットテストは --no-checkを使わず、常に型チェックを通す
 
 ## 開発のゴール
 - main.tsの責務を明確に分離したモジュール構造
@@ -126,18 +127,18 @@ denops/hellshake-yano/
   - Red: デフォルト値確認テスト作成 → 失敗確認
   - Green: 関数を移動 → 成功確認
   - Refactor: 型定義の整理
-- [ ] **Cycle 3**: getMinLengthForKey関数の移動（174-194行）
-  - Red: キー別設定とフォールバックテスト → 失敗
-  - Green: 関数を移動 → 成功
-  - Refactor: 最適化
-- [ ] **Cycle 4**: getMotionCountForKey関数の移動（196-223行）
-  - Red: キー別カウント取得テスト → 失敗
-  - Green: 関数を移動 → 成功
-  - Refactor: 最適化
-- [ ] **Cycle 5**: normalizeBackwardCompatibleFlags関数の移動（258-272行）
-  - Red: 後方互換性テスト → 失敗
-  - Green: 関数を移動 → 成功
-  - Refactor: 最適化
+- [x] **Cycle 3**: getMinLengthForKey関数の移動（174-194行）
+  - Red: キー別設定とフォールバックテスト → 失敗確認
+  - Green: 関数を移動 → 成功確認
+  - Refactor: 最適化完了
+- [x] **Cycle 4**: getMotionCountForKey関数の移動（196-223行）
+  - Red: キー別カウント取得テスト → 失敗確認
+  - Green: 関数を移動 → 成功確認
+  - Refactor: 最適化完了
+- [x] **Cycle 5**: normalizeBackwardCompatibleFlags関数の移動（258-272行）
+  - Red: 後方互換性テスト → 失敗確認
+  - Green: 関数を移動 → 成功確認
+  - Refactor: 最適化完了
 
 #### sub3 highlight検証機能の移動（TDDサイクル） ✅
 @target: denops/hellshake-yano/validation/config.ts（highlight.tsではなくconfig.tsに統合）
@@ -147,18 +148,18 @@ denops/hellshake-yano/
   - isValidHexColor関数の実装
   - validateHighlightColor関数の実装
   - 全機能がconfig.test.tsでテスト済み
-- [ ] **Cycle 9**: normalizeColorName関数の移動（2950-2967行）
-- [ ] **Cycle 10**: validateHighlightColor関数の移動（2969-3059行）
-- [ ] **Cycle 11**: generateHighlightCommand関数の移動（3061-3104行）
-- [ ] **Cycle 12**: validateHighlightConfig関数の移動（3106-3138行）
+- [x] **Cycle 9**: normalizeColorName関数の移動（2950-2967行）
+- [x] **Cycle 10**: validateHighlightColor関数の移動（2969-3059行）
+- [x] **Cycle 11**: generateHighlightCommand関数の移動（3061-3104行）
+- [x] **Cycle 12**: validateHighlightConfig関数の移動（3106-3138行）
 
-#### sub4 統合とクリーンアップ
+#### sub4 統合とクリーンアップ ✅
 @target: denops/hellshake-yano/
-- [ ] validation/index.tsで再エクスポート設定
-- [ ] main.tsから移行済み関数を削除（約650行削減）
-- [ ] main.tsのimportをvalidationモジュールに変更
-- [ ] 既存テストの動作確認とパフォーマンステスト
-- [ ] 循環依存チェック
+- [x] validation/index.tsで再エクスポート設定
+- [x] main.tsから移行済み関数を削除（実装済み）
+- [x] main.tsのimportをvalidationモジュールに変更
+- [x] 既存テストの動作確認（20テスト、77ステップ成功）
+- [x] 循環依存チェック（問題なし）
 
 ### process3 performance モジュールの分離
 #### sub1 パフォーマンス測定機能
@@ -268,3 +269,16 @@ denops/hellshake-yano/
 - [ ] モジュール間の通信最適化
 - [ ] 遅延読み込みの実装
 - [ ] バンドルサイズの確認
+
+## 重要な注意事項
+
+### テスト実行に関する注意
+- **統合テストの行番号**: main.tsへの変更により、統合テストで参照している行番号の修正が必要になることがある
+  - 例: `integration_call_site_test.ts` では実際のコード位置に合わせて行番号範囲の調整が必要
+  - validation/index.tsなどのモジュールファイルが外部から変更された場合も影響を受ける可能性がある
+
+- **型チェックの扱い**:
+  - リファクタリング中は一時的に `--no-check` オプションを使用してテストを実行することも検討
+  - ただし、最終的には型チェックを通すことが必須（CLAUDEルールに従う）
+  - 開発中: `deno test --no-check` で素早いフィードバック
+  - 最終確認: `deno test` で型安全性を保証

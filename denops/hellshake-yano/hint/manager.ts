@@ -4,7 +4,7 @@
  */
 
 import type { Config } from "../main.ts";
-import { getMinLengthForKey } from "../main.ts";
+import { getMinLengthForKey } from "../validation/index.ts";
 
 /**
  * ヒント管理の責務を担うクラス

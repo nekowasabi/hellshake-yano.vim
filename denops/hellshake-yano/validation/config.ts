@@ -331,3 +331,197 @@ export function getDefaultConfig(): Config {
     // per_key_motion_countはデフォルトでは未定義（ユーザーが必要に応じて設定）
   };
 }
+
+/**
+ * キー別の最小文字数を取得する関数
+ *
+ * 優先順位:
+ * 1. per_key_min_length[key] （キー別設定）
+ * 2. default_min_word_length （デフォルト設定）
+ * 3. min_word_length （後方互換性）
+ * 4. 2 （ハードコードされたデフォルト）
+ *
+ * @param config 設定オブジェクト
+ * @param key 対象のキー
+ * @returns キーに対する最小文字数
+ */
+export function getMinLengthForKey(config: Config, key: string): number {
+  // キー別設定が存在し、そのキーの設定があれば使用
+  if (config.per_key_min_length && config.per_key_min_length[key] !== undefined) {
+    return config.per_key_min_length[key];
+  }
+
+  // default_min_word_length が設定されていれば使用
+  if (config.default_min_word_length !== undefined) {
+    return config.default_min_word_length;
+  }
+
+  // 後方互換性：旧形式のmin_word_lengthを使用（デフォルト: 2）
+  return config.min_word_length ?? 2;
+}
+
+/**
+ * キー別のモーション回数を取得する関数
+ *
+ * 優先順位:
+ * 1. per_key_motion_count[key] （キー別設定、有効な整数値のみ）
+ * 2. default_motion_count （デフォルト設定）
+ * 3. motion_count （後方互換性）
+ * 4. 3 （ハードコードされたデフォルト）
+ *
+ * @param key 対象のキー
+ * @param config 設定オブジェクト
+ * @returns キーに対するモーション回数
+ */
+export function getMotionCountForKey(key: string, config: Config): number {
+  // キー別設定が存在し、そのキーの設定があれば使用
+  if (config.per_key_motion_count && config.per_key_motion_count[key] !== undefined) {
+    const value = config.per_key_motion_count[key];
+    // 1以上の整数値のみ有効とみなす
+    if (value >= 1 && Number.isInteger(value)) {
+      return value;
+    }
+  }
+
+  // default_motion_count が設定されていれば使用
+  if (config.default_motion_count !== undefined && config.default_motion_count >= 1) {
+    return config.default_motion_count;
+  }
+
+  // 後方互換性：既存のmotion_countを使用
+  if (config.motion_count !== undefined && config.motion_count >= 1) {
+    return config.motion_count;
+  }
+
+  // 最終的なデフォルト値
+  return 3;
+}
+
+/**
+ * 後方互換性フラグを正規化する関数
+ *
+ * 廃止された設定項目を除去して、新しい設定形式に正規化します。
+ * 現在の対象: use_improved_detection（廃止済み）
+ *
+ * @param cfg 正規化対象の設定オブジェクト
+ * @returns 正規化された設定オブジェクト（元のオブジェクトは変更されない）
+ */
+export function normalizeBackwardCompatibleFlags(cfg: Partial<Config>): Partial<Config> {
+  const normalized = { ...cfg };
+
+  // 廃止されたuse_improved_detectionフラグを削除
+  if ("use_improved_detection" in normalized) {
+    delete normalized.use_improved_detection;
+  }
+
+  return normalized;
+}
+
+/**
+ * 色名を正規化する関数
+ *
+ * 16進数色の場合はそのまま返し、色名の場合は最初の文字を大文字、
+ * 残りを小文字にして正規化します。
+ *
+ * @param color 正規化対象の色名
+ * @returns 正規化された色名
+ */
+export function normalizeColorName(color: string): string {
+  if (!color || typeof color !== "string") {
+    return color;
+  }
+
+  // 16進数色の場合はそのまま返す
+  if (color.startsWith("#")) {
+    return color;
+  }
+
+  // 色名の場合は最初の文字を大文字、残りを小文字にする
+  return color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
+}
+
+/**
+ * ハイライトコマンドを生成する関数
+ *
+ * 文字列の場合はlinkコマンド、オブジェクトの場合は
+ * fg/bgの個別指定でコマンドを生成します。
+ *
+ * @param hlGroupName ハイライトグループ名
+ * @param colorConfig 色設定（文字列またはHighlightColorオブジェクト）
+ * @returns 生成されたハイライトコマンド
+ */
+export function generateHighlightCommand(
+  hlGroupName: string,
+  colorConfig: string | HighlightColor,
+): string {
+  // 文字列の場合（従来のハイライトグループ名）
+  if (typeof colorConfig === "string") {
+    return `highlight default link ${hlGroupName} ${colorConfig}`;
+  }
+
+  // オブジェクトの場合（fg/bg個別指定）
+  const { fg, bg } = colorConfig;
+  const parts = [`highlight ${hlGroupName}`];
+
+  if (fg !== undefined) {
+    const normalizedFg = normalizeColorName(fg);
+    if (fg.startsWith("#")) {
+      // 16進数色の場合はguifgのみ
+      parts.push(`guifg=${fg}`);
+    } else {
+      // 色名の場合はctermfgとguifgの両方
+      parts.push(`ctermfg=${normalizedFg}`);
+      parts.push(`guifg=${normalizedFg}`);
+    }
+  }
+
+  if (bg !== undefined) {
+    const normalizedBg = normalizeColorName(bg);
+    if (bg.startsWith("#")) {
+      // 16進数色の場合はguibgのみ
+      parts.push(`guibg=${bg}`);
+    } else {
+      // 色名の場合はctermbgとguibgの両方
+      parts.push(`ctermbg=${normalizedBg}`);
+      parts.push(`guibg=${normalizedBg}`);
+    }
+  }
+
+  return parts.join(" ");
+}
+
+/**
+ * ハイライト設定を検証する関数（設定更新時に使用）
+ *
+ * highlight_hint_markerとhighlight_hint_marker_currentの
+ * 設定値を検証します。
+ *
+ * @param config 検証する設定オブジェクト
+ * @returns 検証結果（valid: 成功/失敗、errors: エラーメッセージ配列）
+ */
+export function validateHighlightConfig(
+  config: {
+    highlight_hint_marker?: string | HighlightColor;
+    highlight_hint_marker_current?: string | HighlightColor;
+  },
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // highlight_hint_markerの検証
+  if (config.highlight_hint_marker !== undefined) {
+    const markerResult = validateHighlightColor(config.highlight_hint_marker);
+    if (!markerResult.valid) {
+      errors.push(...markerResult.errors.map((e) => `highlight_hint_marker: ${e}`));
+    }
+  }
+
+  // highlight_hint_marker_currentの検証
+  if (config.highlight_hint_marker_current !== undefined) {
+    const currentResult = validateHighlightColor(config.highlight_hint_marker_current);
+    if (!currentResult.valid) {
+      errors.push(...currentResult.errors.map((e) => `highlight_hint_marker_current: ${e}`));
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}

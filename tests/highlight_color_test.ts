@@ -119,7 +119,7 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   const validation1 = validateConfig(invalidConfig1);
   assertEquals(validation1.valid, false);
   assertEquals(
-    validation1.errors.some((e) => e.includes("highlight_hint_marker must be a string")),
+    validation1.errors.some((e: string) => e.includes("highlight_hint_marker must be a string")),
     true,
   );
 
@@ -131,7 +131,7 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   const validation2 = validateConfig(invalidConfig2);
   assertEquals(validation2.valid, false);
   assertEquals(
-    validation2.errors.some((e) => e.includes("highlight_hint_marker_current must be a string")),
+    validation2.errors.some((e: string) => e.includes("highlight_hint_marker_current must be a string")),
     true,
   );
 
@@ -143,7 +143,7 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   const validation3 = validateConfig(invalidConfig3);
   assertEquals(validation3.valid, false);
   assertEquals(
-    validation3.errors.some((e) => e.includes("highlight_hint_marker must be a non-empty string")),
+    validation3.errors.some((e: string) => e.includes("highlight_hint_marker must be a non-empty string")),
     true,
   );
 });
@@ -209,7 +209,7 @@ Deno.test("ハイライト色設定: 特殊文字を含む無効な名前のテ�
     const validation = validateConfig(config);
     assertEquals(validation.valid, false, `${invalidName} should be invalid`);
     assertEquals(
-      validation.errors.some((e) =>
+      validation.errors.some((e: string) =>
         e.includes(
           "highlight_hint_marker must contain only alphanumeric characters and underscores",
         )
@@ -283,7 +283,7 @@ Deno.test("ハイライト色設定: 数字で始まる無効な名前のテス�
     const validation = validateConfig(config);
     assertEquals(validation.valid, false, `${invalidName} should be invalid`);
     assertEquals(
-      validation.errors.some((e) =>
+      validation.errors.some((e: string) =>
         e.includes("highlight_hint_marker must start with a letter or underscore")
       ),
       true,
