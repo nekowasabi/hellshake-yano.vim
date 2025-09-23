@@ -161,17 +161,88 @@ denops/hellshake-yano/
 - [x] 既存テストの動作確認（20テスト、77ステップ成功）
 - [x] 循環依存チェック（問題なし）
 
-### process3 performance モジュールの分離
-#### sub1 パフォーマンス測定機能
-@target: denops/hellshake-yano/performance/metrics.ts
-- [ ] performanceMetricsオブジェクトの移動（100-144行）
-- [ ] recordPerformance関数の移動（146-172行）
-- [ ] パフォーマンス関連のグローバル変数
+### process3 performance モジュールの分離 - TDD Red-Green-Refactorアプローチ
+#### sub1 TDDテストファイルの作成
+@target: tests/performance/
+- [ ] `metrics.test.ts`を作成（パフォーマンス測定機能のテスト）
+- [ ] `debug.test.ts`を作成（デバッグ機能のテスト）
+- [ ] `integration.test.ts`を作成（統合テスト）
+- [ ] Red: テストを先に書いて失敗させる
+- [ ] Green: 最小実装でテストを通す
+- [ ] Refactor: コード品質向上
 
-#### sub2 デバッグ機能
+#### sub2 パフォーマンス測定機能の移行（TDDサイクル）
+@target: denops/hellshake-yano/performance/metrics.ts
+- [ ] **Cycle 1**: PerformanceMetricsインターフェース定義
+  - Red: 型存在テスト作成 → 失敗確認
+  - Green: インターフェース定義 → 成功確認
+  - Refactor: JSDocコメント追加
+- [ ] **Cycle 2**: performanceMetricsオブジェクトの移動（100-144行）
+  - Red: メトリクス格納テスト作成 → 失敗確認
+  - Green: グローバル変数と初期化 → 成功確認
+  - Refactor: 型安全性の強化
+- [ ] **Cycle 3**: recordPerformance関数の移動（146-172行）
+  - Red: パフォーマンス記録テスト（50件制限含む） → 失敗確認
+  - Green: 関数実装（設定注入型） → 成功確認
+  - Refactor: エラーハンドリング追加
+- [ ] **Cycle 4**: getPerformanceMetrics関数の追加
+  - Red: メトリクス取得テスト → 失敗確認
+  - Green: コピー返却実装 → 成功確認
+  - Refactor: 最適化
+- [ ] **Cycle 5**: clearPerformanceMetrics関数の追加
+  - Red: クリアテスト → 失敗確認
+  - Green: リセット実装 → 成功確認
+  - Refactor: 最適化
+
+#### sub3 デバッグ機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/performance/debug.ts
-- [ ] collectDebugInfo関数の移動（225-241行）
-- [ ] clearDebugInfo関数の移動（243-256行）
+- [ ] **Cycle 6**: DebugInfoインターフェース定義
+  - Red: 型存在テスト → 失敗確認
+  - Green: インターフェース定義 → 成功確認
+  - Refactor: 型の整理
+- [ ] **Cycle 7**: collectDebugInfo関数の移動（225-241行）
+  - Red: デバッグ情報収集テスト → 失敗確認
+  - Green: 関数実装（引数注入型） → 成功確認
+  - Refactor: 依存性の最小化
+- [ ] **Cycle 8**: clearDebugInfo関数の移動（243-256行）
+  - Red: クリアテスト → 失敗確認
+  - Green: metrics連携実装 → 成功確認
+  - Refactor: 最適化
+
+#### sub4 統合とクリーンアップ
+@target: denops/hellshake-yano/
+- [ ] performance/index.tsで再エクスポート設定
+- [ ] main.tsから移行済み関数を削除
+- [ ] main.tsのimportをperformanceモジュールに変更
+- [ ] 既存テストの動作確認（performance_benchmark_test.ts等）
+- [ ] 循環依存チェック
+
+#### sub5 技術仕様と品質保証
+##### 依存関係の解決策
+- **設定注入**: グローバルconfigへの依存を引数として注入
+- **純粋関数化**: hintsVisible、currentHintsを外部から渡す
+- **一方向依存**: main.ts → performance（逆方向なし）
+
+##### ファイル構造
+```
+performance/
+├── index.ts    # 再エクスポート（エントリポイント）
+├── metrics.ts  # パフォーマンス測定（~80行）
+└── debug.ts    # デバッグ機能（~40行）
+```
+
+##### 品質基準
+- 型チェック: `deno test`（--no-check不使用）で全テスト通過
+- 後方互換性: 既存の関数シグネチャ完全維持
+- パフォーマンス: モジュール分離のオーバーヘッド < 1ms
+- テストカバレッジ: 100%達成
+
+##### 予想所要時間
+- Cycle 1-5（metrics.ts）: 48分
+- Cycle 6-8（debug.ts）: 23分
+- 統合とクリーンアップ: 23分
+- 既存テスト検証: 15分
+- **合計: 約109分**
 
 ### process4 dictionary モジュールの分離
 #### sub1 辞書操作機能
