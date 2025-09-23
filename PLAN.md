@@ -330,44 +330,230 @@ dictionary/
 - index.ts復旧対策: 15分
 - **合計: 約135分**
 
-### process5 core モジュールの分離
-#### sub1 単語検出機能
+### process5 core モジュールの分離 - TDD Red-Green-Refactorアプローチ
+#### sub1 TDDテストファイルの作成とindex.ts復旧対策
+@target: tests/core/ および scripts/
+- [ ] `detection.test.ts`を作成（単語検出機能のテスト）
+- [ ] `generation.test.ts`を作成（ヒント生成機能のテスト）
+- [ ] `operations.test.ts`を作成（表示操作機能のテスト）
+- [ ] `integration.test.ts`を作成（統合テスト）
+- [ ] `index-recovery.ts`スクリプト作成（index.ts復旧対策）
+- [ ] Red: テストを先に書いて失敗させる
+- [ ] Green: 最小実装でテストを通す
+- [ ] Refactor: コード品質向上
+
+#### sub2 単語検出機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/detection.ts
-- [ ] detectWordsOptimized関数の移動（1108-1150行）
-- [ ] 関連するキャッシュとヘルパー関数
+- [ ] **Cycle 1**: detectWordsOptimized関数の移動（970-1004行）
+  - Red: 基本的な単語検出テスト → 失敗確認
+  - Green: 関数実装（word/detector.ts依存） → 成功確認
+  - Refactor: エラーハンドリング強化、JSDoc追加
+- [ ] **Cycle 2**: 関連するキャッシュとヘルパー関数
+  - Red: キャッシュ機能テスト → 失敗確認
+  - Green: キャッシュ実装 → 成功確認
+  - Refactor: メモリ効率の最適化
 
-#### sub2 ヒント生成機能
+#### sub3 ヒント生成機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/generation.ts
-- [ ] generateHintsOptimized関数の移動（1152-1208行）
-- [ ] 関連するキャッシュとヘルパー関数
+- [ ] **Cycle 3**: generateHintsOptimized関数の移動（1012-1040行）
+  - Red: ヒント生成ロジックテスト → 失敗確認
+  - Green: 関数実装（キャッシュ機能含む） → 成功確認
+  - Refactor: パフォーマンス最適化、型安全性向上
+- [ ] **Cycle 4**: ヒント生成キャッシュの実装
+  - Red: キャッシュ効率テスト → 失敗確認
+  - Green: キャッシュ機構実装 → 成功確認
+  - Refactor: メモリ効率改善
 
-#### sub3 基本操作
+#### sub4 表示操作機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/operations.ts
-- [ ] showHints関数の実装
-- [ ] hideHints関数の移動（1699-1756行）
-- [ ] clearHintDisplay関数の移動（1645-1697行）
+- [ ] **Cycle 5**: showHints関数の実装（453-467行、dispatcher内）
+  - Red: デバウンス機能テスト → 失敗確認
+  - Green: 関数実装（デバウンス処理含む） → 成功確認
+  - Refactor: 依存性注入パターン適用
+- [ ] **Cycle 6**: showHintsInternal関数の実装（472-590行、dispatcher内）
+  - Red: 内部処理テスト → 失敗確認
+  - Green: 関数実装（最適化版） → 成功確認
+  - Refactor: グローバル状態の分離
+- [ ] **Cycle 7**: hideHints関数の移動（1557-1620行）
+  - Red: ヒント非表示テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: リソースリーク防止
+- [ ] **Cycle 8**: clearHintDisplay関数の移動（1503-1549行）
+  - Red: 表示クリアテスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: エラーハンドリング強化
 
-### process6 display モジュールの分離
-#### sub1 レンダリング機能
+#### sub5 統合とクリーンアップ
+@target: denops/hellshake-yano/
+- [ ] core/index.tsで再エクスポート設定
+- [ ] core/index.ts.backupの作成（復旧対策）
+- [ ] main.tsから移行済み関数を削除（約300行削減）
+- [ ] main.tsのimportを更新
+- [ ] 既存テストの動作確認
+- [ ] 循環依存チェック
+
+#### sub6 index.ts復旧対策の恒久実装
+@target: 全モジュール
+- [ ] validation/index.ts.backupの作成と復旧機能
+- [ ] performance/index.ts.backupの作成と復旧機能
+- [ ] dictionary/index.ts.backupの作成と復旧機能
+- [ ] core/index.ts.backupの作成と復旧機能
+- [ ] Git pre-commitフックの設定
+- [ ] テスト時自動チェック機能の実装
+
+#### sub7 技術仕様と品質保証
+##### 依存関係
+- **word/detector.ts**: detectWordsOptimized関数で使用
+- **hint/manager.ts**: ヒント関連処理で参照
+- **Denops**: 全async関数で必須パラメータ
+
+##### ファイル構造
+```
+core/
+├── index.ts           # エントリポイント（恒久対策適用）
+├── index.ts.backup    # バックアップファイル
+├── detection.ts       # 単語検出機能（約35行）
+├── generation.ts      # ヒント生成機能（約30行）
+└── operations.ts      # 表示操作機能（約230行）
+```
+
+##### グローバル変数の扱い
+- lastShowHintsTime（111行）: operations.tsで管理
+- debounceTimeoutId: operations.ts内部変数として
+- hintsVisible, currentHints: 状態オブジェクトとして集約
+
+##### 品質基準
+- 型チェック: `deno test`（--no-check不使用）で全テスト通過
+- 後方互換性: dispatcher内メソッドの外部公開方法検討
+- テストカバレッジ: 新規関数100%達成
+- パフォーマンス: モジュール分離オーバーヘッド < 1ms
+
+##### 予想所要時間
+- Phase 1（基盤・復旧対策）: 30分
+- Phase 2（Cycle 1-2 detection）: 35分
+- Phase 3（Cycle 3-4 generation）: 30分
+- Phase 4（Cycle 5-8 operations）: 45分 + 40分
+- Phase 5（統合）: 25分
+- **合計: 約205分（3時間25分）**
+
+### process6 display モジュールの分離 - TDD Red-Green-Refactorアプローチ
+#### sub1 TDDテストファイルの作成とindex.ts復旧対策
+@target: tests/display/ および scripts/
+- [ ] `renderer.test.ts`を作成（レンダリング機能のテスト）
+- [ ] `highlight.test.ts`を作成（ハイライト機能のテスト）
+- [ ] `state.test.ts`を作成（状態管理のテスト）
+- [ ] `integration.test.ts`を作成（統合テスト）
+- [ ] Red: テストを先に書いて失敗させる
+- [ ] Green: 最小実装でテストを通す
+- [ ] Refactor: コード品質向上
+
+#### sub2 レンダリング機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/display/renderer.ts
-- [ ] displayHintsOptimized関数の移動（1210-1252行）
-- [ ] displayHintsAsync関数の移動（1254-1300行）
-- [ ] displayHintsWithExtmarksBatch関数の移動（1320-1416行）
-- [ ] displayHintsWithMatchAddBatch関数の移動（1418-1476行）
-- [ ] processExtmarksBatched関数の移動（2044-2145行）
-- [ ] processMatchaddBatched関数の移動（2147-2257行）
+- [ ] **Cycle 1**: displayHintsOptimized関数の移動（1070行目から）
+  - Red: 基本的な表示テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: パフォーマンス最適化
+- [ ] **Cycle 2**: displayHintsAsync関数の移動（1113行目から、export）
+  - Red: 非同期表示テスト → 失敗確認
+  - Green: 関数実装（AbortController含む） → 成功確認
+  - Refactor: エラーハンドリング強化
+- [ ] **Cycle 3**: displayHintsWithExtmarksBatch関数の移動（1179行目から）
+  - Red: extmarksバッチ処理テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: バッチサイズ最適化
+- [ ] **Cycle 4**: displayHintsWithMatchAddBatch関数の移動（1277行目から）
+  - Red: matchaddバッチ処理テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: メモリ効率改善
+- [ ] **Cycle 5**: processExtmarksBatched関数の移動（1909行目から）
+  - Red: extmarks処理テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: 並列処理最適化
+- [ ] **Cycle 6**: processMatchaddBatched関数の移動（2012行目から）
+  - Red: matchadd処理テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: キューイング改善
 
-#### sub2 ハイライト機能
+#### sub3 ハイライト機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/display/highlight.ts
-- [ ] highlightCandidateHints関数の移動（1758-1949行）
-- [ ] highlightCandidateHintsAsync関数の移動（1951-2003行）
-- [ ] highlightCandidateHintsOptimized関数の移動（2005-2042行）
+- [ ] **Cycle 7**: highlightCandidateHints関数の移動（1616行目から）
+  - Red: 候補ハイライトテスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: 色管理の最適化
+- [ ] **Cycle 8**: highlightCandidateHintsAsync関数の移動（1809行目から、export）
+  - Red: 非同期ハイライトテスト → 失敗確認
+  - Green: 関数実装（非ブロッキング） → 成功確認
+  - Refactor: パフォーマンス改善
+- [ ] **Cycle 9**: highlightCandidateHintsOptimized関数の移動（1863行目から）
+  - Red: 最適化ハイライトテスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: アルゴリズム最適化
 
-#### sub3 状態管理
+#### sub4 状態管理機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/display/state.ts
-- [ ] isRenderingHints関数の移動（1302-1307行）
-- [ ] abortCurrentRendering関数の移動（1309-1318行）
-- [ ] レンダリング関連のグローバル変数
+- [ ] **Cycle 10**: isRenderingHints関数の移動（1161行目から、export）
+  - Red: 状態取得テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: 型安全性強化
+- [ ] **Cycle 11**: abortCurrentRendering関数の移動（1168行目から、export）
+  - Red: レンダリング中断テスト → 失敗確認
+  - Green: 関数実装 → 成功確認
+  - Refactor: リソースクリーンアップ
+- [ ] **Cycle 12**: レンダリング関連のグローバル変数
+  - Red: 状態管理テスト → 失敗確認
+  - Green: 変数定義と管理 → 成功確認
+  - Refactor: カプセル化
+
+#### sub5 統合とクリーンアップ
+@target: denops/hellshake-yano/
+- [ ] display/index.tsで再エクスポート設定
+- [ ] display/index.ts.backupの作成（復旧対策）
+- [ ] main.tsから移行済み関数を削除（約650行削減）
+- [ ] main.tsのimportを更新
+- [ ] 既存テストの動作確認
+- [ ] 循環依存チェック
+
+#### sub6 技術仕様と品質保証
+##### 依存関係
+- **Denops**: 全async関数で必須パラメータ
+- **Vim API**: extmarks, matchadd関連
+- **performance**: メトリクス記録で依存
+
+##### ファイル構造
+```
+display/
+├── index.ts          # エントリポイント（恒久対策適用）
+├── index.ts.backup   # バックアップファイル
+├── renderer.ts       # レンダリング機能（約350行）
+├── highlight.ts      # ハイライト機能（約250行）
+└── state.ts          # 状態管理（約50行）
+```
+
+##### グローバル変数の扱い
+- renderingAbortController: state.tsで管理
+- currentRenderingPromise: state.ts内部変数
+- hintHighlightIds: renderer.ts内で管理
+
+##### 非同期処理の制御
+- AbortControllerパターンの一貫した使用
+- Promise chainの適切な管理
+- タイムアウト処理の実装
+
+##### 品質基準
+- 型チェック: `deno test`（--no-check不使用）で全テスト通過
+- 後方互換性: エクスポート関数のシグネチャ完全維持
+- テストカバレッジ: 新規関数100%達成
+- パフォーマンス: バッチ処理の効率維持
+
+##### 予想所要時間
+- Phase 1（基盤構築）: 30分
+- Phase 2（Cycle 1-6 renderer）: 90分
+- Phase 3（Cycle 7-9 highlight）: 60分
+- Phase 4（Cycle 10-12 state）: 30分
+- Phase 5（統合）: 30分
+- index.ts復旧対策: 20分
+- テスト作成・実行: 30分
+- **合計: 約290分（4時間50分）**
 
 ### process7 input モジュールの分離
 #### sub1 入力処理機能
