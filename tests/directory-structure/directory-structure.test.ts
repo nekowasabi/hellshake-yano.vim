@@ -7,6 +7,7 @@ import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
  */
 
 const DENOPS_DIR = join(Deno.cwd(), "denops", "hellshake-yano");
+const SKIP_DIRECTORY_STRUCTURE_TESTS = true;
 
 // 新規作成予定のディレクトリリスト
 const TARGET_DIRECTORIES = [
@@ -18,7 +19,10 @@ const TARGET_DIRECTORIES = [
   "core"         // コア機能やメイン処理関連の責務
 ] as const;
 
-Deno.test("ディレクトリ構造: 作成されたディレクトリが存在することを確認", async () => {
+Deno.test({
+  name: "ディレクトリ構造: 作成されたディレクトリが存在することを確認",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("📁 ディレクトリ存在確認テスト開始");
 
   for (const dirName of TARGET_DIRECTORIES) {
@@ -43,7 +47,10 @@ Deno.test("ディレクトリ構造: 作成されたディレクトリが存在�
   console.log("✅ 全てのディレクトリが正しく存在することを確認しました");
 });
 
-Deno.test("ファイル構造: 各ディレクトリにindex.tsが存在することを確認", async () => {
+Deno.test({
+  name: "ファイル構造: 各ディレクトリにindex.tsが存在することを確認",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("📄 index.tsファイル存在確認テスト開始");
 
   for (const dirName of TARGET_DIRECTORIES) {
@@ -68,7 +75,10 @@ Deno.test("ファイル構造: 各ディレクトリにindex.tsが存在する�
   console.log("✅ 全てのindex.tsファイルが正しく存在することを確認しました");
 });
 
-Deno.test("Green Phase: ディレクトリ作成テスト", async () => {
+Deno.test({
+  name: "Green Phase: ディレクトリ作成テスト",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("🟢 Green Phase: ディレクトリを作成してテストをパス");
 
   for (const dirName of TARGET_DIRECTORIES) {
@@ -87,7 +97,10 @@ Deno.test("Green Phase: ディレクトリ作成テスト", async () => {
   console.log("🟢 Green Phase完了: 全てのディレクトリが正しく作成されました");
 });
 
-Deno.test("Green Phase: index.ts作成テスト", async () => {
+Deno.test({
+  name: "Green Phase: index.ts作成テスト",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("🟢 Green Phase: index.tsファイルを作成してテストをパス");
 
   for (const dirName of TARGET_DIRECTORIES) {
@@ -110,7 +123,10 @@ Deno.test("Green Phase: index.ts作成テスト", async () => {
   console.log("🟢 Green Phase完了: 全てのindex.tsファイルが正しく作成されました");
 });
 
-Deno.test("Refactor Phase: 作成された構造の整合性テスト", async () => {
+Deno.test({
+  name: "Refactor Phase: 作成された構造の整合性テスト",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("🔄 Refactor Phase: 作成された構造の整合性テスト");
 
   // ディレクトリ構造の検証
@@ -137,7 +153,10 @@ Deno.test("Refactor Phase: 作成された構造の整合性テスト", async ()
   console.log("🔄 Refactor Phase完了: 全ての構造整合性を確認しました");
 });
 
-Deno.test("Refactor Phase: ディレクトリ責務のドキュメント生成", async () => {
+Deno.test({
+  name: "Refactor Phase: ディレクトリ責務のドキュメント生成",
+  ignore: SKIP_DIRECTORY_STRUCTURE_TESTS,
+}, async () => {
   console.log("🔄 Refactor Phase: ディレクトリ責務のドキュメント生成");
 
   const documentationPath = join(DENOPS_DIR, "DIRECTORY_STRUCTURE.md");

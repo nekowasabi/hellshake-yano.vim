@@ -8,12 +8,15 @@
 
 // Import consolidated types from types.ts
 import type {
-  Config as BaseConfig,
-  HighlightColor
+  Config as TypesConfig,
+  HighlightColor,
+  HintPositionType
 } from "./types.ts";
 
-// Re-export HighlightColor for backward compatibility
-export type { HighlightColor };
+// Re-export types for backward compatibility
+export type { HighlightColor, HintPositionType };
+// Re-export Config from types.ts to ensure consistency
+export type { Config } from "./types.ts";
 
 // HighlightColor interface moved to types.ts for consolidation
 // Use: import type { HighlightColor } from "./types.ts";
@@ -29,8 +32,8 @@ export interface CoreConfig {
 
 // ヒント関連設定
 export interface HintConfig {
-  hintPosition: "start" | "end" | "same";
-  visualHintPosition: "start" | "end" | "same" | "both";
+  hintPosition: HintPositionType;
+  visualHintPosition: "start" | "end" | "same" | "both" | "overlay";
   maxHints: number;
   highlightSelected: boolean;
   useNumbers: boolean;
@@ -94,8 +97,8 @@ export interface CamelCaseConfig {
   markers: string[];
   motionCount: number;
   motionTimeout: number;
-  hintPosition: "start" | "end" | "same";
-  visualHintPosition?: "start" | "end" | "same" | "both";
+  hintPosition: HintPositionType;
+  visualHintPosition?: "start" | "end" | "same" | "both" | "overlay";
   triggerOnHjkl: boolean;
   countedMotions: string[];
   maxHints: number;
@@ -151,8 +154,8 @@ export interface ModernConfig extends CamelCaseConfig {
   // snake_case properties for backward compatibility
   motion_count?: number;
   motion_timeout?: number;
-  hint_position?: string;
-  visual_hint_position?: "start" | "end" | "same";
+  hint_position?: HintPositionType;
+  visual_hint_position?: "start" | "end" | "same" | "both" | "overlay";
   trigger_on_hjkl?: boolean;
   counted_motions?: string[];
   use_numbers?: boolean;
@@ -186,12 +189,13 @@ export interface ModernConfig extends CamelCaseConfig {
 }
 
 // 設定の型定義（既存互換性のため維持）
-export interface Config {
+// Note: Renamed to LocalConfig to avoid conflict with types.ts Config
+interface LocalConfig {
   markers: string[];
   motion_count: number;
   motion_timeout: number;
-  hint_position: string;
-  visual_hint_position?: "start" | "end" | "same" | "both"; // Visual Modeでのヒント位置 (デフォルト: 'end')
+  hint_position: HintPositionType;
+  visual_hint_position?: "start" | "end" | "same" | "both" | "overlay"; // Visual Modeでのヒント位置 (デフォルト: 'end')
   trigger_on_hjkl: boolean;
   counted_motions: string[];
   enabled: boolean;
@@ -237,7 +241,7 @@ export interface Config {
 /**
  * デフォルト設定を取得（後方互換性のため維持）
  */
-export function getDefaultConfig(): Config {
+export function getDefaultConfig(): TypesConfig {
   return {
     markers: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
     motion_count: 3,
@@ -295,7 +299,7 @@ export function getDefaultConfig(): Config {
 /**
  * 設定値のバリデーション（camelCaseとsnake_case両方に対応）
  */
-export function validateConfig(config: Partial<Config | CamelCaseConfig>): { valid: boolean; errors: string[] } {
+export function validateConfig(config: Partial<TypesConfig | CamelCaseConfig>): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // motion_count / motionCount の検証
@@ -428,7 +432,7 @@ export function getDefaultHierarchicalConfig(): HierarchicalConfig {
 /**
  * フラット設定から階層化設定を作成
  */
-export function createHierarchicalConfig(flatConfig: Partial<Config> = {}): HierarchicalConfig {
+export function createHierarchicalConfig(flatConfig: Partial<TypesConfig> = {}): HierarchicalConfig {
   const defaults = getDefaultHierarchicalConfig();
 
   return {
@@ -484,7 +488,7 @@ export function createHierarchicalConfig(flatConfig: Partial<Config> = {}): Hier
 /**
  * 階層化設定をフラット設定に変換（後方互換性のため）
  */
-export function flattenHierarchicalConfig(hierarchicalConfig: HierarchicalConfig): Config {
+export function flattenHierarchicalConfig(hierarchicalConfig: HierarchicalConfig): TypesConfig {
   return {
     // Core
     enabled: hierarchicalConfig.core.enabled,
@@ -553,7 +557,7 @@ export function mergeHierarchicalConfig(
 /**
  * 設定をマージ（部分的な設定更新をサポート）
  */
-export function mergeConfig(baseConfig: Config, updates: Partial<Config>): Config {
+export function mergeConfig(baseConfig: TypesConfig, updates: Partial<TypesConfig>): TypesConfig {
   // バリデーションを実行
   const validation = validateConfig(updates);
   if (!validation.valid) {
@@ -576,7 +580,7 @@ export function mergeConfig(baseConfig: Config, updates: Partial<Config>): Confi
 /**
  * 設定の深いコピーを作成
  */
-export function cloneConfig(config: Config): Config {
+export function cloneConfig(config: TypesConfig): TypesConfig {
   return JSON.parse(JSON.stringify(config));
 }
 
@@ -584,7 +588,7 @@ export function cloneConfig(config: Config): Config {
  * キー別設定を取得するヘルパー関数
  */
 export function getPerKeyValue<T>(
-  config: Config,
+  config: TypesConfig,
   key: string,
   perKeyRecord: Record<string, T> | undefined,
   defaultValue: T | undefined,
@@ -667,7 +671,7 @@ export interface NamingValidation {
 /**
  * snake_case設定をcamelCase設定に変換
  */
-export function convertSnakeToCamelConfig(config: Partial<Config>): CamelCaseConfig {
+export function convertSnakeToCamelConfig(config: Partial<TypesConfig>): CamelCaseConfig {
   const camelConfig: any = {};
 
   // 既存のプロパティをコピー
@@ -686,7 +690,7 @@ export function convertSnakeToCamelConfig(config: Partial<Config>): CamelCaseCon
 /**
  * プロキシを使用して双方向アクセスを可能にするModernConfigを作成
  */
-export function createModernConfig(input: Partial<CamelCaseConfig | Config> = {}): ModernConfig {
+export function createModernConfig(input: Partial<CamelCaseConfig | TypesConfig> = {}): ModernConfig {
   const defaultConfig = getDefaultConfig();
   const baseConfig = { ...defaultConfig, ...input };
   const camelConfig = convertSnakeToCamelConfig(baseConfig);
@@ -790,7 +794,7 @@ export function validateNamingConvention(name: string): NamingValidation {
 /**
  * Deprecation warningsを取得
  */
-export function getDeprecationWarnings(config: Partial<Config> | Partial<CamelCaseConfig>): DeprecationWarning[] {
+export function getDeprecationWarnings(config: Partial<TypesConfig> | Partial<CamelCaseConfig>): DeprecationWarning[] {
   const warnings: DeprecationWarning[] = [];
 
   for (const [snakeKey, camelKey] of Object.entries(SNAKE_TO_CAMEL_MAPPING)) {

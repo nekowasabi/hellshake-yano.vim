@@ -1,5 +1,5 @@
-// performance モジュールのエントリーポイント
-// パフォーマンス計測およびデバッグ関連の機能を再エクスポートする
+// performance モジュールのバックアップエントリーポイント
+// 自動復旧やテンプレート再生成時の参照用
 
 export {
   clearPerformanceMetrics,

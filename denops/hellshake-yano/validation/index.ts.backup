@@ -1,5 +1,5 @@
-// validation モジュールのエントリーポイント
-// main.ts から移動した検証関連の機能を再エクスポートする
+// validation モジュールのバックアップエントリーポイント
+// 自動復旧時に使用される
 
 export {
   generateHighlightCommand,
