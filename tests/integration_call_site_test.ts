@@ -8,6 +8,17 @@ import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
 
 // Read and analyze the actual source code
 const sourceCode = await Deno.readTextFile("denops/hellshake-yano/main.ts");
+const sourceLines = sourceCode.split("\n");
+
+function findAsyncCallLineIndex(): number {
+  return sourceLines.findIndex((line) => {
+    const trimmed = line.trim();
+    return trimmed.includes("highlightCandidateHintsAsync(") &&
+      !trimmed.startsWith("*") &&
+      !trimmed.startsWith("//") &&
+      !trimmed.includes("function");
+  });
+}
 
 Deno.test("Integration: 実装ファイルで非同期版が使用されている", () => {
   // Line 2469付近で非同期版が呼ばれていることを確認
@@ -23,25 +34,13 @@ Deno.test("Integration: 実装ファイルで非同期版が使用されてい�
 });
 
 Deno.test("Integration: awaitが使用されていない", () => {
-  // 呼び出し箇所でawaitが使われていないことを確認
-  const lines = sourceCode.split("\n");
+  const callIndex = findAsyncCallLineIndex();
 
-  // Line 2354付近を探す
-  let foundCall = false;
-  let hasAwait = false;
+  assertEquals(callIndex >= 0, true, "Should find the async call");
 
-  for (let i = 2350; i < 2360 && i < lines.length; i++) {
-    const line = lines[i];
-    if (line.includes("highlightCandidateHintsAsync")) {
-      foundCall = true;
-      if (line.includes("await")) {
-        hasAwait = true;
-      }
-      break;
-    }
-  }
+  const callLine = sourceLines[callIndex] ?? "";
+  const hasAwait = /\bawait\b/.test(callLine);
 
-  assertEquals(foundCall, true, "Should find the async call");
   assertEquals(hasAwait, false, "Should NOT use await with async call");
 });
 
@@ -59,24 +58,22 @@ Deno.test("Integration: 条件分岐内で正しく呼ばれている", () => {
 });
 
 Deno.test("Integration: コメントが適切に記載されている", () => {
-  // 非同期版使用の理由がコメントに記載されていることを確認
-  const lines = sourceCode.split("\n");
+  const callIndex = findAsyncCallLineIndex();
+  assertEquals(callIndex >= 0, true, "Should find the async call");
 
+  const start = Math.max(0, callIndex - 3);
+  const end = Math.min(sourceLines.length - 1, callIndex);
   let foundComment = false;
 
-  for (let i = 2350; i < 2360 && i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = start; i <= end; i++) {
+    const line = sourceLines[i];
     if (line.includes("非同期") || line.includes("ブロック") || line.includes("async")) {
       foundComment = true;
       break;
     }
   }
 
-  assertEquals(
-    foundComment,
-    true,
-    "Should have a comment explaining async usage"
-  );
+  assertEquals(foundComment, true, "Should have a comment explaining async usage");
 });
 
 Deno.test("Integration: 古い同期版の呼び出しが残っていない", () => {

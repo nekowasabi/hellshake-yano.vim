@@ -1,9 +1,6 @@
 import type { Denops } from "@denops/std";
 import {
   detectWords,
-  detectWordsWithConfig,
-  detectWordsWithManager,
-  type EnhancedWordConfig,
   extractWordsFromLineWithConfig,
   extractWordsUnified,
   type UnifiedWordExtractionConfig,
@@ -19,52 +16,46 @@ import {
   calculateHintPositionWithCoordinateSystem,
   clearHintCache,
   generateHints,
-  generateHintsWithGroups,
-  validateHintKeyConfig,
 } from "./hint.ts";
+import {
+  clearHintCache as coreClearHintCache,
+  createHintOperations,
+  detectWordsOptimized,
+  generateHintsOptimized,
+} from "./core/index.ts";
 // Dictionary module - refactored dictionary operations
 import {
-  reloadDictionary,
   editDictionary,
-  showDictionary,
-  validateDictionary,
   initializeDictionarySystem,
   registerDictionaryCommands,
+  reloadDictionary,
+  showDictionary,
+  validateDictionary,
 } from "./dictionary/index.ts";
 // Configuration imports
-import {
-  getDefaultConfig,
-} from "./config.ts";
+import { getDefaultConfig } from "./config.ts";
 // Import Config from types.ts for consistency with validation module
 import type { Config } from "./types.ts";
 // Validation functions - imported directly until validation module is completed
 import {
-  validateConfig,
+  generateHighlightCommand,
   getMinLengthForKey,
   getMotionCountForKey,
   normalizeBackwardCompatibleFlags,
   normalizeColorName,
-  generateHighlightCommand,
-  validateHighlightConfig,
+  validateConfig,
   validateHighlightColor,
+  validateHighlightConfig,
 } from "./validation/config.ts";
 // Performance functions - imported directly until performance module is completed
 import {
-  recordPerformance,
-  getPerformanceMetrics,
   clearPerformanceMetrics,
+  getPerformanceMetrics,
+  recordPerformance,
 } from "./performance/metrics.ts";
-import {
-  collectDebugInfo,
-  clearDebugInfo,
-} from "./performance/debug.ts";
+import { clearDebugInfo, collectDebugInfo } from "./performance/debug.ts";
 // Import types from the central types module for consistency
-import type {
-  HighlightColor,
-  HintKeyConfig,
-  HintMapping,
-  HintPositionWithCoordinateSystem,
-} from "./types.ts";
+import type { HighlightColor, HintMapping, HintPositionWithCoordinateSystem } from "./types.ts";
 
 // Re-export types for backward compatibility
 export type { Config, HighlightColor };
@@ -121,9 +112,6 @@ let debounceTimeoutId: number | undefined;
 let lastShowHintsTime = 0;
 
 const wordsCache = new LRUCache<string, any[]>(100);
-const hintsCache = new LRUCache<string, string[]>(50);
-
-
 
 /**
  * 後方互換性のあるフラグを正規化する
@@ -522,7 +510,11 @@ export async function main(denops: Denops): Promise<void> {
           }
 
           // キャッシュを使用して単語を検出（最適化）
-          const words = await detectWordsOptimized(denops, bufnr);
+          const words = await detectWordsOptimized({
+            denops,
+            bufnr,
+            config,
+          });
           if (words.length === 0) {
             await denops.cmd("echo 'No words found for hints'");
             return;
@@ -565,7 +557,11 @@ export async function main(denops: Denops): Promise<void> {
           // bothモードの場合は2倍のヒントを生成
           const isBothMode = modeString === "visual" && config.visual_hint_position === "both";
           const hintsNeeded = isBothMode ? limitedWords.length * 2 : limitedWords.length;
-          const hints = generateHintsOptimized(hintsNeeded, config.markers);
+          const hints = generateHintsOptimized({
+            wordCount: hintsNeeded,
+            markers: config.markers,
+            config,
+          });
           currentHints = assignHintsToWords(
             limitedWords,
             hints,
@@ -666,7 +662,7 @@ export async function main(denops: Denops): Promise<void> {
      */
     clearCache(): void {
       wordsCache.clear();
-      hintsCache.clear();
+      coreClearHintCache();
     },
 
     /**
@@ -949,7 +945,7 @@ export async function main(denops: Denops): Promise<void> {
         },
         hintsVisible,
         currentHints as any,
-        getPerformanceMetrics()
+        getPerformanceMetrics(),
       );
     },
 
@@ -979,109 +975,6 @@ export async function main(denops: Denops): Promise<void> {
       return config.performance_log;
     },
   };
-}
-
-/**
- * キャッシュを使用した最適化済み単語検出
- * @param denops - Denopsインスタンス
- * @param bufnr - バッファ番号
- * @returns 検出された単語の配列
- */
-async function detectWordsOptimized(denops: Denops, bufnr: number): Promise<any[]> {
-  try {
-    const enhancedConfig: EnhancedWordConfig = {
-      strategy: config.word_detection_strategy,
-      use_japanese: config.use_japanese,
-      enable_tinysegmenter: config.enable_tinysegmenter,
-      segmenter_threshold: config.segmenter_threshold,
-      cache_enabled: true,
-      auto_detect_language: true,
-    };
-
-    // current_key_contextからコンテキストを作成
-    const context = config.current_key_context
-      ? {
-        minWordLength: getMinLengthForKey(config, config.current_key_context),
-      }
-      : undefined;
-
-    const result = await detectWordsWithManager(denops, enhancedConfig, context);
-
-    if (result.success) {
-      return result.words;
-    } else {
-      // フォールバックとしてレガシーメソッドを使用
-      return await detectWordsWithConfig(denops, {
-        use_japanese: config.use_japanese,
-      });
-    }
-  } catch (error) {
-    // 最終フォールバックとしてレガシーメソッドを使用
-    return await detectWordsWithConfig(denops, {
-      use_japanese: config.use_japanese,
-    });
-  }
-}
-
-/**
- * キャッシュを使用した最適化済みヒント生成
- * @param wordCount - 単語の数
- * @param markers - ヒントマーカーの文字配列
- * @returns 生成されたヒント文字列の配列
- */
-function generateHintsOptimized(wordCount: number, markers: string[]): string[] {
-  // Option 2+3: Auto-detect hint groups mode when single_char_keys or multi_char_keys are defined
-  // unless explicitly disabled by use_hint_groups=false
-  const shouldUseHintGroups = config.use_hint_groups !== false &&
-    (config.single_char_keys || config.multi_char_keys);
-
-  if (shouldUseHintGroups && (config.single_char_keys || config.multi_char_keys)) {
-    if (config.debug_mode) {
-      console.log("[hellshake-yano] Auto-detected hint groups mode:", {
-        use_hint_groups: config.use_hint_groups,
-        has_single_char_keys: !!config.single_char_keys,
-        has_multi_char_keys: !!config.multi_char_keys,
-        shouldUseHintGroups,
-      });
-    }
-
-    const hintConfig: HintKeyConfig = {
-      single_char_keys: config.single_char_keys,
-      multi_char_keys: config.multi_char_keys,
-      max_single_char_hints: config.max_single_char_hints,
-      markers: markers,
-    };
-
-    // 設定の検証
-    const validation = validateHintKeyConfig(hintConfig);
-    if (!validation.valid) {
-      if (config.debug_mode) {
-        console.error("[hellshake-yano] Invalid hint key configuration:", validation.errors);
-      }
-      // フォールバックとして通常のヒント生成を使用
-      return generateHints(wordCount, markers);
-    }
-
-    return generateHintsWithGroups(wordCount, hintConfig);
-  }
-
-  // 従来のヒント生成処理
-  // キャッシュヒットチェック
-  const cacheKey = `${wordCount}-${markers?.join("") || "default"}`;
-  const cachedHints = hintsCache.get(cacheKey);
-  if (cachedHints) {
-    return cachedHints.slice(0, wordCount);
-  }
-
-  // キャッシュミスの場合、新たにヒントを生成
-  const hints = generateHints(wordCount, markers);
-
-  // キャッシュを更新（最大1000個まで）
-  if (wordCount <= 1000) {
-    hintsCache.set(cacheKey, hints);
-  }
-
-  return hints;
 }
 
 /**
@@ -2548,15 +2441,6 @@ async function waitForUserInput(denops: Denops): Promise<void> {
   }
 }
 
-
-
-
-
-
-
-
-
-
 // Dictionary system functionality has been migrated to ./dictionary/ module
 // All dictionary-related functions are now imported from ./dictionary/index.ts
 // This includes:
@@ -2571,41 +2455,36 @@ async function waitForUserInput(denops: Denops): Promise<void> {
 // These functions maintain backward compatibility for existing code
 
 // Re-export config functions
-export {
-  getDefaultConfig,
-} from "./config.ts";
+export { getDefaultConfig } from "./config.ts";
 
 // Re-export validation functions
 export {
-  validateConfig,
+  generateHighlightCommand,
   getMinLengthForKey,
   getMotionCountForKey,
-  normalizeBackwardCompatibleFlags,
-  normalizeColorName,
-  generateHighlightCommand,
-  validateHighlightConfig,
-  validateHighlightColor,
   isValidColorName,
   isValidHexColor,
+  normalizeBackwardCompatibleFlags,
+  normalizeColorName,
+  validateConfig,
+  validateHighlightColor,
+  validateHighlightConfig,
   validateHighlightGroupName,
 } from "./validation/index.ts";
 
 // Re-export performance functions
 export {
-  recordPerformance,
-  getPerformanceMetrics,
   clearPerformanceMetrics,
+  getPerformanceMetrics,
+  recordPerformance,
 } from "./performance/metrics.ts";
 
-export {
-  collectDebugInfo,
-  clearDebugInfo,
-} from "./performance/debug.ts";
+export { clearDebugInfo, collectDebugInfo } from "./performance/debug.ts";
 
 // Re-export dictionary functions for backward compatibility
 export {
-  reloadDictionary,
   editDictionary,
+  reloadDictionary,
   showDictionary,
   validateDictionary,
 } from "./dictionary/index.ts";

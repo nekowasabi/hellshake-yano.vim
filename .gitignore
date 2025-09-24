@@ -50,6 +50,8 @@ temp/
 # Debug files
 *.stackdump
 core
+!tests/core/
+!tests/core/**
 
 # OS specific
 Thumbs.db

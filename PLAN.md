@@ -333,18 +333,18 @@ dictionary/
 ### process5 core モジュールの分離 - TDD Red-Green-Refactorアプローチ
 #### sub1 TDDテストファイルの作成とindex.ts復旧対策
 @target: tests/core/ および scripts/
-- [ ] `detection.test.ts`を作成（単語検出機能のテスト）
-- [ ] `generation.test.ts`を作成（ヒント生成機能のテスト）
-- [ ] `operations.test.ts`を作成（表示操作機能のテスト）
-- [ ] `integration.test.ts`を作成（統合テスト）
-- [ ] `index-recovery.ts`スクリプト作成（index.ts復旧対策）
-- [ ] Red: テストを先に書いて失敗させる
-- [ ] Green: 最小実装でテストを通す
-- [ ] Refactor: コード品質向上
+- [x] `detection.test.ts`を作成（単語検出機能のテスト）
+- [x] `generation.test.ts`を作成（ヒント生成機能のテスト）
+- [x] `operations.test.ts`を作成（表示操作機能のテスト）
+- [x] `integration.test.ts`を作成（統合テスト）
+- [x] `index-recovery.ts`スクリプト作成（index.ts復旧対策）
+- [x] Red: テストを先に書いて失敗させる
+- [x] Green: 最小実装でテストを通す
+- [x] Refactor: コード品質向上
 
 #### sub2 単語検出機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/detection.ts
-- [ ] **Cycle 1**: detectWordsOptimized関数の移動（970-1004行）
+- [x] **Cycle 1**: detectWordsOptimized関数の移動（970-1004行）
   - Red: 基本的な単語検出テスト → 失敗確認
   - Green: 関数実装（word/detector.ts依存） → 成功確認
   - Refactor: エラーハンドリング強化、JSDoc追加
@@ -355,26 +355,26 @@ dictionary/
 
 #### sub3 ヒント生成機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/generation.ts
-- [ ] **Cycle 3**: generateHintsOptimized関数の移動（1012-1040行）
+- [x] **Cycle 3**: generateHintsOptimized関数の移動（1012-1040行）
   - Red: ヒント生成ロジックテスト → 失敗確認
   - Green: 関数実装（キャッシュ機能含む） → 成功確認
   - Refactor: パフォーマンス最適化、型安全性向上
-- [ ] **Cycle 4**: ヒント生成キャッシュの実装
+- [x] **Cycle 4**: ヒント生成キャッシュの実装
   - Red: キャッシュ効率テスト → 失敗確認
   - Green: キャッシュ機構実装 → 成功確認
   - Refactor: メモリ効率改善
 
 #### sub4 表示操作機能の移行（TDDサイクル）
 @target: denops/hellshake-yano/core/operations.ts
-- [ ] **Cycle 5**: showHints関数の実装（453-467行、dispatcher内）
+- [x] **Cycle 5**: showHints関数の実装（453-467行、dispatcher内）
   - Red: デバウンス機能テスト → 失敗確認
   - Green: 関数実装（デバウンス処理含む） → 成功確認
   - Refactor: 依存性注入パターン適用
-- [ ] **Cycle 6**: showHintsInternal関数の実装（472-590行、dispatcher内）
+- [x] **Cycle 6**: showHintsInternal関数の実装（472-590行、dispatcher内）
   - Red: 内部処理テスト → 失敗確認
   - Green: 関数実装（最適化版） → 成功確認
   - Refactor: グローバル状態の分離
-- [ ] **Cycle 7**: hideHints関数の移動（1557-1620行）
+- [x] **Cycle 7**: hideHints関数の移動（1557-1620行）
   - Red: ヒント非表示テスト → 失敗確認
   - Green: 関数実装 → 成功確認
   - Refactor: リソースリーク防止
@@ -385,11 +385,11 @@ dictionary/
 
 #### sub5 統合とクリーンアップ
 @target: denops/hellshake-yano/
-- [ ] core/index.tsで再エクスポート設定
-- [ ] core/index.ts.backupの作成（復旧対策）
+- [x] core/index.tsで再エクスポート設定
+- [x] core/index.ts.backupの作成（復旧対策）
 - [ ] main.tsから移行済み関数を削除（約300行削減）
-- [ ] main.tsのimportを更新
-- [ ] 既存テストの動作確認
+- [x] main.tsのimportを更新
+- [x] 既存テストの動作確認
 - [ ] 循環依存チェック
 
 #### sub6 index.ts復旧対策の恒久実装
