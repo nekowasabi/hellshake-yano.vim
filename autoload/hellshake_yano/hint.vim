@@ -1,4 +1,11 @@
 " License: MIT
+" compat.vim との統合により、Vim/Neovim 両対応を実現
+
+" 初期化処理
+function! hellshake_yano#hint#initialize() abort
+  " 互換性レイヤーの初期化
+  call hellshake_yano#compat#initialize()
+endfunction
 
 " キー別ヒント表示の必要性を判定
 function! hellshake_yano#hint#should_trigger_hints_for_key(bufnr, key) abort
@@ -26,6 +33,19 @@ endfunction
 " ヒントを非表示（公開API）
 function! hellshake_yano#hint#hide() abort
   if hellshake_yano#denops#call_function('hideHints', [], 'hide hints')
+    call hellshake_yano#state#set_hints_visible(v:false)
+  endif
+endfunction
+
+" ヒントを自動非表示（カーソル移動、モード変更時）
+function! hellshake_yano#hint#auto_hide() abort
+  " ヒントが表示されていない場合は何もしない
+  if !hellshake_yano#state#is_hints_visible()
+    return
+  endif
+
+  " Denops経由でヒントを非表示
+  if hellshake_yano#denops#call_function('hideHints', [], 'auto hide hints')
     call hellshake_yano#state#set_hints_visible(v:false)
   endif
 endfunction

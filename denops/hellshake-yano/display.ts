@@ -100,9 +100,28 @@ async function clearHintDisplay(
   if (denops.meta.host === "nvim" && extmarkNamespace !== undefined) {
     await denops.call("nvim_buf_clear_namespace", 0, extmarkNamespace, 0, -1);
   } else if (fallbackMatchIds) {
+    // popup を全てクローズ（Vim prop API使用時）
     for (const mid of fallbackMatchIds) {
-      try { await denops.call("matchdelete", mid); } catch { /* ignore */ }
+      try {
+        await denops.call("popup_close", mid);
+      } catch { /* ignore */ }
     }
+
+    // prop を全て削除（Vim prop API使用時）
+    try {
+      await denops.call("prop_remove", {
+        type: "HellshakeYanoMarker",
+        all: true
+      });
+    } catch { /* ignore */ }
+
+    // matchadd も削除（フォールバック用）
+    for (const mid of fallbackMatchIds) {
+      try {
+        await denops.call("matchdelete", mid);
+      } catch { /* ignore */ }
+    }
+
     fallbackMatchIds.length = 0;
   }
 }
@@ -205,41 +224,92 @@ async function processExtmarksBatched(
   }
 }
 
-async function processMatchaddBatched(
+export async function processMatchaddBatched(
   denops: Denops,
   hints: HintMapping[],
   config: Config,
   fallbackMatchIds: number[],
 ): Promise<void> {
   const highlightGroup = getHighlightGroupName(config);
+
+  // Vim prop API サポートチェック
+  const hasPropAPI = await denops.call("exists", "*prop_type_add") === 1;
+  const hasPopupAPI = await denops.call("exists", "*popup_create") === 1;
+
+  // prop type を初期化（prop API利用可能な場合）
+  if (hasPropAPI) {
+    try {
+      // 既存の prop type をクリーンアップ
+      await denops.call("prop_type_delete", "HellshakeYanoMarker", {});
+    } catch {
+      // prop type が存在しない場合は無視
+    }
+
+    try {
+      // prop type を追加（テキストプロパティ用、ハイライトなし）
+      // popupでハイライトするため、propにはhighlightを設定しない
+      await denops.call("prop_type_add", "HellshakeYanoMarker", {});
+    } catch (e) {
+      console.error("Failed to add prop type:", e);
+    }
+  }
+
   for (const h of hints) {
-    const p = calculateHintPosition(h.word, "offset");
-    const isSym = !h.hint.match(/^[A-Za-z0-9]+$/);
-    if (isSym) {
+    // Vim座標系を使用してヒント位置を計算
+    const p = calculateHintPosition(h.word, {
+      hintPosition: "offset",
+      coordinateSystem: "vim"
+    });
+
+    // Vim prop API + popup を使用（Vim 8.2+）
+    if (hasPropAPI && hasPopupAPI) {
       try {
-        if (await denops.call("exists", "*prop_type_add") === 1) {
-          try {
-            await denops.call("prop_type_add", "HellshakeYanoSymbol", { highlight: highlightGroup });
-          } catch { /* exists */ }
-          await denops.call("prop_add", p.line, p.col, { type: "HellshakeYanoSymbol", length: h.hint.length, text: h.hint });
-        } else {
-          let eh = h.hint;
-          const ne = ['\\', '.', '[', ']', '^', '$', '*'];
-          if (ne.some(c => h.hint.includes(c))) {
-            eh = h.hint.replace(/\\/g, '\\\\').replace(/\./g, '\\.').replace(/\[/g, '\\[')
-              .replace(/\]/g, '\\]').replace(/\^/g, '\\^').replace(/\$/g, '\\$').replace(/\*/g, '\\*');
-          }
-          const pat = `\\%${p.line}l\\%${p.col}c.`;
-          const mid = await denops.call("matchadd", highlightGroup, pat, 10) as number;
-          fallbackMatchIds.push(mid);
+        // vim_col/vim_lineが含まれることを確認
+        if (!('vim_col' in p) || !('vim_line' in p)) {
+          throw new Error("calculateHintPosition did not return vim coordinates");
         }
-      } catch {
-        const pat = `\\%${p.line}l\\%${p.col}c.`;
-        const mid = await denops.call("matchadd", highlightGroup, pat) as number;
+
+        // ヒントの表示文字幅を取得（マルチバイト文字対応）
+        const hintWidth = await denops.call("strwidth", h.hint) as number;
+
+        // テキストプロパティを追加（位置マーカーのみ、textは使わない）
+        await denops.call("prop_add", p.vim_line, p.vim_col, {
+          type: "HellshakeYanoMarker",
+          id: h.word.line * 10000 + h.word.col, // ユニークID
+          length: 1, // 1文字分のマーカー
+        });
+
+        // popup でオーバーレイ表示（ヒント文字を表示）
+        // textpropを使用する場合、line/colは-1にしてpropの位置に自動追従させる
+        const popupId = await denops.call("popup_create", h.hint, {
+          line: -1,  // textpropを使用するため-1（propの位置に自動配置）
+          col: -1,   // textpropを使用するため-1（propの位置に自動配置）
+          textprop: "HellshakeYanoMarker",
+          textpropid: h.word.line * 10000 + h.word.col,
+          width: hintWidth,
+          height: 1,
+          highlight: highlightGroup,
+          zindex: 1000, // 最前面に表示
+          wrap: false,  // 折り返さない
+          fixed: true,  // 固定位置
+        }) as number;
+
+        // popup ID を fallbackMatchIds に保存（クリーンアップ用）
+        fallbackMatchIds.push(popupId);
+      } catch (e) {
+        // エラー時は matchadd にフォールバック
+        console.error("Failed to use prop API, falling back to matchadd:", e);
+        const vim_line = 'vim_line' in p ? p.vim_line : p.line;
+        const vim_col = 'vim_col' in p ? p.vim_col : p.col;
+        const pat = `\\%${vim_line}l\\%${vim_col}c.\\{${h.hint.length}}`;
+        const mid = await denops.call("matchadd", highlightGroup, pat, 10) as number;
         fallbackMatchIds.push(mid);
       }
     } else {
-      const pat = `\\%${p.line}l\\%${p.col}c.\\{${h.hint.length}}`;
+      // prop API が使えない場合は matchadd にフォールバック
+      const vim_line = 'vim_line' in p ? p.vim_line : p.line;
+      const vim_col = 'vim_col' in p ? p.vim_col : p.col;
+      const pat = `\\%${vim_line}l\\%${vim_col}c.\\{${h.hint.length}}`;
       const mid = await denops.call("matchadd", highlightGroup, pat) as number;
       fallbackMatchIds.push(mid);
     }

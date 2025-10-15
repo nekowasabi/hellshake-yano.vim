@@ -48,6 +48,7 @@ import {
   validateHighlightColor,
   isControlCharacter,
 } from "./validation-utils.ts";
+import { processMatchaddBatched } from "./display.ts";
 /**
  * @param threshold
  * @param timeoutMs
@@ -299,6 +300,8 @@ export class Core {
   private continuousJumpCount = 0;
   /** 直近のジャンプが発生したバッファ番号 */
   private lastJumpBufnr: number | null = null;
+  /** Vim環境でのmatchadd/popup IDを管理する配列 */
+  private fallbackMatchIds: number[] = [];
   private constructor(config?: Partial<Config>) {
     this.config = { ...getDefaultConfig(), ...config };
   }
@@ -486,14 +489,32 @@ export class Core {
         } catch (error) {
         }
       } else {
+        // Vim環境: fallbackMatchIds に保存された matchadd/popup ID をクリーンアップ
         try {
-          const matches = await denops.call("getmatches") as Array<{ id: number; group: string }>;
-          for (const match of matches) {
-            if (match.group === "HellshakeYanoMarker" || match.group.startsWith("HellshakeYano")) {
-              await denops.call("matchdelete", match.id);
+          for (const id of this.fallbackMatchIds) {
+            try {
+              // popup の場合は popup_close、matchadd の場合は matchdelete
+              await denops.call("popup_close", id).catch(() => {
+                // popup_close が失敗した場合は matchdelete を試す
+                return denops.call("matchdelete", id);
+              });
+            } catch (error) {
+              // 個別のIDクリーンアップエラーは無視
             }
           }
+          this.fallbackMatchIds = [];
         } catch (error) {
+          // クリーンアップエラーは無視
+        }
+
+        // prop type のクリーンアップも試みる
+        try {
+          const hasPropAPI = await denops.call("exists", "*prop_type_delete") === 1;
+          if (hasPropAPI) {
+            await denops.call("prop_remove", { type: "HellshakeYanoMarker", all: true });
+          }
+        } catch (error) {
+          // prop クリーンアップエラーは無視
         }
       }
     } catch (error) {
@@ -767,43 +788,24 @@ export class Core {
       }
     }
   }
-  /* Phase6: 表示処理系の移行 - MatchAddバッチ表示   * main.tsのdisplayHintsWithMatchAddBatch関数の機能をCoreクラスに統合した実装。 */
+  /* Phase6: 表示処理系の移行 - MatchAddバッチ表示   * main.tsのdisplayHintsWithMatchAddBatch関数の機能をCoreクラスに統合した実装。
+   * process50 sub1: display.ts の processMatchaddBatched() を使用してVim prop API + popupによる正しいヒント表示を実現 */
   async displayHintsWithMatchAddBatch(
     denops: Denops,
     hints: HintMapping[],
     mode: string = "normal",
     signal?: AbortSignal,
   ): Promise<void> {
-    const batchSize = 100; // matchaddはより高速なので大きなバッチサイズ
+    if (signal?.aborted) {
+      return;
+    }
 
-    for (let i = 0; i < hints.length; i += batchSize) {
-      if (signal?.aborted) {
-        return;
-      }
-      const batch = hints.slice(i, i + batchSize);
-      try {
-        const matchPromises = batch.map(async (mapping) => {
-          const { word, hint } = mapping;
-          try {
-            const hintLine = word.line;
-            const hintCol = mapping.hintCol || word.col;
-            const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
-            const vimCol = hintByteCol;
-            const pattern = `\\%${hintLine}l\\%${vimCol}c.`;
-            const matchId = await denops.call(
-              "matchadd",
-              "HellshakeYanoMarker",
-              pattern,
-              100,
-            ) as number;
-            return matchId;
-          } catch (matchError) {
-            return null;
-          }
-        });
-        await Promise.all(matchPromises);
-      } catch (batchError) {
-      }
+    // display.ts の processMatchaddBatched を使用
+    // これにより、Vim prop API + popup によるヒント文字の正しい表示が実現される
+    try {
+      await processMatchaddBatched(denops, hints, this.config, this.fallbackMatchIds);
+    } catch (error) {
+      console.error("Failed to display hints with matchadd:", error);
     }
   }
   /*   * Phase7: showHints系の移行 - ヒントを表示   * main.tsのshowHints関数の機能をCoreクラスに統合した実装。
@@ -886,7 +888,14 @@ export class Core {
       this.currentHints = hintMappings;
       this.isActive = true;
 
-      await this.waitForUserInput(denops);
+      // process50 sub1: Vim/Neovim分岐を追加
+      // Vimではヒント表示のみでwaitForUserInput()を呼ばない（getchar()によるブロック回避）
+      // Neovimでは通常通りwaitForUserInput()を呼び出し
+      if (denops.meta.host === "nvim") {
+        await this.waitForUserInput(denops);
+      }
+      // Vimの場合、ヒント表示後に即座にreturnし、
+      // ユーザ入力はVimScriptの autoload/hellshake_yano/motion.vim で処理される
 
     } catch (error) {
       this.hideHints();

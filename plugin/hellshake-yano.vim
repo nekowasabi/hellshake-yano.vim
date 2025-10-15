@@ -482,6 +482,11 @@ augroup HellshakeYano
   " バッファ変更時の処理
   autocmd BufEnter * call hellshake_yano#plugin#on_buf_enter()
   autocmd BufLeave * call hellshake_yano#plugin#on_buf_leave()
+  " ヒントの自動非表示（カーソル移動時）
+  autocmd CursorMoved * call hellshake_yano#hint#auto_hide()
+  autocmd CursorMovedI * call hellshake_yano#hint#auto_hide()
+  " ヒントの自動非表示（Insert mode 開始時）
+  autocmd InsertEnter * call hellshake_yano#hint#auto_hide()
   " denopsプラグインの遅延読み込み
   autocmd User DenopsPluginPost:hellshake-yano call s:on_denops_ready()
   " カラースキーム変更時にハイライトを再適用
