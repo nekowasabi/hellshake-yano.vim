@@ -283,6 +283,14 @@ export async function main(denops: Denops): Promise<void> {
       async clearPerformanceLog(): Promise<void> {
         resetPerformanceMetrics();
       },
+
+      async validateInputChar(inputChar: unknown): Promise<boolean> {
+        if (typeof inputChar !== "string") {
+          return false;
+        }
+        const core: Core = Core.getInstance(config);
+        return core.validateInputChar(inputChar);
+      },
     };
     // updatePluginStateはcore.tsに統合されたため、必要に応じてCoreクラス経由で呼び出し
   } catch (error) {

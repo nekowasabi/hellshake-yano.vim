@@ -28,6 +28,8 @@ endfunction
 " ヒントを表示（公開API）
 function! hellshake_yano#hint#show() abort
   call hellshake_yano#hint#trigger_hints()
+  " process50 sub4: ヒント表示時刻を記録
+  call hellshake_yano#state#set_hint_display_time(hellshake_yano#utils#get_elapsed_time())
 endfunction
 
 " ヒントを非表示（公開API）
@@ -41,6 +43,13 @@ endfunction
 function! hellshake_yano#hint#auto_hide() abort
   " ヒントが表示されていない場合は何もしない
   if !hellshake_yano#state#is_hints_visible()
+    return
+  endif
+
+  " process50 sub4: ヒント表示から200ms以内は非表示にしない（ヒント入力待機中）
+  let current_time = hellshake_yano#utils#get_elapsed_time()
+  let hint_display_time = hellshake_yano#state#get_hint_display_time()
+  if current_time - hint_display_time < 200
     return
   endif
 
@@ -61,6 +70,14 @@ function! hellshake_yano#hint#show_hints_with_key(key) abort
     let current_mode = hellshake_yano#hint#detect_current_mode()
     " Denops側のshowHintsWithKeyメソッドを呼び出し（モード情報付き）
     call denops#notify('hellshake-yano', 'showHintsWithKey', [a:key, current_mode])
+
+    " process50 sub4: ヒント表示時刻を記録
+    call hellshake_yano#state#set_hint_display_time(hellshake_yano#utils#get_elapsed_time())
+    " process50 sub4: ヒント表示フラグを設定
+    call hellshake_yano#state#set_hints_visible(v:true)
+
+    " 検証用: 100ms後にヒントを非表示（デバッグ用 - 一瞬だけ見える）
+    call timer_start(100, {-> hellshake_yano#hint#hide()})
   catch
     call hellshake_yano#utils#show_error('show_hints_with_key', v:exception)
   endtry
@@ -98,4 +115,35 @@ function! hellshake_yano#hint#handle_debug_display() abort
   if get(g:hellshake_yano, 'debug_mode', v:false)
     call hellshake_yano#debug#show()
   endif
+endfunction
+
+" process50 sub4: Vim環境での無効キー入力時のヒント自動非表示
+" 入力キーを検証し、無効な場合はヒントを非表示にする
+function! hellshake_yano#hint#validate_input_and_hide(input_char) abort
+  " ヒントが表示されていない場合は何もしない
+  if !hellshake_yano#state#is_hints_visible()
+    return v:false
+  endif
+
+  " Denopsが準備できていない場合は何もしない
+  if !hellshake_yano#utils#is_denops_ready()
+    return v:false
+  endif
+
+  try
+    " Denops経由でvalidateInputCharを呼び出し
+    let l:is_valid = denops#request('hellshake-yano', 'validateInputChar', [a:input_char])
+
+    " 無効なキーの場合、ヒントを非表示にする
+    if !l:is_valid
+      call hellshake_yano#hint#hide()
+      return v:true
+    endif
+
+    return v:false
+  catch
+    " エラーが発生した場合は何もせず、ヒントはそのまま
+    call hellshake_yano#utils#show_error('validate_input_and_hide', v:exception)
+    return v:false
+  endtry
 endfunction

@@ -2608,6 +2608,48 @@ export class Core {
   static getCurrentHints(): HintMapping[] {
     return (Core as any).currentHints;
   }
+
+  /**
+   * process50 sub4: Vim環境での無効キー入力時のヒント自動非表示機能
+   *
+   * 入力文字が有効なヒントキーかどうかを検証する
+   * この関数はVimScript側から呼び出され、無効なキー入力時にヒントを非表示にするために使用される
+   *
+   * @param inputChar - 検証する入力文字
+   * @returns 有効なヒントキーの場合true、無効な場合false
+   *
+   * @example
+   * const core = Core.getInstance(config);
+   * const isValid = core.validateInputChar("a"); // true (singleCharKeysに含まれる場合)
+   * const isInvalid = core.validateInputChar("x"); // false (含まれない場合)
+   */
+  public validateInputChar(inputChar: string): boolean {
+    // 空文字列、null、undefinedの場合は無効
+    if (!inputChar || inputChar.length === 0) {
+      return false;
+    }
+
+    // 複数文字の場合は最初の文字のみで検証
+    const char = inputChar.length > 1 ? inputChar[0] : inputChar;
+
+    // 有効キーセットを生成（waitForUserInputのロジックと同じ）
+    const allKeys = [...(this.config.singleCharKeys || []), ...(this.config.multiCharKeys || [])];
+
+    // useNumericMultiCharHintsが有効な場合、数値キーを追加
+    if (this.config.useNumericMultiCharHints) {
+      allKeys.push(...["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+    }
+
+    // アルファベットは大文字に正規化（core.ts:1121と同じロジック）
+    const normalizedKeys = allKeys.map(k => /[a-zA-Z]/.test(k) ? k.toUpperCase() : k);
+    const validKeysSet = new Set(normalizedKeys);
+
+    // 入力文字も大文字に正規化
+    const normalizedChar = /[a-zA-Z]/.test(char) ? char.toUpperCase() : char;
+
+    // 有効キーセットに含まれているかチェック
+    return validKeysSet.has(normalizedChar);
+  }
 }
 /* * API統合クラス (process4 sub4-1) * api.tsの機能をcore.tsに統合するために作成された専用クラス
  * 既存のCoreクラスのシングルトンパターンを維持しつつ、
@@ -2894,7 +2936,8 @@ export class HellshakeYanoCore {
       (codePoint >= 0xFE30 && codePoint <= 0xFE6F)    // CJK互換形式 + 小字形バリエーション
     );
   }
-  /*   * 幅が2であるべきLatin-1補助数学記号かチェック
+  /**
+   * 幅が2であるべきLatin-1補助数学記号かチェック
    * @param codePoint Unicodeコードポイント
    * @returns 数学記号の場合true
    */

@@ -61,6 +61,14 @@ function! hellshake_yano#motion#process(key) abort
   let bufnr = hellshake_yano#utils#bufnr()
   call hellshake_yano#state#init_buffer_state(bufnr)
 
+  " process50 sub4: ヒントが表示されている場合、無効なキー入力でヒントを非表示
+  if hellshake_yano#state#is_hints_visible()
+    if hellshake_yano#hint#validate_input_and_hide(a:key)
+      " 無効キーでヒントを非表示にした場合、そのままキーを返す
+      return a:key
+    endif
+  endif
+
   " キーリピート検出処理
   let current_time = hellshake_yano#utils#get_elapsed_time()
   let config = s:get_key_repeat_config()
