@@ -26,6 +26,10 @@ let s:is_repeating = {}
 " キー: bufnr, 値: timer_id
 let s:reset_timers = {}
 
+" スクリプト変数: タイマーコールバック用のバッファ番号保持
+" キー: timer_id, 値: bufnr
+let s:timer_bufnr_map = {}
+
 " 最後のキー入力時刻を取得
 "
 " @param bufnr バッファ番号
@@ -58,6 +62,25 @@ function! hellshake_yano_vim#key_repeat#set_repeating(bufnr, repeating) abort
   let s:is_repeating[a:bufnr] = a:repeating
 endfunction
 
+" 内部関数: タイマーコールバック
+"
+" timer_start()から呼び出されるコールバック関数。
+" Vimのtimer_start()は常に第1引数としてタイマーIDを渡すため、
+" この関数でタイマーIDを受け取り、s:timer_bufnr_mapからbufnrを取得して
+" reset_state()を呼び出します。
+"
+" Note: ラムダ式はVimの+lambda非対応ビルドでE110エラーになるため、
+"       このラッパー関数を使用します（motion.vim:644の修正パターンを参照）
+"
+" @param timer タイマーID（Vimが自動的に渡す）
+function! s:reset_state_timer_callback(timer) abort
+  if has_key(s:timer_bufnr_map, a:timer)
+    let l:bufnr = s:timer_bufnr_map[a:timer]
+    unlet s:timer_bufnr_map[a:timer]
+    call hellshake_yano_vim#key_repeat#reset_state(l:bufnr)
+  endif
+endfunction
+
 " 内部関数: タイマーを停止
 "
 " 既存のリセットタイマーを安全に停止して削除します。
@@ -72,6 +95,10 @@ function! s:stop_timer(bufnr) abort
     catch
       " タイマーが既に停止している場合は無視
     endtry
+    " timer_bufnr_mapからも削除
+    if has_key(s:timer_bufnr_map, l:timer_id)
+      unlet s:timer_bufnr_map[l:timer_id]
+    endif
     unlet s:reset_timers[a:bufnr]
   endif
 endfunction
@@ -105,6 +132,11 @@ function! hellshake_yano_vim#key_repeat#set_reset_timer(bufnr, delay) abort
 
   " 新規タイマーを設定
   " タイマーコールバックでreset_state()を呼び出す
-  let l:timer_id = timer_start(a:delay, {-> hellshake_yano_vim#key_repeat#reset_state(a:bufnr)})
+  " Note: ラムダ式はVimの+lambda非対応ビルドでE110エラーになるため、
+  "       ラッパー関数（s:reset_state_timer_callback）を使用します。
+  "       timer_start()は第1引数にタイマーIDを自動的に渡すため、
+  "       bufnrはs:timer_bufnr_mapで管理します。
+  let l:timer_id = timer_start(a:delay, function('s:reset_state_timer_callback'))
   let s:reset_timers[a:bufnr] = l:timer_id
+  let s:timer_bufnr_map[l:timer_id] = a:bufnr
 endfunction

@@ -203,11 +203,13 @@ function! s:setup_unified_mappings() abort
 
   " Visual mode用のモーション検出マッピング（Phase D-2 Sub1.3）
   " <expr>マッピングを使用してVisual modeを維持
-  " Phase D-7 Process3 Sub2: timer_start()でカウント対応（autoload遅延読み込み問題対策）
+  " visual_schedule()を経由してモーション検出処理を実行
+  " v:count1はVim側が自動的にモーションに適用するため明示不要
   if get(g:hellshake_yano, 'motionCounterEnabled', v:true)
     for key in get(g:hellshake_yano, 'countedMotions', ['w', 'b', 'e'])
-      execute printf('xnoremap <silent> <expr> %s (timer_start(0, {-> hellshake_yano_vim#motion#handle_visual_internal(%s)}), v:count1 > 1 ? v:count1 . %s : %s)',
-        \ key, string(key), string(key), string(key))
+      " Visual modeでもモーション検出を有効化
+      execute printf('xnoremap <silent> <expr> %s hellshake_yano_vim#motion#visual_schedule(%s)',
+        \ key, string(key))
     endfor
   endif
 
