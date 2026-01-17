@@ -34,6 +34,7 @@ This plugin currently ships with one implementation:
 - **Visual Mode Optimization**: Intelligent hint placement for natural word selection in visual mode
 - **Dictionary System**: Built-in and user-defined dictionaries for improved Japanese word segmentation
 - **Continuous Hint Loop**: Optional mode that recenters the cursor and redraws hints automatically after each jump
+- **Multi-Window Mode**: Display hints across all visible split windows and jump between them with a single selection
 
 ## Installation
 
@@ -125,6 +126,9 @@ The plugin can be configured using the `g:hellshake_yano` dictionary variable. A
 | `continuousHintMode`            | boolean     | v:false         | Enable automatic recenter + redraw loop after each hint jump   |
 | `recenterCommand`               | string      | `"normal! zz"` | Command used to recenter the cursor during continuous mode     |
 | `maxContinuousJumps`            | number      | 50              | Safety cap that stops the loop after the specified jump count  |
+| `multiWindowMode`               | boolean     | v:false         | Enable multi-window hint display mode                          |
+| `multiWindowExcludeTypes`       | array       | ['help', 'quickfix', 'terminal', 'popup'] | Buffer types to exclude from multi-window hints |
+| `multiWindowMaxWindows`         | number      | 4               | Maximum number of windows to show hints in                     |
 
 
 ### Configuration Examples
@@ -207,6 +211,16 @@ let g:hellshake_yano = #{
 \   maxContinuousJumps: 25
 \ }
 " Optional: keep the loop short when working in focused buffers
+```
+
+**Multi-window mode:**
+```vim
+let g:hellshake_yano = #{
+\   multiWindowMode: v:true,
+\   multiWindowExcludeTypes: ['help', 'quickfix', 'terminal', 'popup'],
+\   multiWindowMaxWindows: 4
+\ }
+" Jump to words in any visible split window with a single hint selection
 ```
 
 ### Per-Key Minimum Word Length Settings
@@ -589,6 +603,52 @@ This configuration means:
 - `v` key: Show hints for all words (including 1-character) after 1 press
 - `h` key: Show hints for 2+ character words after 3 presses
 - Other keys: Show hints for 2+ character words after 2 presses
+
+### Multi-Window Mode
+
+Enable hints across all visible split windows. Jump to any word in any window with a single hint selection.
+
+#### Basic Configuration
+
+```vim
+let g:hellshake_yano = #{
+\   multiWindowMode: v:true
+\ }
+```
+
+#### Configuration Options
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `multiWindowMode` | `v:false` | Enable multi-window hint display |
+| `multiWindowExcludeTypes` | `['help', 'quickfix', 'terminal', 'popup']` | Buffer types to exclude |
+| `multiWindowMaxWindows` | `4` | Maximum windows to show hints in |
+
+#### How it Works
+
+1. When enabled, hints appear in all visible windows within the same tab
+2. Selecting a hint jumps to that word, switching windows if necessary
+3. Special buffers (help, quickfix, terminal, popup) are excluded by default
+4. Performance is optimized for up to 4 windows (configurable)
+
+#### Advanced Configuration
+
+```vim
+let g:hellshake_yano = #{
+\   multiWindowMode: v:true,
+\   multiWindowExcludeTypes: ['help', 'quickfix', 'terminal', 'popup', 'nofile'],
+\   multiWindowMaxWindows: 6
+\ }
+```
+
+**Lua Configuration (for Neovim):**
+```lua
+vim.g.hellshake_yano = {
+  multiWindowMode = true,
+  multiWindowExcludeTypes = {'help', 'quickfix', 'terminal', 'popup'},
+  multiWindowMaxWindows = 4
+}
+```
 
 ### Key Repeat Suppression
 

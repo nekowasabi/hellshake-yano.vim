@@ -230,7 +230,13 @@ function! hellshake_yano_vim#input#wait_for_input(hint_map) abort
       " 完全一致チェック（優先）
       if has_key(a:hint_map, l:input_buffer)
         let l:target = a:hint_map[l:input_buffer]
-        call hellshake_yano_vim#jump#to(l:target.lnum, l:target.col)
+        " Process 5: マルチウィンドウモード対応
+        " winid が含まれている場合は jump#to_window() を使用
+        if has_key(l:target, 'winid')
+          call hellshake_yano_vim#jump#to_window(l:target.winid, l:target.lnum, l:target.col)
+        else
+          call hellshake_yano_vim#jump#to(l:target.lnum, l:target.col)
+        endif
         break
       endif
 

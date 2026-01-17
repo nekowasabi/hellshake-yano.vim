@@ -1,9 +1,9 @@
 ---
 mission_id: null
 title: 分割ウィンドウ対応ヒント表示機能
-status: planning
-progress: 0
-phase: planning
+status: implementation_complete
+progress: 85
+phase: documentation
 tdd_mode: true
 blockers: 0
 created_at: 2026-01-17
@@ -18,11 +18,11 @@ updated_at: 2026-01-17
 現在のhellshake-yano.vimは単一ウィンドウのみにヒントを表示するが、Vimユーザーは`:split`/`:vsplit`で複数ウィンドウを使用することが多い。分割ウィンドウ間でのヒントジャンプを実現することで、「ウィンドウ移動 + カーソル移動」を1アクションで完了でき、編集効率が大幅に向上する。
 
 ### End State（完了状態の定義）
-- [ ] マルチウィンドウモード設定で有効化可能
-- [ ] 同一タブ内の全ウィンドウにヒントが表示される
-- [ ] ヒント選択で対象ウィンドウにジャンプしカーソル移動完了
-- [ ] 既存の単一ウィンドウ動作に影響なし
-- [ ] 全テストがパス
+- [x] マルチウィンドウモード設定で有効化可能
+- [x] 同一タブ内の全ウィンドウにヒントが表示される
+- [x] ヒント選択で対象ウィンドウにジャンプしカーソル移動完了
+- [x] 既存の単一ウィンドウ動作に影響なし
+- [x] 全テストがパス
 
 ### Key Tasks
 1. ウィンドウ検出基盤の実装（window_detector.vim新規作成）
@@ -109,16 +109,16 @@ hellshake-yano.vimに分割ウィンドウ対応のヒント表示機能を追�
 
 | Process | Status | Progress | Phase | Notes |
 |---------|--------|----------|-------|-------|
-| Process1 | ⬜ | `[.....]` | - | ウィンドウ検出基盤 |
-| Process2 | 🟩 | `[████████████████████████████████]` | REFACTOR | 複数ウィンドウ単語検出 ✅ |
-| Process3 | 🟩 | `[████████████████████████████████]` | REFACTOR | ウィンドウ指定ヒント表示 ✅ |
-| Process4 | ⬜ | `[.....]` | - | ウィンドウ間ジャンプ |
-| Process5 | ⬜ | `[.....]` | - | コア統合 |
+| Process1 | ✅ | `[████████████████████████████████]` | DONE | ウィンドウ検出基盤 ✅ |
+| Process2 | ✅ | `[████████████████████████████████]` | DONE | 複数ウィンドウ単語検出 ✅ |
+| Process3 | ✅ | `[████████████████████████████████]` | DONE | ウィンドウ指定ヒント表示 ✅ |
+| Process4 | ✅ | `[████████████████████████████████]` | DONE | ウィンドウ間ジャンプ ✅ |
+| Process5 | ✅ | `[████████████████████████████████]` | DONE | コア統合 ✅ |
 | Process6 | ✅ | `[████████████████████████████████]` | DONE | 設定追加 ✅ |
 | Process10 | ⬜ | `[.....]` | - | ユニットテスト拡充 |
 | Process50 | ⬜ | `[.....]` | - | パフォーマンス測定 |
 | Process100 | ⬜ | `[.....]` | - | リファクタリング |
-| Process200 | ⬜ | `[.....]` | - | ドキュメンテーション |
+| Process200 | 🟨 | `[████............]` | IN_PROGRESS | ドキュメンテーション |
 | Process300 | ⬜ | `[.....]` | - | OODAフィードバック |
 
 ---
@@ -182,15 +182,15 @@ tags: [window, getwininfo, tabpage]
 ### Sub1: get_visible()関数実装
 @target: `autoload/hellshake_yano_vim/window_detector.vim`（新規）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] `tests-vim/test_window_detector.vim` 作成
-- [ ] Test 1: 単一ウィンドウで正しく情報取得
-- [ ] Test 2: 2分割ウィンドウで両方を検出
-- [ ] Test 3: help ウィンドウが除外される
-- [ ] Test 4: quickfix ウィンドウが除外される
-- [ ] Test 5: 現在ウィンドウに `is_current: v:true` が設定される
-- [ ] Test 6: `multiWindowMaxWindows` 制限が機能する
-- [ ] テスト実行で失敗確認
+#### TDD Step 1: Red（テスト作成）✅ 完了（2026-01-17）
+- [x] `tests-vim/test_window_detector.vim` 作成
+- [x] Test 1: 単一ウィンドウで正しく情報取得
+- [x] Test 2: 2分割ウィンドウで両方を検出
+- [x] Test 3: help ウィンドウが除外される
+- [x] Test 4: quickfix ウィンドウが除外される
+- [x] Test 5: 現在ウィンドウに `is_current: v:true` が設定される
+- [x] Test 6: `multiWindowMaxWindows` 制限が機能する
+- [x] テスト実行で失敗確認
 
 **テストコード例**:
 ```vim
@@ -210,9 +210,9 @@ function! s:test_split_windows() abort
 endfunction
 ```
 
-#### TDD Step 2: Green（実装）
-- [ ] `autoload/hellshake_yano_vim/window_detector.vim` 新規作成
-- [ ] `hellshake_yano_vim#window_detector#get_visible()` 実装
+#### TDD Step 2: Green（実装）✅ 完了（2026-01-17）
+- [x] `autoload/hellshake_yano_vim/window_detector.vim` 新規作成
+- [x] `hellshake_yano_vim#window_detector#get_visible()` 実装
 
 **実装コード**:
 ```vim
@@ -293,12 +293,14 @@ function! hellshake_yano_vim#window_detector#get_visible() abort
 endfunction
 ```
 
-- [ ] テスト実行で成功確認
+- [x] テスト実行で成功確認
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] コードの可読性向上
-- [ ] ドキュメントコメント追加
-- [ ] テスト継続実行確認
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了（2026-01-17）
+- [x] コードの可読性向上
+- [x] ドキュメントコメント追加
+- [x] テスト継続実行確認
+
+**実装完了日**: 2026-01-17
 
 ---
 
@@ -807,17 +809,17 @@ endfunction
 ### Sub1: show()関数修正とs:show_multi_window()追加
 @target: `autoload/hellshake_yano_vim/core.vim`（修正）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] `tests-vim/test_multi_window_integration.vim` 作成
-- [ ] Test 1: `multiWindowMode: v:false` で既存動作
-- [ ] Test 2: `multiWindowMode: v:true` でマルチウィンドウ動作
-- [ ] Test 3: 2ウィンドウで両方にヒント表示
-- [ ] Test 4: ヒント選択で別ウィンドウにジャンプ
-- [ ] テスト実行で失敗確認
+#### TDD Step 1: Red（テスト作成）✅ 完了（2026-01-17）
+- [x] `tests-vim/test_multi_window_integration.vim` 作成
+- [x] Test 1: `multiWindowMode: v:false` で既存動作
+- [x] Test 2: `multiWindowMode: v:true` でマルチウィンドウ動作
+- [x] Test 3: 2ウィンドウで両方にヒント表示
+- [x] Test 4: ヒント選択で別ウィンドウにジャンプ
+- [x] テスト実行で失敗確認
 
-#### TDD Step 2: Green（実装）
-- [ ] `show()` 関数に分岐ロジック追加
-- [ ] `s:show_multi_window()` 内部関数実装
+#### TDD Step 2: Green（実装）✅ 完了（2026-01-17）
+- [x] `show()` 関数に分岐ロジック追加
+- [x] `s:show_multi_window()` 内部関数実装
 
 **実装コード（show()修正部分）**:
 ```vim
@@ -915,12 +917,14 @@ function! s:show_multi_window() abort
 endfunction
 ```
 
-- [ ] テスト実行で成功確認
+- [x] テスト実行で成功確認
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] 既存 `show()` との重複コード削減
-- [ ] エラーハンドリング強化
-- [ ] テスト継続実行確認
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了（2026-01-17）
+- [x] 既存 `show()` との重複コード削減
+- [x] エラーハンドリング強化
+- [x] テスト継続実行確認
+
+**実装完了日**: 2026-01-17
 
 ---
 
@@ -1104,9 +1108,11 @@ tags: [docs, readme]
 ---
 
 ### Sub1: README更新
-- [ ] マルチウィンドウモードの説明追加
-- [ ] 設定項目の説明追加
-- [ ] 使用例追加
+- [x] マルチウィンドウモードの説明追加
+- [x] 設定項目の説明追加
+- [x] 使用例追加
+
+**実装完了日**: 2026-01-17
 
 ### Sub2: CLAUDE.md更新
 - [ ] Implementation Statusに追加

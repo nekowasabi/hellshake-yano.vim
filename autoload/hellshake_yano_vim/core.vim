@@ -214,8 +214,22 @@ function! hellshake_yano_vim#core#show_with_motion_timer(timer) abort
 endfunction
 
 function! hellshake_yano_vim#core#show() abort
+  " Process 5: マルチウィンドウモード対応
+  " multiWindowMode が true の場合は複数ウィンドウにヒントを表示
+  let l:multi_window_mode = hellshake_yano_vim#config#get('multiWindowMode')
+
   " 1. 画面内の単語を検出
-  let l:detected_words = hellshake_yano_vim#word_detector#detect_visible()
+  " マルチウィンドウモードの場合は window_detector と detect_multi_window を使用
+  if l:multi_window_mode
+    let l:windows = hellshake_yano_vim#window_detector#get_visible()
+    if empty(l:windows)
+      call s:show_warning('no visible windows found')
+      return
+    endif
+    let l:detected_words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
+  else
+    let l:detected_words = hellshake_yano_vim#word_detector#detect_visible()
+  endif
 
   " Phase D-1 Sub2.2: 動的maxTotal対応
   " 49個の固定制限を削除し、hint_generator の動的計算に委ねる
@@ -239,16 +253,22 @@ function! hellshake_yano_vim#core#show() abort
   " モーションキーのコンテキストがない。デフォルト値を使用する。
   let l:min_word_length = hellshake_yano_vim#word_detector#get_min_length('')
 
-  " word_detector#detect_visible() の戻り値形式を word_filter#apply() に合わせる
+  " word_detector の戻り値形式を word_filter#apply() に合わせる
   " detect_visible() は {'text': ..., 'lnum': ..., 'col': ..., 'end_col': ...}
+  " detect_multi_window() は {'text': ..., 'lnum': ..., 'col': ..., 'winid': ...}
   " word_filter#apply() は {'word': ..., 'lnum': ..., 'col': ...} を期待
   let l:words_for_filter = []
   for l:word in l:detected_words
-    call add(l:words_for_filter, {
+    let l:filter_word = {
       \ 'word': l:word.text,
       \ 'lnum': l:word.lnum,
       \ 'col': l:word.col
-      \ })
+      \ }
+    " マルチウィンドウモードの場合は winid を保持
+    if l:multi_window_mode && has_key(l:word, 'winid')
+      let l:filter_word.winid = l:word.winid
+    endif
+    call add(l:words_for_filter, l:filter_word)
   endfor
 
   " フィルタリング適用
@@ -260,10 +280,14 @@ function! hellshake_yano_vim#core#show() abort
     return
   endif
 
-  " 単語データから座標データに変換
+  " 単語データから座標データに変換（winidも保持）
   let l:positions = []
   for l:word in l:filtered_words
-    call add(l:positions, {'lnum': l:word.lnum, 'col': l:word.col})
+    let l:pos = {'lnum': l:word.lnum, 'col': l:word.col}
+    if l:multi_window_mode && has_key(l:word, 'winid')
+      let l:pos.winid = l:word.winid
+    endif
+    call add(l:positions, l:pos)
   endfor
 
   " エラーチェック: 座標が取得できない場合は中断
@@ -311,20 +335,33 @@ function! hellshake_yano_vim#core#show() abort
     let l:pos = l:positions[l:i]
     let l:hint = l:hints[l:i]
 
-    " ヒント表示
-    let l:popup_id = hellshake_yano_vim#display#show_hint(l:pos.lnum, l:pos.col, l:hint)
+    " ヒント表示（マルチウィンドウモード対応）
+    if l:multi_window_mode && has_key(l:pos, 'winid')
+      let l:popup_id = hellshake_yano_vim#display#show_hint_with_window(
+            \ l:pos.winid, l:pos.lnum, l:pos.col, l:hint)
+    else
+      let l:popup_id = hellshake_yano_vim#display#show_hint(l:pos.lnum, l:pos.col, l:hint)
+    endif
     call add(l:popup_ids, l:popup_id)
 
-    " ヒントマップに追加（ヒント文字 → 座標）
-    let l:hint_map[l:hint] = {'lnum': l:pos.lnum, 'col': l:pos.col}
+    " ヒントマップに追加（ヒント文字 → 座標、マルチウィンドウモードではwinidも含む）
+    let l:hint_entry = {'lnum': l:pos.lnum, 'col': l:pos.col}
+    if l:multi_window_mode && has_key(l:pos, 'winid')
+      let l:hint_entry.winid = l:pos.winid
+    endif
+    let l:hint_map[l:hint] = l:hint_entry
 
     " words に追加（テスト用に座標とヒントをまとめたデータ）
-    call add(l:words, {
+    let l:word_entry = {
       \ 'lnum': l:pos.lnum,
       \ 'col': l:pos.col,
       \ 'hint': l:hint,
       \ 'popup_id': l:popup_id
-    \ })
+    \ }
+    if l:multi_window_mode && has_key(l:pos, 'winid')
+      let l:word_entry.winid = l:pos.winid
+    endif
+    call add(l:words, l:word_entry)
   endfor
 
   " 4. 状態の更新
