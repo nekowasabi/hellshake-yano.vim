@@ -100,9 +100,14 @@ let s:default_config = {
 "   - この関数は高頻度で呼び出される可能性があるため、パフォーマンスを考慮
 "   - グローバル変数の存在チェックは exists() を使用
 function! hellshake_yano_vim#config#get(key) abort
-  " グローバル変数が存在し、キーが含まれる場合はその値を返す
+  " グローバル変数 g:hellshake_yano_vim_config が存在し、キーが含まれる場合はその値を返す
   if exists('g:hellshake_yano_vim_config') && has_key(g:hellshake_yano_vim_config, a:key)
     return g:hellshake_yano_vim_config[a:key]
+  endif
+
+  " フォールバック: g:hellshake_yano も参照（後方互換性のため）
+  if exists('g:hellshake_yano') && has_key(g:hellshake_yano, a:key)
+    return g:hellshake_yano[a:key]
   endif
 
   " デフォルト設定から値を返す
