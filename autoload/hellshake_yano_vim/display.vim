@@ -2,11 +2,24 @@
 " Author: hellshake-yano
 " License: MIT
 "
-" TDD Phase: GREEN
-" Process4: Popup表示の実装
+" TDD Phase: REFACTOR
+" Process3: ウィンドウ指定ヒント表示
+" Phase MW-3: Multi-Window Support - Window-specific Hint Display
 "
 " このモジュールはヒントの画面表示を担当します。
 " Vim 8.0+ では popup_create() を使用し、Neovim では nvim_buf_set_extmark() を使用します。
+"
+" 主要関数:
+"   - hellshake_yano_vim#display#show_hint(lnum, col, hint) - 現在ウィンドウにヒント表示
+"   - hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hint) - 指定ウィンドウにヒント表示
+"   - hellshake_yano_vim#display#hide_all() - 全ヒント非表示
+"   - hellshake_yano_vim#display#get_highlight_group(type) - ハイライトグループ取得
+"   - hellshake_yano_vim#display#highlight_partial_matches(matches) - 部分マッチハイライト
+"
+" アーキテクチャ:
+"   - show_hint() は現在ウィンドウに特化したラッパー
+"   - show_hint_with_window() は共通実装で、winid指定対応
+"   - 将来のマルチウィンドウ機能を show_hint_with_window() で実装
 
 " スクリプトローカル変数の定義
 let s:save_cpo = &cpo
@@ -117,18 +130,17 @@ function! s:define_highlight_group(name, color_obj) abort
   execute l:hl_cmd
 endfunction
 
-" hellshake_yano_vim#display#show_hint(lnum, col, hint) - ヒント表示
+" hellshake_yano_vim#display#show_hint(lnum, col, hint) - ヒント表示（現在ウィンドウ）
 "
 " 目的:
-"   - 指定された位置にヒント文字を表示
+"   - 指定された位置にヒント文字を表示（現在ウィンドウ対象）
 "   - Vim では popup_create() を使用
 "   - Neovim では nvim_buf_set_extmark() を使用
+"   - Phase MW-3: マルチウィンドウ対応により show_hint_with_window() をラップ
 "
 " アルゴリズム:
-"   1. Vim/Neovim の判定
-"   2. 該当するAPIを使用してヒントを表示
-"   3. popup/extmark ID を s:popup_ids に保存
-"   4. ID を返す
+"   1. 現在ウィンドウIDを取得（win_getid()）
+"   2. show_hint_with_window() を呼び出し（統一実装）
 "
 " @param lnum Number 行番号（1-indexed）
 " @param col Number 列番号（1-indexed）
@@ -141,14 +153,10 @@ endfunction
 " 注意事項:
 "   - Vim では popup_create() が必要（Vim 8.2+）
 "   - Neovim では nvim_buf_set_extmark() が必要（Neovim 0.5+）
+"   - 内部的には show_hint_with_window() を使用
 function! hellshake_yano_vim#display#show_hint(lnum, col, hint) abort
-  if has('nvim')
-    " Neovim の場合: nvim_buf_set_extmark() を使用
-    return s:show_hint_neovim(a:lnum, a:col, a:hint)
-  else
-    " Vim の場合: popup_create() を使用
-    return s:show_hint_vim(a:lnum, a:col, a:hint)
-  endif
+  let l:current_winid = win_getid()
+  return hellshake_yano_vim#display#show_hint_with_window(l:current_winid, a:lnum, a:col, a:hint)
 endfunction
 
 " s:show_hint_vim(lnum, col, hint) - Vim での popup 表示（内部関数）
@@ -231,6 +239,86 @@ function! s:show_hint_neovim(lnum, col, hint) abort
   call add(s:popup_ids, {'id': l:extmark_id, 'hint': a:hint})
 
   return l:extmark_id
+endfunction
+
+" hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hint) - ウィンドウ指定ヒント表示
+"
+" 目的:
+"   - 指定されたウィンドウにヒントを表示
+"   - Phase MW-3: Multi-Window Support - Window-specific Hint Display
+"   - screenpos()でウィンドウ座標を画面座標に変換
+"
+" パラメータ:
+"   @param a:winid Number - 対象ウィンドウID
+"   @param a:lnum Number - 行番号（バッファ内、1-indexed）
+"   @param a:col Number - 列番号（1-indexed）
+"   @param a:hint String - 表示するヒント文字
+"
+" 戻り値:
+"   Number - popup ID（成功時）または -1（画面外の場合）
+"
+" 使用例:
+"   let popup_id = hellshake_yano_vim#display#show_hint_with_window(1000, 10, 5, 'a')
+"
+" 注意事項:
+"   - screenpos() で画面外（row=0 or col=0）の場合は -1 を返す
+"   - ウィンドウID は getwininfo() や win_getid() で取得可能
+function! hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hint) abort
+  " 画面座標に変換（ウィンドウIDを指定）
+  let l:screen = screenpos(a:winid, a:lnum, a:col)
+
+  " 画面外の場合はスキップ
+  if l:screen.row == 0 || l:screen.col == 0
+    return -1
+  endif
+
+  " ハイライトグループ取得
+  let l:hl_group = hellshake_yano_vim#display#get_highlight_group('normal')
+
+  if has('nvim')
+    " Neovim: extmark表示（バッファIDを取得）
+    let l:bufnr = winbufnr(a:winid)
+    if l:bufnr < 1
+      return -1
+    endif
+
+    " namespace 初期化
+    if s:ns_id == -1
+      let s:ns_id = nvim_create_namespace('hellshake_yano_vim_hint')
+    endif
+
+    let l:extmark_id = nvim_buf_set_extmark(l:bufnr, s:ns_id, a:lnum - 1, a:col - 1, {
+      \ 'virt_text': [[a:hint, l:hl_group]],
+      \ 'virt_text_pos': 'overlay',
+      \ 'priority': 1000
+    \ })
+
+    " extmark情報を保存（ウィンドウID付き）
+    call add(s:popup_ids, {'id': l:extmark_id, 'hint': a:hint, 'winid': a:winid, 'bufnr': l:bufnr})
+
+    return l:extmark_id
+  else
+    " Vim: popup表示（画面座標を使用）
+    if !exists('*popup_create')
+      call s:show_error('popup_create() is not available. Please use Vim 8.2 or later.')
+      return -1
+    endif
+
+    let l:popup_id = popup_create(a:hint, {
+      \ 'line': l:screen.row,
+      \ 'col': l:screen.col,
+      \ 'width': strchars(a:hint),
+      \ 'height': 1,
+      \ 'highlight': l:hl_group,
+      \ 'zindex': 1000,
+      \ 'wrap': 0
+    \ })
+
+    " popup情報を保存（ウィンドウID付き）
+    call add(s:popup_ids, {'id': l:popup_id, 'hint': a:hint, 'winid': a:winid})
+
+    return l:popup_id
+  endif
 endfunction
 
 " hellshake_yano_vim#display#hide_all() - 全 popup/extmark を削除
