@@ -117,7 +117,8 @@ hellshake-yano.vimに分割ウィンドウ対応のヒント表示機能を追�
 | Process6 | ✅ | `[████████████████████████████████]` | DONE | 設定追加 ✅ |
 | Process10 | ⬜ | `[.....]` | - | ユニットテスト拡充 |
 | Process50 | ⬜ | `[.....]` | - | パフォーマンス測定 |
-| Process100 | ⬜ | `[.....]` | - | リファクタリング |
+| Process100 | ⬜ | `[.....]` | - | マルチバッファextmark削除バグ修正 |
+| Process101 | ⬜ | `[.....]` | - | リファクタリング |
 | Process200 | 🟨 | `[████............]` | IN_PROGRESS | ドキュメンテーション |
 | Process300 | ⬜ | `[.....]` | - | OODAフィードバック |
 
@@ -1070,7 +1071,61 @@ tags: [performance, benchmark]
 
 ---
 
-## Process 100: リファクタリング
+## Process 100: マルチバッファextmark削除バグ修正
+
+<!--@process-briefing
+category: bugfix
+tags: [display, extmark, multi_buffer, neovim]
+-->
+
+### Briefing
+
+**目的**: マルチウィンドウモードでのヒント削除バグを修正
+
+**問題**:
+- `hide_all()` 関数で `nvim_buf_clear_namespace(0, ...)` とカレントバッファに固定
+- マルチウィンドウ環境で他ウィンドウのextmarkが削除されない
+
+**修正ファイル**: `autoload/hellshake_yano_vim/display.vim`
+
+**修正箇所**:
+1. `hide_all()` 関数（行342-358）
+2. `highlight_partial_matches()` 関数（行399付近）
+
+---
+
+### Sub1: hide_all()マルチバッファ対応
+@target: `autoload/hellshake_yano_vim/display.vim`（修正）
+
+#### TDD Step 1: Red（テスト作成）
+- [ ] マルチバッファ削除テスト作成
+- [ ] テスト実行で失敗確認
+
+#### TDD Step 2: Green（実装）
+- [ ] `s:popup_ids` の `bufnr` を使用して各バッファのextmarkを削除
+- [ ] テスト実行で成功確認
+
+#### TDD Step 3: Refactor（リファクタリング）
+- [ ] エラーハンドリング追加（bufexists()チェック）
+- [ ] ドキュメントコメント追加
+
+---
+
+### Sub2: highlight_partial_matches()マルチバッファ対応
+@target: `autoload/hellshake_yano_vim/display.vim`（修正）
+
+#### TDD Step 1: Red（テスト作成）
+- [ ] 部分マッチフィルタのマルチバッファテスト作成
+
+#### TDD Step 2: Green（実装）
+- [ ] `l:popup_info.bufnr` を使用して削除
+
+#### TDD Step 3: Refactor（リファクタリング）
+- [ ] エラーハンドリング統一
+
+---
+
+## Process 101: リファクタリング
 
 <!--@process-briefing
 category: quality
