@@ -406,5 +406,63 @@ function! hellshake_yano_vim#word_detector#get_min_length(key) abort
   return l:default_value
 endfunction
 
+" ======================================
+" Process2: Multi-Window Word Detection
+" ======================================
+"
+" hellshake_yano_vim#word_detector#detect_multi_window(windows) - 複数ウィンドウから単語検出
+"
+" 目的:
+"   - PLAN.md Process2 に基づき、複数ウィンドウから同時に単語を検出
+"   - 各単語に winid と bufnr を付与して、ウィンドウ特定を可能にする
+"   - 既存の detect_visible() 動作との完全な互換性を維持
+"
+" アルゴリズム:
+"   1. windows 引数の各ウィンドウ情報を反復処理
+"   2. 各ウィンドウの topline ～ botline の行を取得
+"   3. getbufline() を使って指定バッファの行内容を取得
+"   4. 日本語判定して detect_japanese_words() または detect_english_words() を呼び出し
+"   5. 検出された各単語に winid と bufnr を付与
+"   6. すべてのウィンドウの単語を集約して返す
+"
+" @param windows List ウィンドウ情報のリスト
+"   各要素は辞書形式: {winid, bufnr, topline, botline, ...}
+" @return List 単語リスト（各単語は {text, lnum, col, winid, bufnr} を含む）
+function! hellshake_yano_vim#word_detector#detect_multi_window(windows) abort
+  let l:all_words = []
+
+  for l:wininfo in a:windows
+    " バッファの行内容を取得
+    let l:lines = getbufline(l:wininfo.bufnr, l:wininfo.topline, l:wininfo.botline)
+
+    " 各行で単語検出
+    for l:lnum_offset in range(len(l:lines))
+      let l:line = l:lines[l:lnum_offset]
+      let l:lnum = l:wininfo.topline + l:lnum_offset
+
+      " 空行スキップ
+      if empty(l:line)
+        continue
+      endif
+
+      " 日本語/英数字判定
+      if hellshake_yano_vim#japanese#has_japanese(l:line)
+        let l:words = s:detect_japanese_words(l:line, l:lnum)
+      else
+        let l:words = s:detect_english_words(l:line, l:lnum)
+      endif
+
+      " ウィンドウIDとバッファ番号を追加
+      for l:word in l:words
+        let l:word.winid = l:wininfo.winid
+        let l:word.bufnr = l:wininfo.bufnr
+        call add(l:all_words, l:word)
+      endfor
+    endfor
+  endfor
+
+  return l:all_words
+endfunction
+
 let &cpo = s:save_cpo
 unlet s:save_cpo

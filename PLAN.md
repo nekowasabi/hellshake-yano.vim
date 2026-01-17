@@ -110,7 +110,7 @@ hellshake-yano.vimに分割ウィンドウ対応のヒント表示機能を追�
 | Process | Status | Progress | Phase | Notes |
 |---------|--------|----------|-------|-------|
 | Process1 | ⬜ | `[.....]` | - | ウィンドウ検出基盤 |
-| Process2 | ⬜ | `[.....]` | - | 複数ウィンドウ単語検出 |
+| Process2 | 🟩 | `[████████████████████████████████]` | REFACTOR | 複数ウィンドウ単語検出 ✅ |
 | Process3 | 🟩 | `[████████████████████████████████]` | REFACTOR | ウィンドウ指定ヒント表示 ✅ |
 | Process4 | ⬜ | `[.....]` | - | ウィンドウ間ジャンプ |
 | Process5 | ⬜ | `[.....]` | - | コア統合 |
@@ -344,14 +344,14 @@ function! hellshake_yano_vim#word_detector#detect_visible() abort
 ### Sub1: detect_multi_window()関数実装
 @target: `autoload/hellshake_yano_vim/word_detector.vim`（修正）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] `tests-vim/test_word_detector_multi.vim` 作成
-- [ ] Test 1: 単一ウィンドウで既存動作と同等の結果
-- [ ] Test 2: 2ウィンドウで両方から単語検出
-- [ ] Test 3: 各単語に `winid` と `bufnr` が付与される
-- [ ] Test 4: 空のウィンドウがあっても動作する
-- [ ] Test 5: 日本語単語も正しく検出される
-- [ ] テスト実行で失敗確認
+#### TDD Step 1: Red（テスト作成）✅ 完了（2025-01-17）
+- [x] `tests-vim/test_word_detector_multi.vim` 作成（23テスト）
+- [x] Test 1-2: 単一ウィンドウで既存動作と同等の結果
+- [x] Test 3: 2ウィンドウで両方から単語検出
+- [x] Test 4-5: 各単語に `winid` と `bufnr` が付与される
+- [x] Test 6-7: 空のウィンドウがあっても動作する
+- [x] Test 8-9: 日本語単語も正しく検出される
+- [x] テスト実行で失敗確認 → RED状態確認済み
 
 **テストコード例**:
 ```vim
@@ -378,8 +378,15 @@ function! s:test_multi_window_detection() abort
 endfunction
 ```
 
-#### TDD Step 2: Green（実装）
-- [ ] `detect_multi_window(windows)` 関数追加
+#### TDD Step 2: Green（実装）✅ 完了（2025-01-17）
+- [x] `detect_multi_window(windows)` 関数追加
+- [x] テスト実行 → 全テスト成功 ✅
+  - [x] Empty array test: PASS
+  - [x] Single window returns list: PASS
+  - [x] Detects words: PASS（単語数: 4）
+  - [x] Word has winid: PASS
+  - [x] Word has bufnr: PASS
+  - [x] First word text verification: PASS
 
 **実装コード**:
 ```vim
@@ -444,10 +451,25 @@ endfunction
 
 - [ ] テスト実行で成功確認
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] コードの可読性向上
-- [ ] ドキュメントコメント追加
-- [ ] 既存テストの回帰確認
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了（2025-01-17）
+- [x] コードの可読性向上
+  - [x] 詳細なコメント追加（アルゴリズム説明）
+  - [x] 処理フローを明確化
+- [x] ドキュメントコメント追加
+  - [x] 関数全体のドキュメント
+  - [x] パラメータ説明
+  - [x] 戻り値説明
+  - [x] 使用例の記述
+- [x] VimScript 構文チェック ✅ エラーなし
+- [x] 既存テストの回帰確認 ✅ 全テスト成功
+
+**実装完了日**: 2025-01-17
+
+**コード品質チェック**:
+- ✅ 関数に `abort` キーワード使用
+- ✅ 適切な変数スコープ（`l:`, `a:`）
+- ✅ 既存関数との統合（`s:detect_japanese_words()`, `s:detect_english_words()` 再利用）
+- ✅ 完全なドキュメントコメント
 
 ---
 
