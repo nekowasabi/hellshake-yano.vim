@@ -42,6 +42,14 @@ set cpo&vim
 "                          trueにすると"123"などが除外される
 "   debug_mode           - デバッグモード（デフォルト: false）
 "                          将来の拡張用
+"
+" Phase MW-6 のマルチウィンドウ設定:
+"   multiWindowMode      - マルチウィンドウモードの有効/無効（デフォルト: false）
+"                          有効にすると複数ウィンドウにヒントを表示
+"   multiWindowExcludeTypes - 除外するバッファタイプ（デフォルト: ['help', 'quickfix', 'terminal', 'popup']）
+"                          これらのタイプのウィンドウはヒント表示の対象外
+"   multiWindowMaxWindows - 最大ウィンドウ数（デフォルト: 4）
+"                          パフォーマンスのため処理対象ウィンドウ数を制限
 let s:default_config = {
   \ 'enabled': v:true,
   \ 'hint_chars': 'ASDFJKL',
@@ -55,7 +63,11 @@ let s:default_config = {
   \ 'visual_mode_enabled': v:true,
   \ 'max_hints': 49,
   \ 'exclude_numbers': v:false,
-  \ 'debug_mode': v:false
+  \ 'debug_mode': v:false,
+  \
+  \ 'multiWindowMode': v:false,
+  \ 'multiWindowExcludeTypes': ['help', 'quickfix', 'terminal', 'popup'],
+  \ 'multiWindowMaxWindows': 4
 \ }
 
 " hellshake_yano_vim#config#get(key) - 設定値の取得

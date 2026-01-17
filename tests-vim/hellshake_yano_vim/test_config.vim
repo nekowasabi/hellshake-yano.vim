@@ -236,6 +236,55 @@ function! s:test_config_phase_a5_custom() abort
 endfunction
 
 " ========================================
+" Phase MW-6: マルチウィンドウ設定のテスト
+" ========================================
+
+function! s:test_config_multi_window_defaults() abort
+  " グローバル変数をクリア
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  " マルチウィンドウ設定項目のデフォルト値を取得
+  let l:multi_window_mode = hellshake_yano_vim#config#get('multiWindowMode')
+  let l:exclude_types = hellshake_yano_vim#config#get('multiWindowExcludeTypes')
+  let l:max_windows = hellshake_yano_vim#config#get('multiWindowMaxWindows')
+
+  " デフォルト値を確認
+  call s:assert_false(l:multi_window_mode,
+    \ 'default multiWindowMode should be false')
+  call s:assert_equal(['help', 'quickfix', 'terminal', 'popup'], l:exclude_types,
+    \ 'default multiWindowExcludeTypes should be ["help", "quickfix", "terminal", "popup"]')
+  call s:assert_equal(4, l:max_windows,
+    \ 'default multiWindowMaxWindows should be 4')
+endfunction
+
+function! s:test_config_multi_window_custom() abort
+  " マルチウィンドウ設定をカスタマイズ
+  let g:hellshake_yano_vim_config = {
+    \ 'multiWindowMode': v:true,
+    \ 'multiWindowExcludeTypes': ['help', 'terminal'],
+    \ 'multiWindowMaxWindows': 8
+  \ }
+
+  " カスタム値を取得
+  let l:multi_window_mode = hellshake_yano_vim#config#get('multiWindowMode')
+  let l:exclude_types = hellshake_yano_vim#config#get('multiWindowExcludeTypes')
+  let l:max_windows = hellshake_yano_vim#config#get('multiWindowMaxWindows')
+
+  " カスタム値が反映されていることを確認
+  call s:assert_true(l:multi_window_mode,
+    \ 'custom multiWindowMode should be true')
+  call s:assert_equal(['help', 'terminal'], l:exclude_types,
+    \ 'custom multiWindowExcludeTypes should be ["help", "terminal"]')
+  call s:assert_equal(8, l:max_windows,
+    \ 'custom multiWindowMaxWindows should be 8')
+
+  " クリーンアップ
+  unlet g:hellshake_yano_vim_config
+endfunction
+
+" ========================================
 " テストスイート実行
 " ========================================
 
@@ -270,6 +319,12 @@ function! s:run_all_tests() abort
   echo '--- Phase A-5: New Configuration Items ---'
   call s:test_config_phase_a5_defaults()
   call s:test_config_phase_a5_custom()
+  echo ''
+
+  " Phase MW-6: マルチウィンドウ設定のテスト
+  echo '--- Phase MW-6: Multi-Window Configuration ---'
+  call s:test_config_multi_window_defaults()
+  call s:test_config_multi_window_custom()
   echo ''
 
   " 結果サマリー

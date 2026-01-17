@@ -114,7 +114,7 @@ hellshake-yano.vimに分割ウィンドウ対応のヒント表示機能を追�
 | Process3 | 🟩 | `[████████████████████████████████]` | REFACTOR | ウィンドウ指定ヒント表示 ✅ |
 | Process4 | ⬜ | `[.....]` | - | ウィンドウ間ジャンプ |
 | Process5 | ⬜ | `[.....]` | - | コア統合 |
-| Process6 | ⬜ | `[.....]` | - | 設定追加 |
+| Process6 | ✅ | `[████████████████████████████████]` | DONE | 設定追加 ✅ |
 | Process10 | ⬜ | `[.....]` | - | ユニットテスト拡充 |
 | Process50 | ⬜ | `[.....]` | - | パフォーマンス測定 |
 | Process100 | ⬜ | `[.....]` | - | リファクタリング |
@@ -951,16 +951,18 @@ tags: [config, settings]
 ### Sub1: 設定項目追加
 @target: `autoload/hellshake_yano_vim/config.vim`（修正）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] 既存テストファイルに追加
-- [ ] Test 1: `multiWindowMode` のデフォルト値確認
-- [ ] Test 2: `multiWindowExcludeTypes` のデフォルト値確認
-- [ ] Test 3: `multiWindowMaxWindows` のデフォルト値確認
-- [ ] Test 4: 設定変更が反映されること
-- [ ] テスト実行で失敗確認
+#### TDD Step 1: Red（テスト作成）✅ 完了（2026-01-17）
+- [x] 既存テストファイルに追加
+- [x] Test 1: `multiWindowMode` のデフォルト値確認
+- [x] Test 2: `multiWindowExcludeTypes` のデフォルト値確認
+- [x] Test 3: `multiWindowMaxWindows` のデフォルト値確認
+- [x] Test 4: 設定変更が反映されること
+- [x] テスト実行で失敗確認（Red状態確認済み）
 
-#### TDD Step 2: Green（実装）
-- [ ] `s:default_config` に設定項目追加
+**実装完了日**: 2026-01-17
+
+#### TDD Step 2: Green（実装）✅ 完了（2026-01-17）
+- [x] `s:default_config` に設定項目追加
 
 **実装コード**:
 ```vim
@@ -987,11 +989,29 @@ let s:default_config = {
 \ }
 ```
 
-- [ ] テスト実行で成功確認
+- [x] テスト実行で成功確認
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] 設定項目のドキュメントコメント追加
-- [ ] テスト継続実行確認
+**実装完了日**: 2026-01-17
+
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了（2026-01-17）
+- [x] 設定項目のドキュメントコメント追加（Phase MW-6マーク）
+- [x] テスト継続実行確認
+- [x] コードの可読性向上
+
+**実装完了日**: 2026-01-17
+
+**テスト結果**:
+- s:test_config_multi_window_defaults(): PASS
+- s:test_config_multi_window_custom(): PASS
+- 全テストがデフォルト値を正確に検証
+- グローバル変数によるカスタマイズが正常に機能
+
+**実装内容**:
+- `multiWindowMode`: v:false（後方互換性維持）
+- `multiWindowExcludeTypes`: ['help', 'quickfix', 'terminal', 'popup']
+- `multiWindowMaxWindows`: 4
+- ドキュメントコメントでPhase MW-6マークを追加
+- 既存設定機能との完全な互換性を維持
 
 ---
 
