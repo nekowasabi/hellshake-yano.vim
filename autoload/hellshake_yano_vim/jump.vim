@@ -82,6 +82,56 @@ function! hellshake_yano_vim#jump#to(lnum, col) abort
   endif
 endfunction
 
+" hellshake_yano_vim#jump#to_window: 別ウィンドウにジャンプしてカーソル移動
+"
+" 目的:
+"   - 指定ウィンドウにジャンプしてカーソルを移動
+"   - win_gotoid() + cursor() の組み合わせ
+"   - エラー時は元のウィンドウに戻る
+"
+" Phase MW-4: Multi-Window Support - Window Jump
+"
+" @param a:winid (Number): 対象ウィンドウID
+" @param a:lnum (Number): ジャンプ先の行番号（1-indexed）
+" @param a:col (Number): ジャンプ先の列番号（1-indexed）
+" @return 0 (成功時)
+" @throws ウィンドウが存在しない場合、または型が不正な場合
+"
+" エラーハンドリング:
+"   - 型が不正: 'all arguments must be numbers'
+"   - ウィンドウが存在しない: 'window %d no longer exists'
+"   - カーソル移動失敗: 元のウィンドウに戻り、カーソル移動のエラーを再スロー
+"
+" 使用例:
+"   call hellshake_yano_vim#jump#to_window(1000, 10, 5)  " winid=1000, 10行5列にジャンプ
+function! hellshake_yano_vim#jump#to_window(winid, lnum, col) abort
+  " 引数の型チェック
+  if type(a:winid) != v:t_number || type(a:lnum) != v:t_number || type(a:col) != v:t_number
+    throw 'hellshake_yano_vim#jump#to_window: all arguments must be numbers'
+  endif
+
+  " 元のウィンドウIDを保存（エラー時のロールバック用）
+  let l:prev_winid = win_getid()
+
+  " ウィンドウに移動
+  let l:result = win_gotoid(a:winid)
+
+  if !l:result
+    throw printf('hellshake_yano_vim#jump#to_window: window %d no longer exists', a:winid)
+  endif
+
+  " カーソル移動（既存のto()を再利用）
+  try
+    call hellshake_yano_vim#jump#to(a:lnum, a:col)
+  catch
+    " エラーが発生した場合は元のウィンドウに戻る
+    call win_gotoid(l:prev_winid)
+    throw v:exception
+  endtry
+
+  return 0
+endfunction
+
 " スクリプトスコープのリストア
 let &cpo = s:save_cpo
 unlet s:save_cpo
