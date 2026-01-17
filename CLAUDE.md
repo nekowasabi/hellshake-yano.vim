@@ -218,6 +218,150 @@ Denops側の実装を最大限活用し、Vim側はAPIエンドポイントに�
 3. ✅ ~~Process4 Sub3: コマンド統合（オプション）~~ （完了: 2025-10-21）
 4. ドキュメンテーションとリリース準備
 
+## Vim と Neovim の差異まとめ
+
+このセクションでは、hellshake-yano.vim プロジェクトで実際に遭遇した Vim と Neovim の差異をまとめています。
+Vim/Neovim 両対応のプラグインを開発する際の参考にしてください。
+
+### 1. API レベルの差異
+
+#### 1.1 表示系 API
+
+| 機能 | Vim | Neovim | 備考 |
+|------|-----|--------|------|
+| ヒント表示 | `popup_create()` | `nvim_buf_set_extmark()` | 座標系が異なる |
+| ヒント削除 | `popup_close()` | `nvim_buf_del_extmark()` | バッファ指定が必要 |
+| 名前空間 | 不要 | `nvim_create_namespace()` | extmark 管理に必須 |
+| 一括削除 | 個別に `popup_close()` | `nvim_buf_clear_namespace()` | Neovim の方が効率的 |
+| テキストプロパティ | `prop_add()` / `prop_remove()` | `nvim_buf_set_extmark()` | 用途が重複 |
+
+**座標系の違い:**
+- **Vim `popup_create()`**: 画面座標（screen row/col）を使用。`screenpos()` で変換が必要
+- **Neovim `nvim_buf_set_extmark()`**: バッファ座標（0-indexed line/col）を使用。col はバイト位置
+
+```vim
+" Vim: 画面座標を使用
+let l:screen = screenpos(win_getid(), a:lnum, a:col)
+let l:popup_id = popup_create(a:hint, {
+  \ 'line': l:screen.row,
+  \ 'col': l:screen.col,
+  \ 'width': strchars(a:hint),
+  \ })
+
+" Neovim: バッファ座標（0-indexed）を使用
+let l:extmark_id = nvim_buf_set_extmark(l:bufnr, s:ns_id, a:lnum - 1, a:col - 1, {
+  \ 'virt_text': [[a:hint, l:hl_group]],
+  \ 'virt_text_pos': 'overlay',
+  \ })
+```
+
+#### 1.2 タイマー API
+
+| 機能 | Vim | Neovim | 備考 |
+|------|-----|--------|------|
+| タイマー開始 | `timer_start()` | `timer_start()` | 同じ関数名だが挙動に差異あり |
+| タイマー停止 | `timer_stop()` | `timer_stop()` | 同じ |
+| ラムダ構文 | `+lambda` 必要 | 常にサポート | Vim はビルドオプション依存 |
+
+**重要**: `timer_start()` のコールバックには常にタイマー ID が第1引数として渡される。
+
+#### 1.3 ジョブ・チャネル API
+
+| 機能 | Vim | Neovim | 備考 |
+|------|-----|--------|------|
+| ジョブ開始 | `job_start()` | `jobstart()` | 関数名が異なる |
+| チャネル送信 | `ch_sendraw()` | `chansend()` | 関数名が異なる |
+| コールバック形式 | 辞書形式 | リスト形式 | オプション構造が異なる |
+
+#### 1.4 バッファ・ウィンドウ API
+
+| 機能 | Vim | Neovim | 備考 |
+|------|-----|--------|------|
+| バッファ番号 | `bufnr()` | `bufnr()` / `nvim_get_current_buf()` | Neovim は API 版もあり |
+| 行設定 | `setline()` | `setline()` / `nvim_buf_set_lines()` | Neovim は API 版もあり |
+| カーソル位置 | `getpos('.')` | `getpos('.')` / `nvim_win_get_cursor()` | 戻り値形式が異なる |
+
+### 2. VimScript レベルの差異
+
+#### 2.1 ラムダ構文
+
+```vim
+" Neovim: 常に動作
+let F = {-> 'hello'}
+call timer_start(100, {t -> DoSomething()})
+
+" Vim: +lambda がないとエラー (E110: Missing ')')
+" 対策: function() を使用
+call timer_start(100, function('s:callback'))
+```
+
+#### 2.2 文字列関数
+
+| 関数 | 用途 | Vim/Neovim 共通 | 備考 |
+|------|------|----------------|------|
+| `strlen()` | バイト長 | Yes | マルチバイト非対応 |
+| `strchars()` | 文字数 | Yes | マルチバイト対応 |
+| `strdisplaywidth()` | 表示幅 | Yes | 全角文字対応 |
+| `byteidx()` | 文字→バイト位置 | Yes | |
+| `charidx()` | バイト→文字位置 | Yes | |
+
+**推奨**: マルチバイト文字を扱う場合は `strchars()` を使用。
+
+#### 2.3 型定数
+
+```vim
+" 推奨: 明示的な型定数を使用
+if type(l:value) == v:t_string
+if type(l:value) == v:t_dict
+if type(l:value) == v:t_list
+
+" 非推奨: 数値リテラル（可読性が低い）
+if type(l:value) == 1  " string
+if type(l:value) == 4  " dict
+```
+
+### 3. Denops 固有の注意点
+
+#### 3.1 denops.call() の戻り値
+
+Vim と Neovim で戻り値の型が異なる場合がある。必ず型アサーションを行う。
+
+```typescript
+// 型アサーションを明示
+const isNeovim = (await denops.call("has", "nvim") as number) ? true : false;
+const bufnr = await denops.call("bufnr", "%") as number;
+const lines = await denops.call("getline", 1, "$") as string[];
+```
+
+#### 3.2 環境判定
+
+```typescript
+// Denops での環境判定
+const hasNvim = await denops.eval("has('nvim')") as number;
+if (hasNvim) {
+  // Neovim 専用処理
+} else {
+  // Vim 専用処理
+}
+```
+
+#### 3.3 API 呼び出しの分岐
+
+```typescript
+// Neovim 専用 API は has('nvim') で分岐
+if (await denops.eval("has('nvim')") as number) {
+  await denops.call("nvim_buf_set_extmark", bufnr, nsId, line, col, opts);
+} else {
+  await denops.call("popup_create", text, popupOpts);
+}
+```
+
+### 4. このプロジェクトで遭遇した具体的な問題
+
+以下は、このプロジェクトで実際に遭遇し、解決した問題です。
+
+---
+
 ### 知見メモ: Vim と Neovim の timer 呼び出し差異
 - **背景**: 方向限定ヒント導入時、Visual モードで `timer_start()` にラムダ (`{-> ...}`) を渡して `hellshake_yano_vim#motion#handle_visual_internal()` を非同期実行していたところ、Vim で `E110: Missing ')'` が発生。Neovim では正常に動作。
 - **Neovim が動作した理由**: Neovim はデフォルトで `+lambda` をサポートし、Timer API でもラムダクロージャを安全に扱える。また、`denops` 経由の方向キー情報はグローバル状態に保持されており、タイマー呼び出しで渡した引数が不要でも破綻しなかった。
@@ -228,3 +372,158 @@ Denops側の実装を最大限活用し、Vim側はAPIエンドポイントに�
   - Visual モードのマッピングでラムダを排除し、`hellshake_yano_vim#motion#visual_schedule()` から同期的に `handle_visual_internal()` を呼ぶ形に戻す。
   - ヒント表示用タイマー (`hellshake_yano_vim#core#show_with_motion_timer`) はキー引数を受け取らず、直前に保持している `directional_last_motion_key` を使用するよう変更。
 - **教訓**: Vim 互換コードでは `+lambda` 依存を避け、Timer API には「タイマー ID が自動で第1引数に挿入される」ことを前提にコールバックの引数を設計する。
+
+### 知見メモ: Neovim nvim_buf_set_extmark API の id オプション仕様
+- **背景**: マルチバッファ/マルチウィンドウ機能で extmark を設定する際、`id: 0` を指定して「Neovim に ID を自動割り当てさせる」意図でコードを書いたところ、`E5555: Invalid 'id': expected positive Integer` エラーが発生。
+- **問題の原因**: `nvim_buf_set_extmark()` の `id` オプションに `0` を渡すと、「ID 0 の extmark を操作する」と解釈される。コメントに "Let Neovim assign ID" と書いても、API の挙動は変わらない。
+- **正しい方法**:
+  - ID の自動割り当てを希望する場合は、`id` オプション自体を省略する
+  - 明示的に ID を指定する場合は、1 以上の正の整数を使用する
+- **コード例**:
+  ```typescript
+  // NG - E5555 エラーが発生
+  await denops.call("nvim_buf_set_extmark", buffer, nsId, row, col, {
+    id: 0,  // これは無効
+    virt_text: [[label, hlGroup]],
+  });
+
+  // OK - id オプションを省略
+  await denops.call("nvim_buf_set_extmark", buffer, nsId, row, col, {
+    virt_text: [[label, hlGroup]],
+  });
+
+  // OK - 明示的に正の整数を指定
+  await denops.call("nvim_buf_set_extmark", buffer, nsId, row, col, {
+    id: 1,  // 1 以上の正の整数
+    virt_text: [[label, hlGroup]],
+  });
+  ```
+- **影響範囲**: エラーが発生してもキャッチされて処理が続行されると、連鎖的な問題（意図しないジャンプ等）を引き起こす可能性がある。
+- **関連ファイル**: `denops/hellshake-yano/neovim/display/extmark-display.ts`
+- **教訓**: Neovim API のオプションは「省略」と「0 を指定」で挙動が異なる場合がある。ドキュメントを確認し、「自動割り当て」を期待する場合はオプション自体を省略する。
+
+### 知見メモ: Neovim nvim_buf_set_extmark の col パラメータはバイト位置
+- **背景**: マルチバイト文字（日本語等）やタブ文字を含む行で `nvim_buf_set_extmark()` を呼び出すと `E5555: Invalid 'col': out of range` エラーが発生。
+- **問題の原因**: `nvim_buf_set_extmark()` の `col` パラメータはバイト位置（byte index, 0-indexed）を期待するが、表示列（display column）を渡していた。
+  - タブ文字: 1 バイトだが表示幅は複数（例: 8）
+  - マルチバイト文字: 複数バイトだが表示幅は 1-2
+  - 例: 「日本語」の「語」は表示位置 5 だが、バイト位置は 7（各文字 3 バイト）
+- **正しい方法**:
+  - `HintMapping.hintByteCol` または `Word.byteCol` を使用する（既に計算済み）
+  - 表示列（`col`）ではなくバイト位置を渡す
+  - エラーハンドリングを追加して範囲外の場合はスキップ
+- **コード例**:
+  ```typescript
+  // NG - 表示列を使用（E5555 エラーの可能性）
+  const p = calculateHintPosition(h.word, { hintPosition: "offset" });
+  await denops.call("nvim_buf_set_extmark", bufnr, nsId, p.line - 1, p.col - 1, { ... });
+
+  // OK - バイト位置を使用
+  const line = h.word.line - 1;
+  const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
+    ? h.hintByteCol - 1
+    : (h.word.byteCol !== undefined && h.word.byteCol > 0)
+      ? h.word.byteCol - 1
+      : h.word.col - 1;  // フォールバック
+
+  try {
+    await denops.call("nvim_buf_set_extmark", bufnr, nsId, line, col, { ... });
+  } catch (error) {
+    console.warn(`Skipping extmark: col out of range`);
+  }
+  ```
+- **注意**: Vim の `matchadd()` は表示列を使用するため、Vim 用コードでは `p.col` をそのまま使用して良い。
+- **関連ファイル**: `denops/hellshake-yano/neovim/display/extmark-display.ts`
+- **教訓**: Neovim API と Vim API で列の扱いが異なる。Neovim はバイト位置、Vim は表示列を使うことが多い。マルチバイト文字対応時は常にこの違いを意識する。
+
+### 知見メモ: popup_create() と nvim_buf_set_extmark() の width 指定
+
+- **背景**: ヒント表示の幅指定で `strlen()` を使用していたところ、マルチバイト文字で表示崩れが発生。
+- **問題の原因**: `strlen()` はバイト長を返すため、マルチバイト文字では実際の表示幅と異なる。
+- **正しい方法**:
+  - Vim `popup_create()` の `width`: `strchars()` を使用（文字数）
+  - Neovim `nvim_buf_set_extmark()`: width 指定は不要（virt_text が自動調整）
+- **コード例**:
+  ```vim
+  " Vim: strchars() で文字数を取得
+  let l:popup_id = popup_create(a:hint, {
+    \ 'width': strchars(a:hint),
+    \ })
+  ```
+- **教訓**: 表示幅が必要な場合は `strdisplaywidth()`、文字数が必要な場合は `strchars()` を使用する。`strlen()` はバイト処理専用。
+
+### 知見メモ: Neovim nvim_buf_clear_namespace() のバッファ指定
+
+- **背景**: マルチウィンドウ機能で複数バッファにextmarkを設定後、`nvim_buf_clear_namespace(0, ...)` で全クリアしようとしたところ、カレントバッファ以外のextmarkが残存。
+- **問題の原因**: `nvim_buf_clear_namespace()` の第1引数 `0` は「カレントバッファ」を意味し、「全バッファ」ではない。
+- **正しい方法**:
+  - 各バッファのextmarkを個別にクリアする
+  - extmark作成時にバッファ番号を保存しておく
+- **コード例**:
+  ```vim
+  " NG - カレントバッファのみクリア
+  call nvim_buf_clear_namespace(0, s:ns_id, 0, -1)
+
+  " OK - 保存したバッファ番号を使用して個別クリア
+  for l:popup_info in s:popup_ids
+    let l:bufnr = get(l:popup_info, 'bufnr', 0)
+    if l:bufnr > 0 && bufexists(l:bufnr)
+      call nvim_buf_clear_namespace(l:bufnr, s:ns_id, 0, -1)
+    endif
+  endfor
+  ```
+- **教訓**: Neovim API の `0` は「カレント」を意味することが多い。複数バッファを扱う場合は明示的にバッファ番号を指定する。
+
+### 知見メモ: Vim/Neovim 判定のベストプラクティス
+
+- **推奨方法**: `has('nvim')` を使用
+- **注意点**: この関数は Vim では常に `0` を返し、Neovim では `1` を返す
+- **コード例**:
+  ```vim
+  " VimScript
+  if has('nvim')
+    " Neovim 専用処理
+  else
+    " Vim 専用処理
+  endif
+  ```
+  ```typescript
+  // Denops (TypeScript)
+  const isNeovim = await denops.call("has", "nvim") as number;
+  if (isNeovim) {
+    // Neovim 専用処理
+  }
+  ```
+- **避けるべき方法**: `exists('*nvim_create_namespace')` など特定関数の存在確認（将来的に Vim に追加される可能性）
+
+### 知見メモ: try-catch の重要性（Vim/Neovim 両対応）
+
+- **背景**: バッファやウィンドウが予期せず削除された場合、API 呼び出しでエラーが発生
+- **対策**: すべての Vim/Neovim API 呼び出しを try-catch で囲む
+- **コード例**:
+  ```vim
+  " VimScript
+  try
+    call nvim_buf_del_extmark(l:bufnr, s:ns_id, l:extmark_id)
+  catch
+    " extmark が既に削除されている場合はスキップ
+  endtry
+  ```
+  ```typescript
+  // Denops (TypeScript)
+  try {
+    await denops.call("nvim_buf_set_extmark", bufnr, nsId, line, col, opts);
+  } catch (error) {
+    console.warn(`Skipping extmark: ${error}`);
+  }
+  ```
+- **教訓**: エラーが発生しても処理を継続できるよう、適切なエラーハンドリングを実装する。特にクリーンアップ処理では重要。
+
+### 知見メモ: TypeScript プロパティ名の命名規則不一致によるキャッシュ無効化バグ
+- **背景**: `createCacheKey()` 関数で `config.japanese_min_word_length` と `config.japanese_merge_threshold` を参照していたが、`Config` インターフェースは camelCase（`japaneseMinWordLength`, `japaneseMergeThreshold`）で定義されていた
+- **症状**: 2回目以降のヒント表示で設定が無視され、ヒント幅が極端に狭くなる
+- **原因**: snake_case プロパティは `Config` 型に存在しないため常に `undefined` を返し、フォールバック値が使われる。結果としてキャッシュキーが設定変更を反映せず、古いキャッシュが再利用された
+- **修正**:
+  1. `EnhancedWordConfig` 型に camelCase プロパティを追加
+  2. `createCacheKey()` で camelCase を使用
+- **教訓**: TypeScript では型定義と実装コードの命名規則を一致させること。特にキャッシュキー生成など、値の同一性が重要な箇所では注意が必要

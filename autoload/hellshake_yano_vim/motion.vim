@@ -316,10 +316,9 @@ endfunction
 function! hellshake_yano_vim#motion#handle_with_count(motion_key, count) abort
   " 不正なモーションキーのチェック
   " Phase D-2 Sub1.1: h/j/k/l モーション対応
+  " Process 101 Refactor: util.vim の共通関数を使用
   if index(['w', 'b', 'e', 'h', 'j', 'k', 'l'], a:motion_key) == -1
-    echohl ErrorMsg
-    echomsg 'hellshake_yano_vim#motion#handle_with_count: invalid motion key: ' . a:motion_key
-    echohl None
+    call hellshake_yano_vim#util#show_error('motion', 'handle_with_count: invalid motion key: ' . a:motion_key)
     return
   endif
 
@@ -419,10 +418,8 @@ function! hellshake_yano_vim#motion#handle_with_count(motion_key, count) abort
     let s:motion_state.last_motion_time = l:current_time
 
   catch
-    " エラーハンドリング
-    echohl ErrorMsg
-    echomsg 'hellshake_yano_vim#motion#handle_with_count: error occurred: ' . v:exception
-    echohl None
+    " エラーハンドリング（Process 101 Refactor: util.vim使用）
+    call hellshake_yano_vim#util#show_error('motion', 'handle_with_count: error occurred: ' . v:exception)
 
     " エラー時は状態をリセット
     call hellshake_yano_vim#motion#init()
@@ -576,10 +573,9 @@ endfunction
 function! hellshake_yano_vim#motion#handle_visual_internal(motion_key) abort
   " 不正なモーションキーのチェック
   " Phase D-2 Sub1.2: Visual Modeモーション対応
+  " Process 101 Refactor: util.vim の共通関数を使用
   if index(['w', 'b', 'e', 'h', 'j', 'k', 'l'], a:motion_key) == -1
-    echohl ErrorMsg
-    echomsg 'hellshake_yano_vim#motion#handle_visual: invalid motion key: ' . a:motion_key
-    echohl None
+    call hellshake_yano_vim#util#show_error('motion', 'handle_visual: invalid motion key: ' . a:motion_key)
     return
   endif
 
@@ -649,10 +645,8 @@ function! hellshake_yano_vim#motion#handle_visual_internal(motion_key) abort
     let s:motion_state.last_motion_time = l:current_time
 
   catch
-    " エラーハンドリング
-    echohl ErrorMsg
-    echomsg 'hellshake_yano_vim#motion#handle_visual: error occurred: ' . v:exception
-    echohl None
+    " エラーハンドリング（Process 101 Refactor: util.vim使用）
+    call hellshake_yano_vim#util#show_error('motion', 'handle_visual: error occurred: ' . v:exception)
 
     " エラー時は状態をリセット
     call hellshake_yano_vim#motion#init()

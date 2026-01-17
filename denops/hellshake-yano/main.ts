@@ -8,7 +8,7 @@
  */
 import type { Denops } from "@denops/std";
 import { Config, DEFAULT_CONFIG } from "./config.ts";
-import type { DebugInfo, HintMapping, Word } from "./types.ts";
+import type { DebugInfo, HintMapping, Word, WindowInfo } from "./types.ts";
 
 // 統合レイヤーのインポート
 import { Initializer } from "./integration/initializer.ts";
@@ -506,6 +506,118 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
             source: "fallback",
           };
         }
+      },
+
+      // ========================================
+      // Multi-window support methods (Process 7)
+      // ========================================
+
+      /**
+       * Show hints across multiple windows
+       * @returns Array of hint mappings for all visible windows
+       */
+      async showHintsMultiWindow(): Promise<HintMapping[]> {
+        const core = Core.getInstance(config);
+        return await core.showHintsMultiWindow(denops);
+      },
+
+      /**
+       * Hide hints from all windows
+       */
+      async hideHintsMultiWindow(): Promise<void> {
+        const core = Core.getInstance(config);
+        await core.hideHintsMultiWindow(denops);
+      },
+
+      /**
+       * Toggle multi-window mode
+       * @returns New state of multi-window mode
+       */
+      // deno-lint-ignore require-await
+      async toggleMultiWindowMode(): Promise<boolean> {
+        const core = Core.getInstance(config);
+        return core.toggleMultiWindowMode();
+      },
+
+      /**
+       * Get visible windows in current tabpage
+       * @returns Array of WindowInfo for visible editable windows
+       */
+      async getVisibleWindows(): Promise<WindowInfo[]> {
+        const core = Core.getInstance(config);
+        return await core.getVisibleWindows(denops);
+      },
+
+      /**
+       * Check if multi-window mode is currently active
+       * @returns true if multiple editable windows are visible and mode is enabled
+       */
+      async isMultiWindowModeActive(): Promise<boolean> {
+        const core = Core.getInstance(config);
+        return await core.isMultiWindowModeActive(denops);
+      },
+
+      /**
+       * Update multi-window configuration
+       * @param updates - Configuration updates for multi-window settings
+       */
+      // deno-lint-ignore require-await
+      async updateMultiWindowConfig(updates: unknown): Promise<void> {
+        if (typeof updates === "object" && updates !== null) {
+          const core = Core.getInstance(config);
+          const validUpdates: {
+            multiWindowMode?: boolean;
+            multiWindowExcludeTypes?: string[];
+            multiWindowMaxWindows?: number;
+          } = {};
+
+          const u = updates as Record<string, unknown>;
+          if (typeof u.multiWindowMode === "boolean") {
+            validUpdates.multiWindowMode = u.multiWindowMode;
+          }
+          if (Array.isArray(u.multiWindowExcludeTypes)) {
+            validUpdates.multiWindowExcludeTypes = u.multiWindowExcludeTypes.filter(
+              (t): t is string => typeof t === "string"
+            );
+          }
+          if (typeof u.multiWindowMaxWindows === "number") {
+            validUpdates.multiWindowMaxWindows = u.multiWindowMaxWindows;
+          }
+
+          core.updateMultiWindowConfig(validUpdates);
+          // Update global config as well
+          config = { ...config, ...validUpdates };
+        }
+      },
+
+      /**
+       * Enable multi-window mode
+       */
+      // deno-lint-ignore require-await
+      async enableMultiWindowMode(): Promise<void> {
+        const core = Core.getInstance(config);
+        core.enableMultiWindowMode();
+        config = { ...config, multiWindowMode: true };
+      },
+
+      /**
+       * Disable multi-window mode
+       */
+      // deno-lint-ignore require-await
+      async disableMultiWindowMode(): Promise<void> {
+        const core = Core.getInstance(config);
+        core.disableMultiWindowMode();
+        config = { ...config, multiWindowMode: false };
+      },
+
+      /**
+       * Check if multi-window mode is enabled in config
+       * @returns true if multiWindowMode config is true
+       */
+      // deno-lint-ignore require-await
+      async isMultiWindowModeEnabled(): Promise<boolean> {
+        const core = Core.getInstance(config);
+        return core.isMultiWindowModeEnabled();
       },
     };
     // updatePluginStateはcore.tsに統合されたため、必要に応じてCoreクラス経由で呼び出し

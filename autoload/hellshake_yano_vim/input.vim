@@ -264,17 +264,13 @@ endfunction
 " 内部ヘルパー関数
 " ===========================
 
-" s:show_error(message) - エラーメッセージを表示（統一されたフォーマット）
+" s:show_error(message) - エラーメッセージを表示
 "
-" 目的:
-"   - エラーメッセージを統一されたフォーマットで表示
-"   - プラグイン名をプレフィックスとして付与
+" Process 101 Refactor: util.vim の共通関数を使用
 "
 " @param message String エラーメッセージ
 function! s:show_error(message) abort
-  echohl ErrorMsg
-  echomsg 'hellshake_yano_vim#input: ' . a:message
-  echohl None
+  call hellshake_yano_vim#util#show_error('input', a:message)
 endfunction
 
 " ===========================

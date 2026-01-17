@@ -7,6 +7,31 @@ export interface Word {
   line: number;
   col: number;
   byteCol?: number;
+  /** Window ID for multi-window support (optional) */
+  winid?: number;
+  /** Buffer number for multi-window support (optional) */
+  bufnr?: number;
+}
+
+/**
+ * Window information for multi-window hint display
+ * Corresponds to Vim's window_detector.vim
+ */
+export interface WindowInfo {
+  /** Window ID (unique identifier) */
+  winid: number;
+  /** Buffer number displayed in this window */
+  bufnr: number;
+  /** First visible line number (1-indexed) */
+  topline: number;
+  /** Last visible line number (1-indexed) */
+  botline: number;
+  /** Window width in columns */
+  width: number;
+  /** Window height in lines */
+  height: number;
+  /** Whether this is the current window */
+  isCurrent: boolean;
 }
 export interface HintMapping {
   word: Word;
@@ -142,7 +167,27 @@ export function isWord(obj: unknown): obj is Word {
     typeof (obj as Word).col === "number" &&
     (obj as Word).line > 0 &&
     (obj as Word).col > 0 &&
-    ((obj as Word).byteCol === undefined || typeof (obj as Word).byteCol === "number")
+    ((obj as Word).byteCol === undefined || typeof (obj as Word).byteCol === "number") &&
+    ((obj as Word).winid === undefined || typeof (obj as Word).winid === "number") &&
+    ((obj as Word).bufnr === undefined || typeof (obj as Word).bufnr === "number")
+  );
+}
+
+export function isWindowInfo(obj: unknown): obj is WindowInfo {
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    typeof (obj as WindowInfo).winid === "number" &&
+    typeof (obj as WindowInfo).bufnr === "number" &&
+    typeof (obj as WindowInfo).topline === "number" &&
+    typeof (obj as WindowInfo).botline === "number" &&
+    typeof (obj as WindowInfo).width === "number" &&
+    typeof (obj as WindowInfo).height === "number" &&
+    typeof (obj as WindowInfo).isCurrent === "boolean" &&
+    (obj as WindowInfo).winid > 0 &&
+    (obj as WindowInfo).bufnr > 0 &&
+    (obj as WindowInfo).topline > 0 &&
+    (obj as WindowInfo).botline >= (obj as WindowInfo).topline
   );
 }
 
@@ -196,7 +241,7 @@ export type RequiredProperties<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type SafeKeys<T> = keyof T;
 export type ValueOf<T> = T[keyof T];
 export function createMinimalConfig(): Config {
-  return {enabled:true,markers:["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"],motionCount:3,motionTimeout:2000,hintPosition:"start",triggerOnHjkl:true,countedMotions:[],maxHints:100,debounceDelay:50,useNumbers:false,directionalHintFilter:false,highlightSelected:false,debugCoordinates:false,singleCharKeys:[],multiCharKeys:[],useHintGroups:false,continuousHintMode:false,recenterCommand:"normal! zz",maxContinuousJumps:50,highlightHintMarker:"DiffAdd",highlightHintMarkerCurrent:"DiffText",suppressOnKeyRepeat:true,keyRepeatThreshold:50,useJapanese:false,wordDetectionStrategy:"hybrid",enableTinySegmenter:true,segmenterThreshold:4,japaneseMinWordLength:2,japaneseMergeParticles:true,japaneseMergeThreshold:2,defaultMinWordLength:3,defaultMotionCount:3,debugMode:false,performanceLog:false,motionCounterEnabled:true,motionCounterThreshold:3,motionCounterTimeout:2000,showHintOnMotionThreshold:true};
+  return {enabled:true,markers:["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"],motionCount:3,motionTimeout:2000,hintPosition:"start",triggerOnHjkl:true,countedMotions:[],maxHints:100,debounceDelay:50,useNumbers:false,directionalHintFilter:false,highlightSelected:false,debugCoordinates:false,singleCharKeys:[],multiCharKeys:[],useHintGroups:false,continuousHintMode:false,recenterCommand:"normal! zz",maxContinuousJumps:50,highlightHintMarker:"DiffAdd",highlightHintMarkerCurrent:"DiffText",suppressOnKeyRepeat:true,keyRepeatThreshold:50,useJapanese:false,wordDetectionStrategy:"hybrid",enableTinySegmenter:true,segmenterThreshold:4,japaneseMinWordLength:2,japaneseMergeParticles:true,japaneseMergeThreshold:2,defaultMinWordLength:3,defaultMotionCount:3,debugMode:false,performanceLog:false,motionCounterEnabled:true,motionCounterThreshold:3,motionCounterTimeout:2000,showHintOnMotionThreshold:true,multiWindowMode:false,multiWindowExcludeTypes:["help","quickfix","terminal","popup","nofile"],multiWindowMaxWindows:4};
 }
 export interface WordDetectionConfig {
   minLength?: number;

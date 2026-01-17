@@ -421,17 +421,13 @@ endfunction
 " 内部ヘルパー関数
 " ===========================
 
-" s:show_warning(message) - 警告メッセージを表示（統一されたフォーマット）
+" s:show_warning(message) - 警告メッセージを表示
 "
-" 目的:
-"   - 警告メッセージを統一されたフォーマットで表示
-"   - プラグイン名をプレフィックスとして付与
+" Process 101 Refactor: util.vim の共通関数を使用
 "
 " @param message String 警告メッセージ
 function! s:show_warning(message) abort
-  echohl WarningMsg
-  echomsg 'hellshake_yano_vim#core: ' . a:message
-  echohl None
+  call hellshake_yano_vim#util#show_warning('core', a:message)
 endfunction
 
 let &cpo = s:save_cpo

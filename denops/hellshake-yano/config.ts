@@ -47,6 +47,13 @@ export interface Config {
   debug?: boolean;
   useNumericMultiCharHints?: boolean;
   bothMinWordLength?: number;
+  // Multi-window support settings (Phase MW)
+  /** Enable multi-window hint display mode */
+  multiWindowMode: boolean;
+  /** Buffer types to exclude from multi-window detection */
+  multiWindowExcludeTypes: string[];
+  /** Maximum number of windows to process */
+  multiWindowMaxWindows: number;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -116,6 +123,10 @@ export const DEFAULT_CONFIG: Config = {
   debug: false,
   useNumericMultiCharHints: false,
   bothMinWordLength: 5,
+  // Multi-window support defaults (Phase MW)
+  multiWindowMode: false, // Disabled by default for backward compatibility
+  multiWindowExcludeTypes: ["help", "quickfix", "terminal", "popup", "nofile"],
+  multiWindowMaxWindows: 4,
 };
 
 export const DEFAULT_UNIFIED_CONFIG: Config = DEFAULT_CONFIG;

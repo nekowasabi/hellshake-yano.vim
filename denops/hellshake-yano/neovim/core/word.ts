@@ -22,6 +22,8 @@ export interface EnhancedWordConfig extends WordDetectionManagerConfig {
   minWordLength?: number;
   maxWordLength?: number;
   enableTinySegmenter?: boolean;
+  japaneseMinWordLength?: number;
+  japaneseMergeThreshold?: number;
 }
 const LARGE_FILE_THRESHOLD = 1000;
 const MAX_WORDS_PER_FILE = 1000;
@@ -180,6 +182,7 @@ function cleanupCache() {
 }
 
 // キャッシュキー生成関数
+// Fix: 日本語設定パラメータをキャッシュキーに含めることで設定変更時の誤キャッシュヒットを防止
 function createCacheKey(
   bufnr: number,
   topLine: number,
@@ -194,13 +197,20 @@ function createCacheKey(
                    config.minWordLength ??
                    3;
 
-  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${config.useJapanese ?? true}`;
+  // Include Japanese-specific settings to ensure cache invalidation on config change
+  // Note: property names are now properly camelCase
+  const japaneseMinLength = config.japaneseMinWordLength ?? config.minWordLength ?? 2;
+  const segmenterThreshold = config.segmenterThreshold ?? 10;
+  const japaneseMergeThreshold = config.japaneseMergeThreshold ?? 3;
+
+  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${config.useJapanese ?? true}:jp${japaneseMinLength}:seg${segmenterThreshold}:merge${japaneseMergeThreshold}`;
 }
 
 export async function detectWordsWithManager(
   denops: Denops,
   config: EnhancedWordConfig = {},
   context?: DetectionContext,
+  skipCache?: boolean,
 ): Promise<WordDetectionResult> {
   // バッファ番号と画面範囲を取得
   const bufnr = await denops.call("bufnr", "%") as number;
@@ -210,10 +220,12 @@ export async function detectWordsWithManager(
   // キャッシュキーを生成
   const cacheKey = createCacheKey(bufnr, topLine, bottomLine, config, context);
 
-  // キャッシュチェック
-  const cached = detectionCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-    return cached.result;
+  // キャッシュチェック（skipCache=trueの場合はスキップ）
+  if (!skipCache) {
+    const cached = detectionCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+      return cached.result;
+    }
   }
 
   // キャッシュクリーンアップ
@@ -454,8 +466,24 @@ export async function detectWordsInRange(
 export function clearWordDetectionCache(): void {
   wordDetectionCache.clear();
 }
+
 /**
+ * Clear the detection cache used by detectWordsWithManager
+ * This should be called during cleanup to prevent memory leaks and stale cache issues
  */
+export function clearDetectionCache(): void {
+  detectionCache.clear();
+}
+
+/**
+ * Clear all word detection caches (both wordDetectionCache and detectionCache)
+ * Use this for complete cleanup during error recovery or session end
+ */
+export function clearAllWordCaches(): void {
+  wordDetectionCache.clear();
+  detectionCache.clear();
+}
+
 /**
  * @returns 
  */
@@ -569,6 +597,8 @@ export function extractWords(
   const words: Word[] = [];
   const normalizedConfig = normalizeConfig(options);
   const excludeJapanese = normalizedConfig.excludeJapanese;
+  // Bug 4 fix: Use config.defaultMinWordLength instead of hardcoded value
+  const minWordLength = normalizedConfig.minWordLength ?? normalizedConfig.defaultMinWordLength ?? 3;
   if (normalizedConfig.legacyMode || !normalizedConfig.useImprovedDetection) {
     if (!lineText || lineText.trim().length < 2) {
       return words;
@@ -579,7 +609,8 @@ export function extractWords(
     let match: RegExpExecArray | null;
     const matches: { text: string; index: number }[] = [];
     while ((match = wordRegex.exec(lineText)) !== null) {
-      if (match[0].length >= 2 && !/^\d+$/.test(match[0])) {
+      // Bug 4 fix: Use minWordLength from config instead of hardcoded >= 2
+      if (match[0].length >= minWordLength && !/^\d+$/.test(match[0])) {
         matches.push({ text: match[0], index: match.index });
       }
       if (matches.length >= 100) {
@@ -622,7 +653,8 @@ export function extractWords(
       let currentIndex = baseIndex;
 
       for (const part of parts) {
-        if (part.length >= 1) {
+        // Bug 4 fix: Use minWordLength from config instead of hardcoded >= 1
+        if (part.length >= minWordLength) {
           splitMatches.push({ text: part, index: currentIndex });
         }
         currentIndex += part.length + 1; // +1 for the hyphen
@@ -633,7 +665,8 @@ export function extractWords(
       let currentIndex = baseIndex;
 
       for (const part of parts) {
-        if (part.length >= 1) {
+        // Bug 4 fix: Use minWordLength from config instead of hardcoded >= 1
+        if (part.length >= minWordLength) {
           splitMatches.push({ text: part, index: currentIndex });
         }
         currentIndex += part.length + 1; // +1 for the underscore
@@ -1984,3 +2017,248 @@ declare global {
   ) => Word[]) | undefined;
 }
 globalThis.extractWords = extractWords;
+
+// ============================================================================
+// Multi-Window Word Detection (Phase MW)
+// ============================================================================
+
+import type { WindowInfo } from "../../types.ts";
+import {
+  getVisibleWindows,
+  getWindowVisibleLines,
+  shouldUseMultiWindowMode,
+} from "./window.ts";
+
+/**
+ * Detect words across multiple windows
+ *
+ * This function detects words in all visible windows when multiWindowMode is enabled.
+ * Each detected word includes winid and bufnr for proper hint display.
+ *
+ * Algorithm:
+ * 1. Check if multi-window mode should be active
+ * 2. If not, fall back to single-window detection
+ * 3. Get all visible windows
+ * 4. For each window, detect words in visible range
+ * 5. Tag each word with winid and bufnr
+ * 6. Merge and return all words
+ *
+ * Bug 2 fix: Clear both global cache (detectionCache) and manager's internal cache
+ * to prevent stale cached results with incorrect line ranges across windows.
+ *
+ * @param denops - Denops instance
+ * @param config - Plugin configuration (must include multiWindowMode settings)
+ * @param context - Optional detection context
+ * @returns Array of words with winid/bufnr tags
+ */
+export async function detectWordsMultiWindow(
+  denops: Denops,
+  config: Config,
+  context?: DetectionContext,
+): Promise<Word[]> {
+  // Clear both global cache and manager's internal cache to prevent
+  // stale cached results with incorrect line ranges across windows
+  clearDetectionCache();
+  const manager = getWordDetectionManager(config as EnhancedWordConfig);
+  manager.clearCache();
+
+  // Check if multi-window mode should be used
+  const useMultiWindow = await shouldUseMultiWindowMode(denops, config);
+
+  if (!useMultiWindow) {
+    // Fall back to single-window detection
+    const result = await detectWordsWithManager(denops, config as EnhancedWordConfig, context);
+    return result.words;
+  }
+
+  // Get all visible windows
+  const windows = await getVisibleWindows(denops, config);
+
+  if (windows.length === 0) {
+    return [];
+  }
+
+  const allWords: Word[] = [];
+
+  // Process each window
+  for (const windowInfo of windows) {
+    try {
+      const windowWords = await detectWordsInWindow(denops, windowInfo, manager, context);
+      allWords.push(...windowWords);
+    } catch (error) {
+      // Log error but continue processing other windows
+      console.error(`[hellshake-yano] Error detecting words in window ${windowInfo.winid}:`, error);
+    }
+  }
+
+  return allWords;
+}
+
+/**
+ * Detect words within a specific window
+ *
+ * @param denops - Denops instance
+ * @param windowInfo - Window information
+ * @param manager - Word detection manager
+ * @param context - Optional detection context
+ * @returns Array of words tagged with window info
+ */
+async function detectWordsInWindow(
+  denops: Denops,
+  windowInfo: WindowInfo,
+  manager: WordDetectionManager,
+  context?: DetectionContext,
+): Promise<Word[]> {
+  // Get visible lines for this window
+  const lines = await getWindowVisibleLines(denops, windowInfo);
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const text = lines.join("\n");
+  const startLine = windowInfo.topline;
+
+  // Detect words using the manager
+  const result = await manager.detectWords(text, startLine, denops, context);
+
+  // Apply minWordLength filter explicitly for multi-window mode
+  // This ensures consistent filtering even when context is passed
+  const minWordLength = context?.minWordLength ?? 3;
+  const filteredWords = result.words.filter((word) => word.text.length >= minWordLength);
+
+  // Tag each word with winid and bufnr
+  const taggedWords: Word[] = filteredWords.map((word) => ({
+    ...word,
+    winid: windowInfo.winid,
+    bufnr: windowInfo.bufnr,
+  }));
+
+  // Get folded lines for this buffer and filter them out
+  const foldedLines = await getFoldedLinesForBuffer(denops, windowInfo);
+  const visibleWords = taggedWords.filter((word) => !foldedLines.has(word.line));
+
+  return visibleWords;
+}
+
+/**
+ * Get folded lines for a specific buffer/window
+ *
+ * @param denops - Denops instance
+ * @param windowInfo - Window information
+ * @returns Set of folded line numbers
+ */
+async function getFoldedLinesForBuffer(
+  denops: Denops,
+  windowInfo: WindowInfo,
+): Promise<Set<number>> {
+  const foldedLines = new Set<number>();
+  let currentLine = windowInfo.topline;
+
+  // We need to check folds in the context of the target window
+  // Save current window and switch to target
+  const currentWinid = await denops.call("win_getid") as number;
+
+  try {
+    if (currentWinid !== windowInfo.winid) {
+      await denops.call("win_gotoid", windowInfo.winid);
+    }
+
+    while (currentLine <= windowInfo.botline) {
+      const foldStart = await denops.call("foldclosed", currentLine) as number;
+      if (foldStart !== -1) {
+        const foldEnd = await denops.call("foldclosedend", currentLine) as number;
+        // Add all lines in the fold to exclusion set
+        for (let line = foldStart; line <= foldEnd; line++) {
+          foldedLines.add(line);
+        }
+        currentLine = foldEnd + 1; // Skip to line after fold
+      } else {
+        currentLine++;
+      }
+    }
+  } finally {
+    // Restore original window
+    if (currentWinid !== windowInfo.winid) {
+      await denops.call("win_gotoid", currentWinid);
+    }
+  }
+
+  return foldedLines;
+}
+
+/**
+ * Result type for multi-window word detection
+ */
+export interface MultiWindowWordDetectionResult extends WordDetectionResult {
+  /** Windows that were processed */
+  windows: WindowInfo[];
+  /** Per-window word counts */
+  wordCountPerWindow: Map<number, number>;
+}
+
+/**
+ * Detect words across multiple windows with detailed result
+ *
+ * Bug 2 fix: Clear both global cache (detectionCache) and manager's internal cache
+ * to prevent stale cached results with incorrect line ranges across windows.
+ *
+ * @param denops - Denops instance
+ * @param config - Plugin configuration
+ * @param context - Optional detection context
+ * @returns Detailed result including per-window information
+ */
+export async function detectWordsMultiWindowDetailed(
+  denops: Denops,
+  config: Config,
+  context?: DetectionContext,
+): Promise<MultiWindowWordDetectionResult> {
+  // Clear both global cache and manager's internal cache to prevent
+  // stale cached results with incorrect line ranges across windows
+  clearDetectionCache();
+  const manager = getWordDetectionManager(config as EnhancedWordConfig);
+  manager.clearCache();
+
+  const startTime = Date.now();
+  const useMultiWindow = await shouldUseMultiWindowMode(denops, config);
+
+  if (!useMultiWindow) {
+    // Fall back to single-window detection
+    const result = await detectWordsWithManager(denops, config as EnhancedWordConfig, context);
+    return {
+      ...result,
+      windows: [],
+      wordCountPerWindow: new Map(),
+    };
+  }
+
+  const windows = await getVisibleWindows(denops, config);
+  const allWords: Word[] = [];
+  const wordCountPerWindow = new Map<number, number>();
+
+  for (const windowInfo of windows) {
+    try {
+      const windowWords = await detectWordsInWindow(denops, windowInfo, manager, context);
+      allWords.push(...windowWords);
+      wordCountPerWindow.set(windowInfo.winid, windowWords.length);
+    } catch (error) {
+      console.error(`[hellshake-yano] Error detecting words in window ${windowInfo.winid}:`, error);
+      wordCountPerWindow.set(windowInfo.winid, 0);
+    }
+  }
+
+  const duration = Date.now() - startTime;
+
+  return {
+    words: allWords,
+    detector: "multi-window",
+    success: true,
+    performance: {
+      duration,
+      wordCount: allWords.length,
+      linesProcessed: windows.reduce((sum, w) => sum + (w.botline - w.topline + 1), 0),
+    },
+    windows,
+    wordCountPerWindow,
+  };
+}

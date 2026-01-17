@@ -338,11 +338,35 @@ endfunction
 " 注意事項:
 "   - Vim では popup_close() を使用
 "   - Neovim では nvim_buf_clear_namespace() を使用
+"
+" Process 100 Fix:
+"   - Neovim: 複数バッファのextmarkを削除するため、s:popup_idsに保存された
+"     bufnr情報を使用して各バッファのextmarkを個別にクリア
+"   - nvim_buf_clear_namespace(0, ...) はカレントバッファのみ削除するため不十分
 function! hellshake_yano_vim#display#hide_all() abort
   if has('nvim')
-    " Neovim の場合: namespace 全体をクリア
+    " Neovim の場合: 各バッファのextmarkを個別にクリア（Process 100 Fix）
     if s:ns_id != -1
-      call nvim_buf_clear_namespace(0, s:ns_id, 0, -1)
+      " バッファごとにグループ化して効率的にクリア
+      let l:cleared_buffers = {}
+      for l:popup_info in s:popup_ids
+        let l:bufnr = get(l:popup_info, 'bufnr', 0)
+        if l:bufnr > 0 && !has_key(l:cleared_buffers, l:bufnr)
+          " バッファが存在するか確認してからクリア
+          if bufexists(l:bufnr)
+            try
+              call nvim_buf_clear_namespace(l:bufnr, s:ns_id, 0, -1)
+            catch
+              " バッファが既に削除されている場合などはスキップ
+            endtry
+          endif
+          let l:cleared_buffers[l:bufnr] = 1
+        endif
+      endfor
+      " bufnr が保存されていない古い形式のextmarkがある場合、カレントバッファもクリア
+      if empty(l:cleared_buffers)
+        call nvim_buf_clear_namespace(0, s:ns_id, 0, -1)
+      endif
     endif
   else
     " Vim の場合: 各 popup を個別に閉じる
@@ -379,6 +403,9 @@ endfunction
 "   - Vim では popup_close() を使用
 "   - Neovim では nvim_buf_del_extmark() を使用
 "   - 非表示にしたポップアップは s:popup_ids から削除される
+"
+" Process 100 Fix:
+"   - Neovim: bufnr情報を使用して正しいバッファのextmarkを削除
 function! hellshake_yano_vim#display#highlight_partial_matches(matches) abort
   " 新しい popup_ids リスト（マッチしたヒントのみ保持）
   let l:new_popup_ids = []
@@ -393,13 +420,22 @@ function! hellshake_yano_vim#display#highlight_partial_matches(matches) abort
     else
       " マッチしない: ポップアップを非表示
       if has('nvim')
-        " Neovim: extmark を削除
+        " Neovim: extmark を削除（Process 100 Fix: bufnrを使用）
         if s:ns_id != -1
-          try
-            call nvim_buf_del_extmark(0, s:ns_id, l:popup_id)
-          catch
-            " extmark が既に削除されている場合はスキップ
-          endtry
+          let l:bufnr = get(l:popup_info, 'bufnr', 0)
+          if l:bufnr > 0 && bufexists(l:bufnr)
+            try
+              call nvim_buf_del_extmark(l:bufnr, s:ns_id, l:popup_id)
+            catch
+              " extmark が既に削除されている場合はスキップ
+            endtry
+          else
+            " 後方互換: bufnrがない場合はカレントバッファで試行
+            try
+              call nvim_buf_del_extmark(0, s:ns_id, l:popup_id)
+            catch
+            endtry
+          endif
         endif
       else
         " Vim: popup を閉じる
@@ -433,17 +469,13 @@ endfunction
 " 内部ヘルパー関数
 " ===========================
 
-" s:show_error(message) - エラーメッセージを表示（統一されたフォーマット）
+" s:show_error(message) - エラーメッセージを表示
 "
-" 目的:
-"   - エラーメッセージを統一されたフォーマットで表示
-"   - プラグイン名をプレフィックスとして付与
+" Process 101 Refactor: util.vim の共通関数を使用
 "
 " @param message String エラーメッセージ
 function! s:show_error(message) abort
-  echohl ErrorMsg
-  echomsg 'hellshake_yano_vim#display: ' . a:message
-  echohl None
+  call hellshake_yano_vim#util#show_error('display', a:message)
 endfunction
 
 " ===========================

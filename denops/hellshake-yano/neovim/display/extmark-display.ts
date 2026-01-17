@@ -2,6 +2,7 @@ import type { Denops } from "@denops/std";
 import type { Config, HintMapping, Word } from "../../types.ts";
 import { assignHintsToWords, calculateHintPosition } from "../core/hint.ts";
 import { generateHintsFromConfig, recordPerformance } from "../../common/utils/performance.ts";
+import { clearDetectionCache } from "../core/word.ts";
 
 export const HIGHLIGHT_BATCH_SIZE = 15;
 let _isRenderingHints = false;
@@ -197,11 +198,24 @@ async function processExtmarksBatched(
 ): Promise<void> {
   const highlightGroup = getHighlightGroupName(config);
   for (const h of hints) {
-    const p = calculateHintPosition(h.word, { hintPosition: "offset" });
-    await denops.call("nvim_buf_set_extmark", 0, extmarkNamespace, p.line - 1, p.col - 1, {
-      virt_text: [[h.hint, highlightGroup]],
-      virt_text_pos: "overlay",
-    });
+    // Use hintByteCol for byte position (nvim_buf_set_extmark expects byte index)
+    // Fall back to word.byteCol or word.col if hintByteCol is not available
+    const line = h.word.line - 1; // 0-indexed
+    const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
+      ? h.hintByteCol - 1
+      : (h.word.byteCol !== undefined && h.word.byteCol > 0)
+        ? h.word.byteCol - 1
+        : h.word.col - 1;
+
+    try {
+      await denops.call("nvim_buf_set_extmark", 0, extmarkNamespace, line, col, {
+        virt_text: [[h.hint, highlightGroup]],
+        virt_text_pos: "overlay",
+      });
+    } catch (error) {
+      // Skip if col is out of range (e.g., due to display column vs byte column mismatch)
+      console.warn(`[hellshake-yano] Skipping extmark at line ${line + 1}, col ${col + 1}:`, error);
+    }
   }
 }
 
@@ -244,4 +258,347 @@ async function processMatchaddBatched(
       fallbackMatchIds.push(mid);
     }
   }
+}
+
+// ============================================================================
+// Multi-Window / Multi-Buffer Extmark Support (Phase MW)
+// ============================================================================
+
+/**
+ * State tracking for multi-buffer extmarks
+ * Maps bufnr -> Set of extmark IDs for cleanup
+ */
+const multiBufferExtmarkState = new Map<number, Set<number>>();
+
+/**
+ * Display hints across multiple buffers using extmarks
+ *
+ * This function handles hint display when words come from multiple windows/buffers.
+ * Each word's bufnr is used to set extmarks in the correct buffer.
+ *
+ * @param denops - Denops instance
+ * @param hints - Hint mappings (words must have bufnr set)
+ * @param config - Plugin configuration
+ * @param extmarkNamespace - Neovim extmark namespace
+ * @returns Map of bufnr -> extmark IDs for later cleanup
+ */
+export async function displayHintsMultiBuffer(
+  denops: Denops,
+  hints: HintMapping[],
+  config: Config,
+  extmarkNamespace: number,
+): Promise<Map<number, number[]>> {
+  _isRenderingHints = true;
+  const extmarkIdsByBuffer = new Map<number, number[]>();
+
+  try {
+    // Group hints by buffer
+    const hintsByBuffer = groupHintsByBuffer(hints);
+
+    // Process each buffer
+    for (const [bufnr, bufferHints] of hintsByBuffer) {
+      if (!_isRenderingHints) break;
+
+      const extmarkIds = await processExtmarksForBuffer(
+        denops,
+        bufferHints,
+        config,
+        extmarkNamespace,
+        bufnr,
+      );
+
+      extmarkIdsByBuffer.set(bufnr, extmarkIds);
+
+      // Track for cleanup
+      if (!multiBufferExtmarkState.has(bufnr)) {
+        multiBufferExtmarkState.set(bufnr, new Set());
+      }
+      for (const id of extmarkIds) {
+        multiBufferExtmarkState.get(bufnr)!.add(id);
+      }
+    }
+  } finally {
+    _isRenderingHints = false;
+  }
+
+  return extmarkIdsByBuffer;
+}
+
+/**
+ * Group hints by their buffer number
+ *
+ * @param hints - Array of hint mappings
+ * @returns Map of bufnr -> hints for that buffer
+ */
+function groupHintsByBuffer(hints: HintMapping[]): Map<number, HintMapping[]> {
+  const grouped = new Map<number, HintMapping[]>();
+
+  for (const hint of hints) {
+    const bufnr = hint.word.bufnr ?? 0; // Default to current buffer (0)
+    if (!grouped.has(bufnr)) {
+      grouped.set(bufnr, []);
+    }
+    grouped.get(bufnr)!.push(hint);
+  }
+
+  return grouped;
+}
+
+/**
+ * Process extmarks for a specific buffer
+ *
+ * @param denops - Denops instance
+ * @param hints - Hints for this buffer
+ * @param config - Plugin configuration
+ * @param extmarkNamespace - Neovim extmark namespace
+ * @param bufnr - Target buffer number
+ * @returns Array of created extmark IDs
+ */
+async function processExtmarksForBuffer(
+  denops: Denops,
+  hints: HintMapping[],
+  config: Config,
+  extmarkNamespace: number,
+  bufnr: number,
+): Promise<number[]> {
+  const highlightGroup = getHighlightGroupName(config);
+  const extmarkIds: number[] = [];
+
+  // Pre-fetch line lengths for validation to prevent E5555 errors
+  const lineLengthCache = new Map<number, number>();
+
+  for (const h of hints) {
+    if (!_isRenderingHints) break;
+
+    // Use hintByteCol for byte position (nvim_buf_set_extmark expects byte index)
+    // Fall back to word.byteCol or word.col if hintByteCol is not available
+    const line = h.word.line - 1; // 0-indexed
+    const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
+      ? h.hintByteCol - 1
+      : (h.word.byteCol !== undefined && h.word.byteCol > 0)
+        ? h.word.byteCol - 1
+        : h.word.col - 1;
+
+    // Validate line and col to prevent E5555 (col out of range) errors
+    if (line < 0 || col < 0) {
+      continue; // Skip invalid positions
+    }
+
+    // Get line length from cache or fetch it
+    let lineLength = lineLengthCache.get(line);
+    if (lineLength === undefined) {
+      try {
+        const lineContent = await denops.call("nvim_buf_get_lines", bufnr, line, line + 1, false) as string[];
+        lineLength = lineContent.length > 0 ? new TextEncoder().encode(lineContent[0]).length : 0;
+        lineLengthCache.set(line, lineLength);
+      } catch {
+        // Buffer or line doesn't exist, skip this hint
+        continue;
+      }
+    }
+
+    // Skip if col is beyond line length (would cause E5555)
+    if (col > lineLength) {
+      continue;
+    }
+
+    try {
+      // Use bufnr directly instead of 0 (current buffer)
+      const extmarkId = await denops.call(
+        "nvim_buf_set_extmark",
+        bufnr,
+        extmarkNamespace,
+        line,
+        col,
+        {
+          // id オプションを省略してNeovimに自動割り当てさせる
+          virt_text: [[h.hint, highlightGroup]],
+          virt_text_pos: "overlay",
+        },
+      ) as number;
+
+      extmarkIds.push(extmarkId);
+    } catch (error) {
+      // Buffer might not exist, line/col out of range, or byte column mismatch
+      console.warn(`[hellshake-yano] Failed to set extmark in buffer ${bufnr} at line ${line + 1}, col ${col + 1}:`, error);
+    }
+  }
+
+  return extmarkIds;
+}
+
+/**
+ * Clear hints from all tracked buffers
+ *
+ * @param denops - Denops instance
+ * @param extmarkNamespace - Neovim extmark namespace
+ */
+export async function clearHintsMultiBuffer(
+  denops: Denops,
+  extmarkNamespace: number,
+): Promise<void> {
+  for (const [bufnr, _extmarkIds] of multiBufferExtmarkState) {
+    try {
+      // Check if buffer still exists
+      const bufExists = await denops.call("bufexists", bufnr) as number;
+      if (bufExists) {
+        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      }
+    } catch (error) {
+      // Buffer might have been deleted
+      console.error(`[hellshake-yano] Failed to clear namespace in buffer ${bufnr}:`, error);
+    }
+  }
+
+  // Clear tracking state
+  multiBufferExtmarkState.clear();
+}
+
+/**
+ * Clear hints from specific buffers
+ *
+ * @param denops - Denops instance
+ * @param extmarkNamespace - Neovim extmark namespace
+ * @param buffers - Buffer numbers to clear
+ */
+export async function clearHintsForBuffers(
+  denops: Denops,
+  extmarkNamespace: number,
+  buffers: number[],
+): Promise<void> {
+  for (const bufnr of buffers) {
+    try {
+      const bufExists = await denops.call("bufexists", bufnr) as number;
+      if (bufExists) {
+        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      }
+      multiBufferExtmarkState.delete(bufnr);
+    } catch (error) {
+      console.error(`[hellshake-yano] Failed to clear namespace in buffer ${bufnr}:`, error);
+    }
+  }
+}
+
+/**
+ * Hide hints across multiple buffers
+ *
+ * Enhanced version of hideHints that handles multi-buffer scenarios.
+ *
+ * @param denops - Denops instance
+ * @param extmarkNamespace - Neovim extmark namespace
+ * @param fallbackMatchIds - Fallback match IDs for Vim
+ * @param hintsVisible - Visibility state reference
+ * @param currentHints - Current hints reference
+ */
+export async function hideHintsMultiBuffer(
+  denops: Denops,
+  extmarkNamespace?: number,
+  fallbackMatchIds?: number[],
+  hintsVisible?: { value: boolean },
+  currentHints?: HintMapping[],
+): Promise<void> {
+  const st = performance.now();
+  try {
+    abortCurrentRendering();
+
+    if (denops.meta.host === "nvim" && extmarkNamespace !== undefined) {
+      // Clear all tracked multi-buffer extmarks
+      await clearHintsMultiBuffer(denops, extmarkNamespace);
+      // Also clear current buffer for safety
+      await denops.call("nvim_buf_clear_namespace", 0, extmarkNamespace, 0, -1);
+    } else if (fallbackMatchIds) {
+      for (const mid of fallbackMatchIds) {
+        try {
+          await denops.call("matchdelete", mid);
+        } catch { /* ignore */ }
+      }
+      fallbackMatchIds.length = 0;
+    }
+
+    if (hintsVisible) hintsVisible.value = false;
+    if (currentHints) currentHints.length = 0;
+
+    // Clear detection cache to prevent memory leaks and stale cache issues
+    // This is especially important for multi-buffer scenarios where cache can accumulate
+    clearDetectionCache();
+  } finally {
+    recordPerformance("hideHints", performance.now() - st);
+  }
+}
+
+/**
+ * Display hints with automatic multi-buffer detection
+ *
+ * This function automatically detects if hints span multiple buffers
+ * and uses the appropriate display method.
+ *
+ * @param denops - Denops instance
+ * @param words - Words to display hints for
+ * @param hints - Hint strings
+ * @param config - Plugin configuration
+ * @param extmarkNamespace - Neovim extmark namespace
+ * @param fallbackMatchIds - Fallback match IDs for Vim
+ * @param currentHints - Current hints reference
+ * @param hintsVisible - Visibility state reference
+ * @returns Created hint mappings
+ */
+export async function displayHintsAutoMultiBuffer(
+  denops: Denops,
+  words: Word[],
+  hints: string[],
+  config: Config,
+  extmarkNamespace?: number,
+  fallbackMatchIds?: number[],
+  currentHints?: HintMapping[],
+  hintsVisible?: { value: boolean },
+): Promise<HintMapping[]> {
+  // Check if we have multi-buffer words
+  const hasMultiBuffer = words.some((w) => w.bufnr !== undefined && w.bufnr !== 0);
+
+  if (hasMultiBuffer && denops.meta.host === "nvim" && extmarkNamespace !== undefined) {
+    // Use multi-buffer display
+    const cp = await denops.call("getpos", ".") as [number, number, number, number];
+    const cl = cp[1], cc = cp[2];
+
+    let ah = hints;
+    if (hints.length < words.length) {
+      ah = generateHintsFromConfig(words.length, config);
+    }
+
+    const nh = assignHintsToWords(words, ah, cl, cc, "normal", {
+      hintPosition: config.hintPosition,
+      bothMinWordLength: config.bothMinWordLength,
+    });
+
+    if (currentHints) {
+      currentHints.length = 0;
+      currentHints.push(...nh);
+    }
+    if (hintsVisible) hintsVisible.value = true;
+
+    await displayHintsMultiBuffer(denops, nh, config, extmarkNamespace);
+
+    return nh;
+  } else {
+    // Fall back to standard display
+    return displayHintsOptimized(
+      denops,
+      words,
+      hints,
+      config,
+      extmarkNamespace,
+      fallbackMatchIds,
+      currentHints,
+      hintsVisible,
+    );
+  }
+}
+
+/**
+ * Get the current multi-buffer extmark state (for debugging)
+ *
+ * @returns Map of bufnr -> Set of extmark IDs
+ */
+export function getMultiBufferExtmarkState(): Map<number, Set<number>> {
+  return new Map(multiBufferExtmarkState);
 }

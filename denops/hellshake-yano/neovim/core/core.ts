@@ -26,6 +26,7 @@ import type {
   PerformanceMetrics,
   PerformanceStats,
   PluginStatistics,
+  WindowInfo,
   Word,
   WordDetectionResult,
 } from "../../types.ts";
@@ -892,6 +893,16 @@ export class Core {
       if (!this.isEnabled()) {
         return;
       }
+
+      // Multi-window mode check: delegate to showHintsMultiWindow if active
+      if (this.config.multiWindowMode) {
+        const { shouldUseMultiWindowMode } = await import("./window.ts");
+        if (await shouldUseMultiWindowMode(denops, this.config)) {
+          await this.showHintsMultiWindowInternal(denops, modeString);
+          return;
+        }
+      }
+
       const bufnr = await denops.call("bufnr", "%") as number;
       if (bufnr === -1) {
         return;
@@ -1503,13 +1514,25 @@ export class Core {
         return;
       }
       const mode = config.mode || "normal";
-      const bufnr = await denops.call("bufnr", "%") as number;
+      // マルチバッファ対応: 全ヒントからユニークなバッファを取得
+      const uniqueBuffers = new Set<number>();
+      for (const mapping of this.currentHints) {
+        const bufnr = mapping.word?.bufnr ?? 0;
+        if (bufnr > 0) uniqueBuffers.add(bufnr);
+      }
+      // フォールバック: 現在のバッファ
+      if (uniqueBuffers.size === 0) {
+        uniqueBuffers.add(await denops.call("bufnr", "%") as number);
+      }
       const extmarkNamespace = await denops.call(
         "nvim_create_namespace",
         "hellshake_yano_hints",
       ) as number;
       if (signal.aborted) return;
-      await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      // 各バッファのextmarkをクリア
+      for (const bufnr of uniqueBuffers) {
+        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      }
       if (signal.aborted) return;
       const candidateHints: HintMapping[] = [];
       const nonCandidateHints: HintMapping[] = [];
@@ -1522,10 +1545,13 @@ export class Core {
       }
       const syncCandidates = candidateHints.slice(0, SYNC_BATCH_SIZE);
       const asyncCandidates = candidateHints.slice(SYNC_BATCH_SIZE);
+      // フォールバック用に現在のバッファを取得
+      const currentBufnr = await denops.call("bufnr", "%") as number;
       for (const mapping of syncCandidates) {
         if (signal.aborted) return;
         try {
-          await this.setHintExtmark(denops, mapping, bufnr, extmarkNamespace, true);
+          const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
+          await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
         } catch (error) {
         }
       }
@@ -1533,7 +1559,8 @@ export class Core {
       for (const mapping of syncNonCandidates) {
         if (signal.aborted) return;
         try {
-          await this.setHintExtmark(denops, mapping, bufnr, extmarkNamespace, false);
+          const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
+          await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
         } catch (error) {
         }
       }
@@ -1545,14 +1572,16 @@ export class Core {
             for (const mapping of asyncCandidates) {
               if (signal.aborted) return;
               try {
-                await this.setHintExtmark(denops, mapping, bufnr, extmarkNamespace, true);
+                const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
+                await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
               } catch (error) {
               }
             }
             for (const mapping of asyncNonCandidates) {
               if (signal.aborted) return;
               try {
-                await this.setHintExtmark(denops, mapping, bufnr, extmarkNamespace, false);
+                const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
+                await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
               } catch (error) {
               }
             }
@@ -2767,6 +2796,256 @@ export class Core {
   static getCurrentHints(): HintMapping[] {
     return (Core as any).currentHints;
   }
+
+  // ========================================
+  // Multi-window support methods (Process 7)
+  // ========================================
+
+  /**
+   * Internal method for multi-window hint display with user input handling
+   * Called from showHintsInternal when multiWindowMode is active
+   * @param denops - Denops instance
+   * @param mode - Display mode (default: "normal")
+   */
+  async showHintsMultiWindowInternal(denops: Denops, mode?: string): Promise<void> {
+    const modeString = mode || "normal";
+    try {
+      this.hideHints();
+
+      const hintMappings = await this.showHintsMultiWindow(denops);
+
+      if (hintMappings.length === 0) {
+        return;
+      }
+
+      this.currentHints = hintMappings;
+      this.isActive = true;
+
+      // Wait for user input and handle jump (including cross-window jump)
+      await this.waitForUserInputMultiWindow(denops);
+    } catch (error) {
+      console.error("[hellshake-yano] showHintsMultiWindowInternal error:", error);
+      this.hideHints();
+    }
+  }
+
+  /**
+   * Wait for user input in multi-window mode and handle cross-window jump
+   * @param denops - Denops instance
+   */
+  async waitForUserInputMultiWindow(denops: Denops): Promise<void> {
+    try {
+      const inputChars: string[] = [];
+      const maxInputLength = 2; // Support 2-char hints
+
+      while (inputChars.length < maxInputLength) {
+        const char = await denops.call("getcharstr") as string;
+
+        // ESC to cancel
+        if (char === "\x1b" || char === "") {
+          await this.hideHintsMultiWindow(denops);
+          return;
+        }
+
+        inputChars.push(char);
+        const inputStr = inputChars.join("");
+
+        // Update highlight for candidate hints (Bug 1 fix)
+        if (this.currentHints.length > 0) {
+          await this.highlightCandidateHintsHybrid(denops, this.currentHints, inputStr);
+        }
+
+        // Find matching hint
+        const matchingHint = this.currentHints.find((h) => h.hint === inputStr);
+
+        if (matchingHint) {
+          await this.hideHintsMultiWindow(denops);
+
+          // Handle cross-window jump if winid is present
+          if (matchingHint.word.winid && matchingHint.word.winid !== await denops.call("win_getid")) {
+            await denops.call("win_gotoid", matchingHint.word.winid);
+          }
+
+          // Move cursor to target position
+          // Use byteCol fallback chain (same as jumpToHintTarget) for correct multi-byte handling
+          const col = matchingHint.hintByteCol ??
+                      matchingHint.hintCol ??
+                      matchingHint.word.byteCol ??
+                      matchingHint.word.col;
+          await denops.call("cursor", matchingHint.word.line, col);
+          // Bug 3 fix: Call postJumpHandler for continuousHintMode check
+          await this.postJumpHandler(denops, matchingHint);
+          return;
+        }
+
+        // Check if any hints start with current input
+        const possibleMatches = this.currentHints.filter((h) => h.hint.startsWith(inputStr));
+        if (possibleMatches.length === 0) {
+          // No matches, cancel
+          await this.hideHintsMultiWindow(denops);
+          return;
+        }
+      }
+
+      // Max input reached without match
+      await this.hideHintsMultiWindow(denops);
+    } catch (error) {
+      console.error("[hellshake-yano] waitForUserInputMultiWindow error:", error);
+      await this.hideHintsMultiWindow(denops);
+    }
+  }
+
+  /**
+   * Show hints across multiple windows
+   * Detects words in all visible windows and displays hints
+   * @param denops - Denops instance
+   * @param config - Optional partial config override
+   * @returns Array of hint mappings for all visible windows
+   */
+  async showHintsMultiWindow(denops: Denops, config?: Partial<Config>): Promise<HintMapping[]> {
+    const effectiveConfig = { ...this.config, ...config };
+    try {
+      const { detectWordsMultiWindow } = await import("./word.ts");
+      const { displayHintsAutoMultiBuffer } = await import("../display/extmark-display.ts");
+      const { generateHints } = await import("./hint.ts");
+
+      // Create DetectionContext with minWordLength from config
+      // This ensures consistent word filtering across all windows
+      const context: DetectionContext = {
+        minWordLength: effectiveConfig.defaultMinWordLength ?? 3,
+      };
+
+      const words = await detectWordsMultiWindow(denops, effectiveConfig, context);
+      if (words.length === 0) {
+        return [];
+      }
+
+      const hints = generateHints(words.length, {
+        singleCharKeys: effectiveConfig.singleCharKeys,
+        multiCharKeys: effectiveConfig.multiCharKeys,
+        markers: effectiveConfig.markers,
+      });
+
+      // Get or create extmark namespace for multi-buffer display
+      let extmarkNamespace: number | undefined;
+      if (denops.meta.host === "nvim") {
+        extmarkNamespace = await denops.call(
+          "nvim_create_namespace",
+          "hellshake_yano_hints",
+        ) as number;
+      }
+
+      // Use auto multi-buffer display with extmark namespace
+      const hintMappings = await displayHintsAutoMultiBuffer(
+        denops,
+        words,
+        hints,
+        effectiveConfig,
+        extmarkNamespace,
+      );
+      this.currentHints = hintMappings;
+
+      return hintMappings;
+    } catch (error) {
+      console.error("[hellshake-yano] showHintsMultiWindow error:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Hide hints from all windows/buffers
+   * @param denops - Denops instance
+   */
+  async hideHintsMultiWindow(denops: Denops): Promise<void> {
+    try {
+      const { hideHintsMultiBuffer } = await import("../display/extmark-display.ts");
+
+      // Get extmark namespace for proper cleanup
+      let extmarkNamespace: number | undefined;
+      if (denops.meta.host === "nvim") {
+        extmarkNamespace = await denops.call(
+          "nvim_create_namespace",
+          "hellshake_yano_hints",
+        ) as number;
+      }
+
+      await hideHintsMultiBuffer(denops, extmarkNamespace);
+      this.currentHints = [];
+    } catch (error) {
+      console.error("[hellshake-yano] hideHintsMultiWindow error:", error);
+    }
+  }
+
+  /**
+   * Check if multi-window mode is currently active
+   * @param denops - Denops instance
+   * @returns true if multiple editable windows are visible and mode is enabled
+   */
+  async isMultiWindowModeActive(denops: Denops): Promise<boolean> {
+    const { shouldUseMultiWindowMode } = await import("./window.ts");
+    return await shouldUseMultiWindowMode(denops, this.config);
+  }
+
+  /**
+   * Get visible windows in current tabpage
+   * @param denops - Denops instance
+   * @returns Array of WindowInfo for visible editable windows
+   */
+  async getVisibleWindows(denops: Denops): Promise<WindowInfo[]> {
+    const { getVisibleWindows } = await import("./window.ts");
+    return await getVisibleWindows(denops, this.config);
+  }
+
+  /**
+   * Enable multi-window mode
+   */
+  enableMultiWindowMode(): void {
+    this.config.multiWindowMode = true;
+  }
+
+  /**
+   * Disable multi-window mode
+   */
+  disableMultiWindowMode(): void {
+    this.config.multiWindowMode = false;
+  }
+
+  /**
+   * Toggle multi-window mode
+   * @returns New state of multi-window mode
+   */
+  toggleMultiWindowMode(): boolean {
+    this.config.multiWindowMode = !this.config.multiWindowMode;
+    return this.config.multiWindowMode;
+  }
+
+  /**
+   * Check if multi-window mode is enabled in config
+   * @returns true if multiWindowMode config is true
+   */
+  isMultiWindowModeEnabled(): boolean {
+    return this.config.multiWindowMode;
+  }
+
+  /**
+   * Update multi-window configuration
+   * @param updates - Configuration updates for multi-window settings
+   */
+  updateMultiWindowConfig(updates: {
+    multiWindowMode?: boolean;
+    multiWindowExcludeTypes?: string[];
+    multiWindowMaxWindows?: number;
+  }): void {
+    if (updates.multiWindowMode !== undefined) {
+      this.config.multiWindowMode = updates.multiWindowMode;
+    }
+    if (updates.multiWindowExcludeTypes !== undefined) {
+      this.config.multiWindowExcludeTypes = updates.multiWindowExcludeTypes;
+    }
+    if (updates.multiWindowMaxWindows !== undefined) {
+      this.config.multiWindowMaxWindows = updates.multiWindowMaxWindows;
+    }
+  }
 }
 /* * API統合クラス (process4 sub4-1) * api.tsの機能をcore.tsに統合するために作成された専用クラス
  * 既存のCoreクラスのシングルトンパターンを維持しつつ、
@@ -3077,6 +3356,72 @@ export class HellshakeYanoCore {
       codePoint === 0x00D7 || // × (multiplication sign)
       codePoint === 0x00F7 // ÷ (division sign)
     );
+  }
+
+  // ============================================================================
+  // Multi-Window Support (Phase MW)
+  // ============================================================================
+
+  /**
+   * Show hints across multiple windows
+   * Delegates to Core singleton for actual implementation
+   * @param denops - Denops instance
+   * @param config - Optional partial configuration override
+   * @returns Promise resolving to hint mappings
+   */
+  async showHintsMultiWindow(
+    denops: Denops,
+    config?: Partial<Config>,
+  ): Promise<HintMapping[]> {
+    const core = Core.getInstance(this.config);
+    return await core.showHintsMultiWindow(denops, config);
+  }
+
+  /** Hide hints across multiple buffers */
+  async hideHintsMultiWindow(denops: Denops): Promise<void> {
+    const core = Core.getInstance(this.config);
+    await core.hideHintsMultiWindow(denops);
+  }
+
+  /** Check if multi-window mode is active */
+  async isMultiWindowModeActive(denops: Denops): Promise<boolean> {
+    try {
+      const { shouldUseMultiWindowMode } = await import("./window.ts");
+      return await shouldUseMultiWindowMode(denops, this.config);
+    } catch { return false; }
+  }
+
+  /** Get visible windows information */
+  async getVisibleWindows(denops: Denops): Promise<WindowInfo[]> {
+    try {
+      const { getVisibleWindows } = await import("./window.ts");
+      return await getVisibleWindows(denops, this.config);
+    } catch { return []; }
+  }
+
+  /** Enable multi-window mode */
+  enableMultiWindowMode(): void { this.config.multiWindowMode = true; }
+
+  /** Disable multi-window mode */
+  disableMultiWindowMode(): void { this.config.multiWindowMode = false; }
+
+  /** Toggle multi-window mode */
+  toggleMultiWindowMode(): boolean {
+    this.config.multiWindowMode = !this.config.multiWindowMode;
+    return this.config.multiWindowMode;
+  }
+
+  /** Check if multi-window mode is enabled in config */
+  isMultiWindowModeEnabled(): boolean { return this.config.multiWindowMode; }
+
+  /** Update multi-window configuration */
+  updateMultiWindowConfig(updates: { multiWindowMode?: boolean; multiWindowExcludeTypes?: string[]; multiWindowMaxWindows?: number; }): void {
+    if (updates.multiWindowMode !== undefined) this.config.multiWindowMode = updates.multiWindowMode;
+    if (updates.multiWindowExcludeTypes !== undefined) this.config.multiWindowExcludeTypes = updates.multiWindowExcludeTypes;
+    if (updates.multiWindowMaxWindows !== undefined) {
+      if (updates.multiWindowMaxWindows < 1) throw new Error("multiWindowMaxWindows must be at least 1");
+      this.config.multiWindowMaxWindows = updates.multiWindowMaxWindows;
+    }
   }
 }
 export { isControlCharacter };
