@@ -117,8 +117,8 @@ hellshake-yano.vimに分割ウィンドウ対応のヒント表示機能を追�
 | Process6 | ✅ | `[████████████████████████████████]` | DONE | 設定追加 ✅ |
 | Process10 | ⬜ | `[.....]` | - | ユニットテスト拡充 |
 | Process50 | ⬜ | `[.....]` | - | パフォーマンス測定 |
-| Process100 | ⬜ | `[.....]` | - | マルチバッファextmark削除バグ修正 |
-| Process101 | ⬜ | `[.....]` | - | リファクタリング |
+| Process100 | ✅ | `[████████████████████████████████]` | DONE | マルチバッファextmark削除バグ修正 ✅ |
+| Process101 | ✅ | `[████████████████████████████████]` | DONE | リファクタリング ✅ |
 | Process200 | 🟨 | `[████............]` | IN_PROGRESS | ドキュメンテーション |
 | Process300 | ⬜ | `[.....]` | - | OODAフィードバック |
 
@@ -1094,34 +1094,44 @@ tags: [display, extmark, multi_buffer, neovim]
 
 ---
 
-### Sub1: hide_all()マルチバッファ対応
+### Sub1: hide_all()マルチバッファ対応 ✅ 完了（2026-01-20）
 @target: `autoload/hellshake_yano_vim/display.vim`（修正）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] マルチバッファ削除テスト作成
-- [ ] テスト実行で失敗確認
+#### TDD Step 1: Red（テスト作成）✅ 完了
+- [x] マルチバッファ削除テスト作成（tests-vim/test_process100_multi_buffer_extmark.vim）
+- [x] テスト実行で失敗確認
 
-#### TDD Step 2: Green（実装）
-- [ ] `s:popup_ids` の `bufnr` を使用して各バッファのextmarkを削除
-- [ ] テスト実行で成功確認
+#### TDD Step 2: Green（実装）✅ 完了
+- [x] `s:popup_ids` の `bufnr` を使用して各バッファのextmarkを削除
+- [x] バッファごとにグループ化して効率的にクリア
+- [x] テスト実行で成功確認
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] エラーハンドリング追加（bufexists()チェック）
-- [ ] ドキュメントコメント追加
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了
+- [x] エラーハンドリング追加（bufexists()チェック、try-catch）
+- [x] ドキュメントコメント追加（Process 100 Fixマーク）
+
+**実装内容**:
+- `hide_all()` 関数（行346-382）で `s:popup_ids` に保存された `bufnr` 情報を使用
+- バッファが存在するか `bufexists()` で確認してからクリア
+- `nvim_buf_clear_namespace(0, ...)` ではなく個別バッファを指定
 
 ---
 
-### Sub2: highlight_partial_matches()マルチバッファ対応
+### Sub2: highlight_partial_matches()マルチバッファ対応 ✅ 完了（2026-01-20）
 @target: `autoload/hellshake_yano_vim/display.vim`（修正）
 
-#### TDD Step 1: Red（テスト作成）
-- [ ] 部分マッチフィルタのマルチバッファテスト作成
+#### TDD Step 1: Red（テスト作成）✅ 完了
+- [x] 部分マッチフィルタのマルチバッファテスト作成
 
-#### TDD Step 2: Green（実装）
-- [ ] `l:popup_info.bufnr` を使用して削除
+#### TDD Step 2: Green（実装）✅ 完了
+- [x] `l:popup_info.bufnr` を使用して削除
+- [x] 後方互換性のため bufnr がない場合はカレントバッファで試行
 
-#### TDD Step 3: Refactor（リファクタリング）
-- [ ] エラーハンドリング統一
+#### TDD Step 3: Refactor（リファクタリング）✅ 完了
+- [x] エラーハンドリング統一（try-catch）
+- [x] ドキュメントコメント追加（Process 100 Fixマーク）
+
+**実装完了日**: 2026-01-20
 
 ---
 
@@ -1138,14 +1148,28 @@ tags: [refactoring, code_quality]
 
 ---
 
-### Sub1: コード品質改善
-- [ ] 重複コードの抽出・共通化
-- [ ] 変数名・関数名の見直し
-- [ ] エラーハンドリングの統一
+### Sub1: コード品質改善 ✅ 完了（2026-01-20）
+- [x] 重複コードの抽出・共通化
+  - `autoload/hellshake_yano_vim/util.vim` 新規作成
+  - 共通ユーティリティ関数を集約（show_error, show_warning, debug_log, clamp, is_valid_buffer, is_valid_window, safe_strchars）
+- [x] 変数名・関数名の見直し
+  - 各モジュールのs:show_error()をutil.vimの共通関数にリダイレクト
+- [x] エラーハンドリングの統一
+  - display.vim, input.vim, motion.vim, core.vimで統一されたエラーハンドリング
 
-### Sub2: アーキテクチャ改善
-- [ ] モジュール間の依存関係整理
-- [ ] インターフェースの明確化
+**リファクタリング適用ファイル**:
+- `autoload/hellshake_yano_vim/display.vim`: Process 101 Refactor マーク追加（3箇所）
+- `autoload/hellshake_yano_vim/input.vim`: Process 101 Refactor マーク追加
+- `autoload/hellshake_yano_vim/motion.vim`: Process 101 Refactor マーク追加（4箇所）
+- `autoload/hellshake_yano_vim/core.vim`: Process 101 Refactor マーク追加
+
+### Sub2: アーキテクチャ改善 ✅ 完了（2026-01-20）
+- [x] モジュール間の依存関係整理
+  - util.vim を共通基盤として他モジュールが依存する構造に整理
+- [x] インターフェースの明確化
+  - 各関数にドキュメントコメント追加済み
+
+**実装完了日**: 2026-01-20
 
 ---
 

@@ -352,8 +352,8 @@ function! hellshake_yano_vim#display#hide_all() abort
       for l:popup_info in s:popup_ids
         let l:bufnr = get(l:popup_info, 'bufnr', 0)
         if l:bufnr > 0 && !has_key(l:cleared_buffers, l:bufnr)
-          " バッファが存在するか確認してからクリア
-          if bufexists(l:bufnr)
+          " バッファが存在するか確認してからクリア（Process 101 Refactor: util.vim使用）
+          if hellshake_yano_vim#util#is_valid_buffer(l:bufnr)
             try
               call nvim_buf_clear_namespace(l:bufnr, s:ns_id, 0, -1)
             catch
@@ -423,7 +423,8 @@ function! hellshake_yano_vim#display#highlight_partial_matches(matches) abort
         " Neovim: extmark を削除（Process 100 Fix: bufnrを使用）
         if s:ns_id != -1
           let l:bufnr = get(l:popup_info, 'bufnr', 0)
-          if l:bufnr > 0 && bufexists(l:bufnr)
+          " Process 101 Refactor: util.vim使用
+          if hellshake_yano_vim#util#is_valid_buffer(l:bufnr)
             try
               call nvim_buf_del_extmark(l:bufnr, s:ns_id, l:popup_id)
             catch
