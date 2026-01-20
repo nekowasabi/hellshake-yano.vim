@@ -212,6 +212,37 @@ Denops側の実装を最大限活用し、Vim側はAPIエンドポイントに�
 
 **実装完了日**: 2025-10-21
 
+### Phase D-7: マルチウィンドウ機能（Process 1-6, 100, 101）
+
+#### 実装完了（2026-01-17 〜 2026-01-20）
+
+**実装した機能:**
+- Process 1: ウィンドウ検出基盤（`window_detector.vim` 新規作成）
+- Process 2: 複数ウィンドウ単語検出（`word_detector.vim` 拡張）
+- Process 3: ウィンドウ指定ヒント表示（`display.vim` 拡張）
+- Process 4: ウィンドウ間ジャンプ（`jump.vim` 拡張）
+- Process 5: コア統合（`core.vim` 修正）
+- Process 6: 設定追加（`config.vim` 修正）
+- Process 100: マルチバッファextmark削除バグ修正
+- Process 101: リファクタリング（`util.vim` 新規作成）
+
+**新規ファイル:**
+- `autoload/hellshake_yano_vim/window_detector.vim`: ウィンドウ検出基盤
+- `autoload/hellshake_yano_vim/util.vim`: 共通ユーティリティ関数
+
+**主要関数:**
+- `hellshake_yano_vim#window_detector#get_visible()`: 現在タブ内の表示可能ウィンドウ一覧取得
+- `hellshake_yano_vim#word_detector#detect_multi_window(windows)`: 複数ウィンドウから単語検出
+- `hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hint)`: 指定ウィンドウにヒント表示
+- `hellshake_yano_vim#jump#to_window(winid, lnum, col)`: 別ウィンドウにジャンプ
+- `hellshake_yano_vim#util#is_valid_buffer(bufnr)`: バッファ有効性チェック
+- `hellshake_yano_vim#util#is_valid_window(winid)`: ウィンドウ有効性チェック
+
+**設定項目:**
+- `multiWindowMode`: マルチウィンドウモード有効化（デフォルト: `v:false`）
+- `multiWindowExcludeTypes`: 除外バッファタイプ（デフォルト: `['help', 'quickfix', 'terminal', 'popup']`）
+- `multiWindowMaxWindows`: 最大ウィンドウ数（デフォルト: `4`）
+
 ### 次のステップ
 1. ✅ ~~Process4 Sub1: Denops連携ラッパー実装~~ （完了: 2025-01-21）
 2. ✅ ~~Process4 Sub2: word_detector.vim統合~~ （完了: 2025-10-21）
@@ -527,3 +558,61 @@ if (await denops.eval("has('nvim')") as number) {
   1. `EnhancedWordConfig` 型に camelCase プロパティを追加
   2. `createCacheKey()` で camelCase を使用
 - **教訓**: TypeScript では型定義と実装コードの命名規則を一致させること。特にキャッシュキー生成など、値の同一性が重要な箇所では注意が必要
+
+### 知見メモ: マルチウィンドウ実装パターン
+- **背景**: 分割ウィンドウ間でのヒントジャンプ機能を実装（Process 1-6）
+- **実装パターン**:
+  1. **ウィンドウ検出**: `getwininfo()` で全ウィンドウ情報を取得し、`tabpagenr()` で同一タブ内をフィルタ
+  2. **座標変換**: `screenpos(winid, lnum, col)` でウィンドウIDを指定して別ウィンドウの座標も変換可能
+  3. **ウィンドウ間ジャンプ**: `win_gotoid(winid)` でウィンドウ移動後に `cursor()` でカーソル移動
+- **コード例**:
+  ```vim
+  " ウィンドウ検出
+  let l:all_windows = getwininfo()
+  let l:current_tabnr = tabpagenr()
+  for l:wininfo in l:all_windows
+    if l:wininfo.tabnr == l:current_tabnr
+      " 同一タブ内のウィンドウを処理
+    endif
+  endfor
+
+  " 別ウィンドウの座標変換
+  let l:screen = screenpos(a:winid, a:lnum, a:col)
+
+  " ウィンドウ間ジャンプ
+  let l:prev_winid = win_getid()
+  if win_gotoid(a:winid)
+    call cursor(a:lnum, a:col)
+  else
+    " ウィンドウが存在しない場合のエラー処理
+  endif
+  ```
+- **教訓**: マルチウィンドウ機能は `winid` を一貫して使用することで、ウィンドウの特定と操作が確実になる
+
+### 知見メモ: 共通ユーティリティ関数の集約パターン
+- **背景**: Process 101 リファクタリングで、複数モジュールに散在していた共通パターンを `util.vim` に集約
+- **集約した関数**:
+  - `hellshake_yano_vim#util#is_valid_buffer(bufnr)`: バッファ有効性チェック（`bufexists()` + `bufloaded()`）
+  - `hellshake_yano_vim#util#is_valid_window(winid)`: ウィンドウ有効性チェック（`win_id2win()` > 0）
+  - `hellshake_yano_vim#util#show_error(msg)`: エラーメッセージ表示（ErrorMsg ハイライト）
+  - `hellshake_yano_vim#util#show_warning(msg)`: 警告メッセージ表示（WarningMsg ハイライト）
+  - `hellshake_yano_vim#util#debug_log(msg)`: デバッグログ出力
+  - `hellshake_yano_vim#util#clamp(value, min, max)`: 値のクランプ
+  - `hellshake_yano_vim#util#safe_strchars(str)`: 安全な文字数カウント
+- **効果**:
+  - 重複コード削減
+  - エラーハンドリングの一貫性向上
+  - テスト容易性の向上
+- **コード例**:
+  ```vim
+  " バッファ/ウィンドウの有効性チェック（統一パターン）
+  if !hellshake_yano_vim#util#is_valid_buffer(l:bufnr)
+    return
+  endif
+
+  if !hellshake_yano_vim#util#is_valid_window(l:winid)
+    call hellshake_yano_vim#util#show_error('Invalid window')
+    return
+  endif
+  ```
+- **教訓**: 複数モジュールで同じパターンが3回以上出現したら、共通モジュールへの集約を検討する
