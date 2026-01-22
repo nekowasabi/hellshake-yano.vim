@@ -616,3 +616,32 @@ if (await denops.eval("has('nvim')") as number) {
   endif
   ```
 - **教訓**: 複数モジュールで同じパターンが3回以上出現したら、共通モジュールへの集約を検討する
+
+### 知見メモ: multiWindowMode はウィンドウ数もチェックすべき
+- **背景**: `multiWindowMode` 設定が `true` のとき、ウィンドウが1つしかない場合でもマルチウィンドウ処理が実行され、画面描画が乱れる現象が発生。Vim/Neovim 両方で再現。
+- **問題の原因**: `core.vim` の `show()` 関数で `multiWindowMode` フラグのみをチェックし、実際のウィンドウ数を確認していなかった。
+  - シングルウィンドウでも `detect_multi_window()` が呼ばれる
+  - 各単語に `winid`/`bufnr` が付与される
+  - `show_hint_with_window()` → `screenpos(winid, ...)` のパスが実行される
+  - Vim/Neovim で異なる座標計算が行われ、表示が乱れる
+- **正しい方法**:
+  - `multiWindowMode = true` の場合でも、`len(windows) == 1` ならシングルウィンドウ処理に切り替える
+  - `l:multi_window_mode = v:false` を設定して後続処理もシングルモードにする
+- **コード例**:
+  ```vim
+  if l:multi_window_mode
+    let l:windows = hellshake_yano_vim#window_detector#get_visible()
+    if empty(l:windows)
+      return
+    endif
+    " ウィンドウが1つの場合はシングルウィンドウ処理に切り替え
+    if len(l:windows) == 1
+      let l:detected_words = hellshake_yano_vim#word_detector#detect_visible()
+      let l:multi_window_mode = v:false
+    else
+      let l:detected_words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
+    endif
+  endif
+  ```
+- **Vim/Neovim 両対応の重要性**: 本プラグインは Vim/Neovim 両対応が必須。修正時は必ず両環境でテストすること。
+- **教訓**: 設定フラグだけでなく、実際の状態（ウィンドウ数など）も確認して処理を分岐すべき。「モードが有効」と「機能が必要」は別の概念

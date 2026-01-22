@@ -220,13 +220,21 @@ function! hellshake_yano_vim#core#show() abort
 
   " 1. 画面内の単語を検出
   " マルチウィンドウモードの場合は window_detector と detect_multi_window を使用
+  " Process 200: シングルウィンドウ最適化 - ウィンドウ1つの場合は detect_visible() に切り替え
   if l:multi_window_mode
     let l:windows = hellshake_yano_vim#window_detector#get_visible()
     if empty(l:windows)
       call s:show_warning('no visible windows found')
       return
     endif
-    let l:detected_words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
+    " 最適化: ウィンドウが1つの場合はシングルウィンドウ処理に切り替え
+    " これにより不要な winid 付与と screenpos(winid, ...) 呼び出しを回避
+    if len(l:windows) == 1
+      let l:detected_words = hellshake_yano_vim#word_detector#detect_visible()
+      let l:multi_window_mode = v:false  " 後続処理でシングルモードとして扱う
+    else
+      let l:detected_words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
+    endif
   else
     let l:detected_words = hellshake_yano_vim#word_detector#detect_visible()
   endif
