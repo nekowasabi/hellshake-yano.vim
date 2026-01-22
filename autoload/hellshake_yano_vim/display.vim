@@ -222,7 +222,7 @@ endfunction
 function! s:show_hint_neovim(lnum, col, hint) abort
   " namespace が未初期化の場合は作成
   if s:ns_id == -1
-    let s:ns_id = nvim_create_namespace('hellshake_yano_vim_hint')
+    let s:ns_id = nvim_create_namespace('hellshake_yano_hints')
   endif
 
   " Phase D-1 Sub3: カスタムハイライトグループを取得
@@ -284,7 +284,7 @@ function! hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hin
 
     " namespace 初期化
     if s:ns_id == -1
-      let s:ns_id = nvim_create_namespace('hellshake_yano_vim_hint')
+      let s:ns_id = nvim_create_namespace('hellshake_yano_hints')
     endif
 
     let l:extmark_id = nvim_buf_set_extmark(l:bufnr, s:ns_id, a:lnum - 1, a:col - 1, {

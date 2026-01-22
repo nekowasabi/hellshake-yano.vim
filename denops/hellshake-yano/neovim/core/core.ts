@@ -49,6 +49,10 @@ import {
   validateHighlightColor,
   validateHighlightGroupName,
 } from "../../validation-utils.ts";
+
+/** Neovim extmark namespace name */
+const EXTMARK_NAMESPACE = "hellshake_yano_hints";
+
 /**
  * @param threshold
  * @param timeoutMs
@@ -532,7 +536,7 @@ export class Core {
         try {
           const extmarkNamespace = await denops.call(
             "nvim_create_namespace",
-            "hellshake_yano_hints",
+            EXTMARK_NAMESPACE,
           ) as number;
           await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
         } catch (error) {
@@ -777,7 +781,7 @@ export class Core {
     try {
       extmarkNamespace = await denops.call(
         "nvim_create_namespace",
-        "hellshake_yano_hints",
+        EXTMARK_NAMESPACE,
       ) as number;
     } catch (error) {
       await this.displayHintsWithMatchAddBatch(denops, hints, mode, signal);
@@ -1431,7 +1435,7 @@ export class Core {
         if (signal.aborted) return;
         const extmarkNamespace = await denops.call(
           "nvim_create_namespace",
-          "hellshake_yano_hints",
+          EXTMARK_NAMESPACE,
         ) as number;
         if (signal.aborted) return;
         await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
@@ -1526,7 +1530,7 @@ export class Core {
       }
       const extmarkNamespace = await denops.call(
         "nvim_create_namespace",
-        "hellshake_yano_hints",
+        EXTMARK_NAMESPACE,
       ) as number;
       if (signal.aborted) return;
       // 各バッファのextmarkをクリア
@@ -2488,7 +2492,7 @@ export class Core {
       if (denops.meta.host === "nvim") {
         extmarkNamespace = await denops.call(
           "nvim_create_namespace",
-          "hellshake_yano_hints",
+          EXTMARK_NAMESPACE,
         ) as number;
       }
       return { extmarkNamespace, caches: pluginState.caches };
@@ -2931,7 +2935,7 @@ export class Core {
       if (denops.meta.host === "nvim") {
         extmarkNamespace = await denops.call(
           "nvim_create_namespace",
-          "hellshake_yano_hints",
+          EXTMARK_NAMESPACE,
         ) as number;
       }
 
@@ -2965,7 +2969,7 @@ export class Core {
       if (denops.meta.host === "nvim") {
         extmarkNamespace = await denops.call(
           "nvim_create_namespace",
-          "hellshake_yano_hints",
+          EXTMARK_NAMESPACE,
         ) as number;
       }
 

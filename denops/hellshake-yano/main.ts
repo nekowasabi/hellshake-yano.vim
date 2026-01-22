@@ -284,7 +284,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
     core.updateConfig(config);
 
     if (denops.meta.host === "nvim") {
-      extmarkNamespace = await denops.call("nvim_create_namespace", "hellshake-yano") as number;
+      extmarkNamespace = await denops.call("nvim_create_namespace", "hellshake_yano_hints") as number;
     }
 
     await initializeDictionarySystem(denops);
