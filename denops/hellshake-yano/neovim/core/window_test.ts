@@ -10,7 +10,12 @@ import {
 import { describe, it } from "jsr:@std/testing@^1.0.0/bdd";
 import type { Denops } from "jsr:@denops/std@^7.4.0";
 import type { Config, WindowInfo } from "../../types.ts";
-import { shouldUseMultiWindowMode, getVisibleWindows } from "./window.ts";
+import {
+  shouldUseMultiWindowMode,
+  getVisibleWindows,
+  getWindowVisibleLines,
+  isValidBuffer,
+} from "./window.ts";
 
 // モックDenops作成ヘルパー
 function createMockDenops(callResponses: Record<string, unknown>): Denops {
@@ -27,6 +32,9 @@ function createMockDenops(callResponses: Record<string, unknown>): Denops {
       // デフォルトレスポンス
       if (fn === "nvim_list_wins") return [];
       if (fn === "nvim_get_current_win") return 1000;
+      if (fn === "getwininfo") return [];
+      if (fn === "win_getid") return 1000;
+      if (fn === "bufexists") return 0;  // デフォルトは存在しない
       throw new Error(`Unexpected call: ${fn}(${JSON.stringify(args)})`);
     },
     batch: async () => [],
@@ -225,5 +233,148 @@ describe("getVisibleWindows", () => {
 
     assertEquals(result[0].isCurrent, false);
     assertEquals(result[1].isCurrent, true);
+  });
+});
+
+// =============================================================================
+// isValidBuffer テスト - Phase D-7: Race Condition 対策
+// =============================================================================
+describe("isValidBuffer", () => {
+  it("should return true for existing buffer", async () => {
+    const denops = createMockDenops({
+      "bufexists:[1]": 1,  // バッファ1は存在
+    });
+
+    const result = await isValidBuffer(denops, 1);
+
+    assertEquals(result, true);
+  });
+
+  it("should return false for non-existing buffer", async () => {
+    const denops = createMockDenops({
+      "bufexists:[999]": 0,  // バッファ999は存在しない
+    });
+
+    const result = await isValidBuffer(denops, 999);
+
+    assertEquals(result, false);
+  });
+
+  it("should return false when bufexists throws an error", async () => {
+    const denops = {
+      ...createMockDenops({}),
+      call: async (fn: string, ..._args: unknown[]) => {
+        if (fn === "bufexists") {
+          throw new Error("Invalid buffer id");
+        }
+        throw new Error(`Unexpected call: ${fn}`);
+      },
+    } as unknown as Denops;
+
+    const result = await isValidBuffer(denops, 1);
+
+    assertEquals(result, false);  // エラー時はfalseを返す
+  });
+});
+
+// =============================================================================
+// getWindowVisibleLines テスト - Phase D-7: Race Condition 対策
+// =============================================================================
+describe("getWindowVisibleLines", () => {
+  it("should return lines for valid buffer", async () => {
+    const mockLines = ["line 1", "line 2", "line 3"];
+    const denops = createMockDenops({
+      "bufexists:[1]": 1,  // バッファは有効
+      "nvim_buf_get_lines:[1,0,3,false]": mockLines,
+    });
+    const windowInfo: WindowInfo = {
+      winid: 1000,
+      bufnr: 1,
+      topline: 1,
+      botline: 3,
+      width: 80,
+      height: 24,
+      isCurrent: true,
+    };
+
+    const result = await getWindowVisibleLines(denops, windowInfo);
+
+    assertEquals(result, mockLines);
+  });
+
+  it("should return empty array for invalid buffer (race condition)", async () => {
+    const denops = createMockDenops({
+      "bufexists:[999]": 0,  // バッファは無効（削除済み）
+    });
+    const windowInfo: WindowInfo = {
+      winid: 1000,
+      bufnr: 999,  // 無効なバッファ
+      topline: 1,
+      botline: 10,
+      width: 80,
+      height: 24,
+      isCurrent: true,
+    };
+
+    const result = await getWindowVisibleLines(denops, windowInfo);
+
+    assertEquals(result, []);  // 空配列を返す（エラーを投げない）
+  });
+
+  it("should return empty array when nvim_buf_get_lines throws 'Invalid buffer id'", async () => {
+    const denops = {
+      ...createMockDenops({}),
+      call: async (fn: string, ...args: unknown[]) => {
+        if (fn === "bufexists") {
+          return 1;  // バッファ存在チェックは通過
+        }
+        if (fn === "nvim_buf_get_lines") {
+          // チェック後にバッファが削除された（Race Condition）
+          throw new Error("Invalid buffer id: 1");
+        }
+        throw new Error(`Unexpected call: ${fn}(${JSON.stringify(args)})`);
+      },
+    } as unknown as Denops;
+    const windowInfo: WindowInfo = {
+      winid: 1000,
+      bufnr: 1,
+      topline: 1,
+      botline: 10,
+      width: 80,
+      height: 24,
+      isCurrent: true,
+    };
+
+    const result = await getWindowVisibleLines(denops, windowInfo);
+
+    assertEquals(result, []);  // エラーを投げずに空配列を返す
+  });
+
+  it("should handle other errors gracefully", async () => {
+    const denops = {
+      ...createMockDenops({}),
+      call: async (fn: string, ...args: unknown[]) => {
+        if (fn === "bufexists") {
+          return 1;
+        }
+        if (fn === "nvim_buf_get_lines") {
+          throw new Error("Some other error");
+        }
+        throw new Error(`Unexpected call: ${fn}(${JSON.stringify(args)})`);
+      },
+    } as unknown as Denops;
+    const windowInfo: WindowInfo = {
+      winid: 1000,
+      bufnr: 1,
+      topline: 1,
+      botline: 10,
+      width: 80,
+      height: 24,
+      isCurrent: true,
+    };
+
+    const result = await getWindowVisibleLines(denops, windowInfo);
+
+    assertEquals(result, []);  // どのエラーでも空配列を返す
   });
 });

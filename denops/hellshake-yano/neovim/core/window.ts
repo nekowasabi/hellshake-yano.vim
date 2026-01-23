@@ -4,11 +4,38 @@
  * Phase D-7 Process5: マルチウィンドウサポート
  *
  * このモジュールは複数ウィンドウ環境でのヒント表示を管理します。
+ * - isValidBuffer: バッファ有効性チェック（Race Condition 対策）
  * - shouldUseMultiWindowMode: マルチウィンドウモードを使用すべきか判定
  * - getVisibleWindows: 可視ウィンドウの情報を取得
+ * - getWindowVisibleLines: ウィンドウ可視範囲の行テキストを取得
  */
 import type { Denops } from "jsr:@denops/std@^7.4.0";
 import type { Config, WindowInfo } from "../../types.ts";
+
+/**
+ * バッファが有効かどうかをチェック
+ *
+ * Phase D-7: Race Condition 対策
+ * getVisibleWindows() でバッファ情報を取得後、
+ * getWindowVisibleLines() で使用するまでにバッファが
+ * 閉じられる可能性があるため、API呼び出し前にチェックする。
+ *
+ * @param denops - Denops インスタンス
+ * @param bufnr - チェックするバッファ番号
+ * @returns バッファが存在し有効な場合は true
+ */
+export async function isValidBuffer(
+  denops: Denops,
+  bufnr: number
+): Promise<boolean> {
+  try {
+    const exists = (await denops.call("bufexists", bufnr)) as number;
+    return exists === 1;
+  } catch {
+    // エラー発生時は無効として扱う
+    return false;
+  }
+}
 
 /**
  * マルチウィンドウモードを使用すべきか判定
@@ -99,6 +126,10 @@ export async function getVisibleWindows(
 /**
  * ウィンドウの可視範囲の行テキストを取得
  *
+ * Phase D-7: Race Condition 対策
+ * API呼び出し前にバッファ有効性をチェックし、
+ * 無効なバッファの場合は空配列を返す。
+ *
  * @param denops - Denops インスタンス
  * @param windowInfo - ウィンドウ情報
  * @returns 可視範囲の行テキスト配列
@@ -111,18 +142,33 @@ export async function getWindowVisibleLines(
   windowInfo: WindowInfo
 ): Promise<string[]> {
   try {
+    // バッファ有効性チェック（Race Condition 対策）
+    if (!(await isValidBuffer(denops, windowInfo.bufnr))) {
+      console.warn(
+        `[window.ts] Buffer ${windowInfo.bufnr} is no longer valid (likely closed during async operation)`
+      );
+      return [];
+    }
+
     // nvim_buf_get_lines は 0-indexed で、end は exclusive
-    const lines = await denops.call(
+    const lines = (await denops.call(
       "nvim_buf_get_lines",
       windowInfo.bufnr,
-      windowInfo.topline - 1,  // 0-indexed に変換
-      windowInfo.botline,       // exclusive なのでそのまま
-      false                     // strict_indexing = false
-    ) as string[];
+      windowInfo.topline - 1, // 0-indexed に変換
+      windowInfo.botline, // exclusive なのでそのまま
+      false // strict_indexing = false
+    )) as string[];
 
     return lines;
   } catch (error) {
-    console.error("[window.ts] getWindowVisibleLines error:", error);
+    // Race condition による Invalid buffer id エラーは警告レベルに
+    if (error instanceof Error && error.message.includes("Invalid buffer id")) {
+      console.warn(
+        `[window.ts] Buffer became invalid during getWindowVisibleLines: ${error.message}`
+      );
+    } else {
+      console.error("[window.ts] getWindowVisibleLines error:", error);
+    }
     return [];
   }
 }
