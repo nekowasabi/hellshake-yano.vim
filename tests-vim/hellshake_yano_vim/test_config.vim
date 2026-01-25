@@ -65,8 +65,8 @@ function! s:test_config_get_default() abort
   call s:assert_true(l:motion_enabled, 'default motion_enabled should be true')
   call s:assert_equal(2, l:motion_threshold, 'default motion_threshold should be 2')
   call s:assert_equal(2000, l:motion_timeout_ms, 'default motion_timeout_ms should be 2000')
-  call s:assert_equal(['w', 'b', 'e'], l:motion_keys,
-    \ 'default motion_keys should be ["w", "b", "e"]')
+  call s:assert_equal(['w', 'b', 'e', 'h', 'j', 'k', 'l'], l:motion_keys,
+    \ 'default motion_keys should include h, j, k, l')
 endfunction
 
 " ========================================
@@ -145,12 +145,12 @@ function! s:test_config_get_nonexistent_key() abort
     unlet g:hellshake_yano_vim_config
   endif
 
-  " 存在しないキーを取得（デフォルトではv:noneを返す）
+  " 存在しないキーを取得（デフォルトではv:nullを返す）
   let l:result = hellshake_yano_vim#config#get('nonexistent_key')
 
-  " v:none が返されることを確認
-  call s:assert_equal(v:none, l:result,
-    \ 'get() should return v:none for nonexistent key')
+  " v:null が返されることを確認
+  call s:assert_equal(v:null, l:result,
+    \ 'get() should return v:null for nonexistent key')
 endfunction
 
 " ========================================
@@ -285,6 +285,119 @@ function! s:test_config_multi_window_custom() abort
 endfunction
 
 " ========================================
+" Phase 1.2: Denops連携テスト
+" ========================================
+
+function! s:test_is_denops_ready_function_exists() abort
+  " is_denops_ready() 関数が存在することを確認
+  let l:has_func = exists('*hellshake_yano_vim#core#is_denops_ready')
+  call s:assert_true(l:has_func,
+    \ 'hellshake_yano_vim#core#is_denops_ready() function should exist')
+endfunction
+
+function! s:test_is_denops_ready_returns_boolean() abort
+  " is_denops_ready() がブール値を返すことを確認
+  let l:result = hellshake_yano_vim#core#is_denops_ready()
+  let l:is_bool = type(l:result) == v:t_bool
+  call s:assert_true(l:is_bool,
+    \ 'is_denops_ready() should return boolean')
+endfunction
+
+function! s:test_config_key_mapping_helper_exists() abort
+  " s:map_key_to_ts() ヘルパーが動作することを確認（間接テスト）
+  " 直接テストできないため、get() の動作を通じて検証
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  " motion_threshold のデフォルト値が取得できることを確認
+  let l:result = hellshake_yano_vim#config#get('motion_threshold')
+  call s:assert_equal(2, l:result,
+    \ 'get() should work with key mapping (motion_threshold default)')
+endfunction
+
+function! s:test_config_reload_function_exists() abort
+  " reload() 関数が存在することを確認
+  let l:has_func = exists('*hellshake_yano_vim#config#reload')
+  call s:assert_true(l:has_func,
+    \ 'hellshake_yano_vim#config#reload() function should exist')
+endfunction
+
+" ========================================
+" Phase 1.2: 型変換テスト（Council条件4）
+" ========================================
+
+function! s:test_exclude_numbers_get_set() abort
+  " exclude_numbers の get/set が動作することを確認
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  " デフォルト値の確認
+  let l:default = hellshake_yano_vim#config#get('exclude_numbers')
+  call s:assert_false(l:default,
+    \ 'default exclude_numbers should be false')
+
+  " set と get の動作確認
+  call hellshake_yano_vim#config#set('exclude_numbers', v:true)
+  let l:result = hellshake_yano_vim#config#get('exclude_numbers')
+  call s:assert_true(l:result,
+    \ 'set/get exclude_numbers should work')
+
+  " クリーンアップ
+  unlet g:hellshake_yano_vim_config
+endfunction
+
+function! s:test_hint_chars_string_type() abort
+  " hint_chars が文字列として取得できることを確認
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  let l:hint_chars = hellshake_yano_vim#config#get('hint_chars')
+  call s:assert_equal(v:t_string, type(l:hint_chars),
+    \ 'hint_chars should be string type')
+  call s:assert_equal('ASDFJKL', l:hint_chars,
+    \ 'default hint_chars should be "ASDFJKL"')
+endfunction
+
+function! s:test_config_fallback_without_denops() abort
+  " Denops未初期化時にフォールバックが動作することを確認
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  " Denopsが未初期化の状態でget()を呼び出し
+  let l:is_ready = hellshake_yano_vim#core#is_denops_ready()
+  call s:assert_false(l:is_ready,
+    \ 'is_denops_ready() should return false without Denops')
+
+  " フォールバックでデフォルト値が取得できることを確認
+  let l:threshold = hellshake_yano_vim#config#get('motion_threshold')
+  call s:assert_equal(2, l:threshold,
+    \ 'get() should fallback to default when Denops not ready')
+endfunction
+
+function! s:test_config_set_updates_local() abort
+  " set() がローカル設定を更新することを確認
+  if exists('g:hellshake_yano_vim_config')
+    unlet g:hellshake_yano_vim_config
+  endif
+
+  " 設定を変更
+  call hellshake_yano_vim#config#set('motion_threshold', 5)
+
+  " ローカル設定が更新されていることを確認
+  call s:assert_true(exists('g:hellshake_yano_vim_config'),
+    \ 'set() should create g:hellshake_yano_vim_config')
+  call s:assert_equal(5, g:hellshake_yano_vim_config['motion_threshold'],
+    \ 'set() should update local config')
+
+  " クリーンアップ
+  unlet g:hellshake_yano_vim_config
+endfunction
+
+" ========================================
 " テストスイート実行
 " ========================================
 
@@ -325,6 +438,26 @@ function! s:run_all_tests() abort
   echo '--- Phase MW-6: Multi-Window Configuration ---'
   call s:test_config_multi_window_defaults()
   call s:test_config_multi_window_custom()
+  echo ''
+
+  " Phase 1.2: Denops連携テスト
+  echo '--- Phase 1.2: Denops Integration ---'
+  call s:test_is_denops_ready_function_exists()
+  call s:test_is_denops_ready_returns_boolean()
+  call s:test_config_key_mapping_helper_exists()
+  call s:test_config_reload_function_exists()
+  echo ''
+
+  " Phase 1.2: 型変換テスト
+  echo '--- Phase 1.2: Type Conversion Tests ---'
+  call s:test_exclude_numbers_get_set()
+  call s:test_hint_chars_string_type()
+  echo ''
+
+  " Phase 1.2: フォールバック・同期テスト
+  echo '--- Phase 1.2: Fallback & Sync Tests ---'
+  call s:test_config_fallback_without_denops()
+  call s:test_config_set_updates_local()
   echo ''
 
   " 結果サマリー
