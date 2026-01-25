@@ -71,6 +71,34 @@ function! hellshake_yano_vim#core#get_state() abort
   return deepcopy(s:state)
 endfunction
 
+" hellshake_yano_vim#core#is_denops_ready() - Denops初期化状態の確認
+"
+" Phase 1.2: VimScript→TypeScript統合
+"
+" 目的:
+"   - Denopsプラグインが初期化済みかどうかを確認
+"   - config.vim がDenops APIを呼び出せるかの判定に使用
+"
+" アルゴリズム:
+"   1. denops#plugin#is_loaded() が存在するか確認
+"   2. 存在する場合、'hellshake-yano' プラグインがロード済みか確認
+"   3. 存在しない場合は v:false を返す
+"
+" @return Boolean Denopsが利用可能な場合 v:true、そうでなければ v:false
+function! hellshake_yano_vim#core#is_denops_ready() abort
+  " denops#plugin#is_loaded() が存在しない場合は未初期化
+  if !exists('*denops#plugin#is_loaded')
+    return v:false
+  endif
+
+  " hellshake-yano プラグインがロードされているか確認
+  try
+    return denops#plugin#is_loaded('hellshake-yano')
+  catch
+    return v:false
+  endtry
+endfunction
+
 " hellshake_yano_vim#core#get_fixed_positions() - 固定座標の取得
 "
 " 目的:

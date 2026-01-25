@@ -18,6 +18,7 @@ export interface VimScriptConfig {
   min_word_length?: number;
   use_japanese?: boolean;
   debug_mode?: boolean;
+  exclude_numbers?: boolean;
   // deno-lint-ignore no-explicit-any
   [key: string]: any; // Unknown keys are allowed but will be ignored
 }
@@ -34,6 +35,7 @@ export interface MappedConfig {
   defaultMinWordLength?: number;
   useJapanese?: boolean;
   debugMode?: boolean;
+  excludeNumbers?: boolean;
   // deno-lint-ignore no-explicit-any
   [key: string]: any;
 }
@@ -90,6 +92,10 @@ export class ConfigMapper {
     },
     "debug_mode": {
       key: "debugMode",
+      transform: (v: boolean) => v,
+    },
+    "exclude_numbers": {
+      key: "excludeNumbers",
       transform: (v: boolean) => v,
     },
   };

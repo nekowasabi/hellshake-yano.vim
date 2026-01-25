@@ -115,8 +115,8 @@ function! hellshake_yano_vim#config#get(key) abort
     return s:default_config[a:key]
   endif
 
-  " キーが存在しない場合は v:none を返す
-  return v:none
+  " キーが存在しない場合は v:null を返す（Vim/Neovim互換）
+  return v:null
 endfunction
 
 " hellshake_yano_vim#config#set(key, value) - 設定値の変更
@@ -153,8 +153,136 @@ function! hellshake_yano_vim#config#set(key, value) abort
     let g:hellshake_yano_vim_config = {}
   endif
 
-  " キーと値を設定
+  " キーと値を設定（ローカルキャッシュ）
   let g:hellshake_yano_vim_config[a:key] = a:value
+
+  " Phase 1.2: Denopsが準備できていれば TypeScript側（SoT）にも同期
+  if hellshake_yano_vim#core#is_denops_ready()
+    try
+      let l:ts_key = s:map_key_to_ts(a:key)
+      let l:ts_value = a:value
+
+      " hint_chars の特殊変換: 文字列 → 配列
+      if a:key ==# 'hint_chars' && type(a:value) == v:t_string
+        let l:ts_value = split(a:value, '\zs')
+      endif
+
+      call denops#request('hellshake-yano', 'updateConfig', [{l:ts_key: l:ts_value}])
+    catch
+      " エラーは無視（ローカル設定は更新済み）
+      " デバッグモード時のみログ出力
+      if hellshake_yano_vim#config#get('debug_mode')
+        echohl WarningMsg
+        echo '[hellshake-yano] Failed to sync config: ' . v:exception
+        echohl None
+      endif
+    endtry
+  endif
+endfunction
+
+" hellshake_yano_vim#config#reload() - 設定の再読み込み
+"
+" Phase 1.2: VimScript→TypeScript統合
+"
+" 目的:
+"   - TypeScript側（SoT）から設定を取得し、VimScript側に反映
+"   - ユーザーが設定を変更した後に即時反映するために使用
+"
+" アルゴリズム:
+"   1. Denops が初期化されていない場合は警告を表示して終了
+"   2. denops#request() で TypeScript側の getConfig API を呼び出し
+"   3. 取得した設定を s:map_config_from_ts() で VimScript形式に変換
+"   4. g:hellshake_yano_vim_config を更新
+"
+" Council条件3: 即時反映
+"   - reload() 実行時点で動作中の設定に即座に適用
+"   - UIへの反映は次回ヒント表示時
+"
+" @return なし
+function! hellshake_yano_vim#config#reload() abort
+  " Denops が初期化されていない場合は警告
+  if !hellshake_yano_vim#core#is_denops_ready()
+    echohl WarningMsg
+    echo '[hellshake-yano] Denops not ready'
+    echohl None
+    return
+  endif
+
+  try
+    " TypeScript側から設定を取得
+    let l:config = denops#request('hellshake-yano', 'getConfig', [])
+
+    " VimScript形式に変換して反映
+    let g:hellshake_yano_vim_config = s:map_config_from_ts(l:config)
+
+    echohl MoreMsg
+    echo '[hellshake-yano] Config reloaded'
+    echohl None
+  catch
+    echohl ErrorMsg
+    echo '[hellshake-yano] Failed: ' . v:exception
+    echohl None
+  endtry
+endfunction
+
+" ========================================
+" 内部ヘルパー関数（Phase 1.2）
+" ========================================
+
+" s:map_key_to_ts(key) - VimScript形式のキーをTypeScript形式に変換
+"
+" @param key String VimScript形式のキー（snake_case）
+" @return String TypeScript形式のキー（camelCase）
+function! s:map_key_to_ts(key) abort
+  let l:mapping = {
+    \ 'hint_chars': 'markers',
+    \ 'motion_threshold': 'motionCount',
+    \ 'motion_timeout_ms': 'motionTimeout',
+    \ 'motion_keys': 'countedMotions',
+    \ 'motion_enabled': 'motionCounterEnabled',
+    \ 'visual_mode_enabled': 'visualModeEnabled',
+    \ 'max_hints': 'maxHints',
+    \ 'min_word_length': 'defaultMinWordLength',
+    \ 'use_japanese': 'useJapanese',
+    \ 'debug_mode': 'debugMode',
+    \ 'exclude_numbers': 'excludeNumbers'
+    \ }
+
+  return get(l:mapping, a:key, a:key)
+endfunction
+
+" s:map_config_from_ts(config) - TypeScript形式の設定をVimScript形式に変換
+"
+" @param config Dictionary TypeScript形式の設定
+" @return Dictionary VimScript形式の設定
+function! s:map_config_from_ts(config) abort
+  let l:reverse_mapping = {
+    \ 'markers': 'hint_chars',
+    \ 'motionCount': 'motion_threshold',
+    \ 'motionTimeout': 'motion_timeout_ms',
+    \ 'countedMotions': 'motion_keys',
+    \ 'motionCounterEnabled': 'motion_enabled',
+    \ 'visualModeEnabled': 'visual_mode_enabled',
+    \ 'maxHints': 'max_hints',
+    \ 'defaultMinWordLength': 'min_word_length',
+    \ 'useJapanese': 'use_japanese',
+    \ 'debugMode': 'debug_mode',
+    \ 'excludeNumbers': 'exclude_numbers'
+    \ }
+
+  let l:result = {}
+  for [l:ts_key, l:value] in items(a:config)
+    let l:vim_key = get(l:reverse_mapping, l:ts_key, l:ts_key)
+
+    " hint_chars の特殊変換: 配列 → 文字列
+    if l:ts_key ==# 'markers' && type(l:value) == v:t_list
+      let l:result[l:vim_key] = join(l:value, '')
+    else
+      let l:result[l:vim_key] = l:value
+    endif
+  endfor
+
+  return l:result
 endfunction
 
 let &cpo = s:save_cpo
