@@ -16,6 +16,47 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
+" ========================================
+" Phase 1.3 Process 2: Denops統合
+" ========================================
+
+" hellshake_yano_vim#hint_generator#has_denops() - Denops利用可能チェック
+"
+" 目的:
+"   - Denopsプラグインが利用可能かチェック
+"   - dictionary.vimの統合パターンに準拠
+"
+" @return v:true: Denops利用可能 / v:false: 利用不可
+function! hellshake_yano_vim#hint_generator#has_denops() abort
+  if !exists('*denops#plugin#is_loaded')
+    return v:false
+  endif
+  try
+    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
+  catch
+    return v:false
+  endtry
+endfunction
+
+" ========================================
+" Phase 1.3 Process 3: キャッシュ機構
+" ========================================
+
+" ヒントキャッシュ（高頻度呼び出し対策）
+let s:hint_cache = {}
+let s:cache_max_size = 100  " キャッシュエントリ上限
+
+" hellshake_yano_vim#hint_generator#clear_cache() - キャッシュクリア
+"
+" 目的:
+"   - ヒントキャッシュをクリア
+"   - 設定変更時やテスト時に呼び出す
+"
+" @return void
+function! hellshake_yano_vim#hint_generator#clear_cache() abort
+  let s:hint_cache = {}
+endfunction
+
 " s:get_config() - 設定の取得
 "
 " 目的:
@@ -187,6 +228,53 @@ function! hellshake_yano_vim#hint_generator#generate(count) abort
     return []
   endif
 
+  " Phase 1.3 Process 3: キャッシュチェック
+  let l:cache_key = string(a:count)
+  if has_key(s:hint_cache, l:cache_key)
+    return copy(s:hint_cache[l:cache_key])
+  endif
+
+  " Phase 1.3 Process 2: Denops優先 - 利用可能な場合はDenops経由で生成
+  let l:result = []
+  if hellshake_yano_vim#hint_generator#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'generateHints', [a:count])
+      if type(l:result) != v:t_list
+        let l:result = []
+      endif
+    catch
+      " Denops呼び出し失敗時はフォールバック
+      let l:result = []
+    endtry
+  endif
+
+  " フォールバック: ローカル実装
+  if empty(l:result)
+    let l:result = s:generate_local(a:count)
+  endif
+
+  " Phase 1.3 Process 3: キャッシュに保存（上限チェック）
+  if len(s:hint_cache) >= s:cache_max_size
+    " 最も古いエントリを削除（簡易LRU）
+    let l:keys = keys(s:hint_cache)
+    if !empty(l:keys)
+      unlet s:hint_cache[l:keys[0]]
+    endif
+  endif
+  let s:hint_cache[l:cache_key] = l:result
+
+  return copy(l:result)
+endfunction
+
+" s:generate_local(count) - ローカル実装（フォールバック用）
+"
+" 目的:
+"   - Denops未起動時のフォールバック実装
+"   - 既存のヒント生成ロジックを維持
+"
+" @param count Number 生成するヒント数
+" @return List<String> ヒント文字の配列
+function! s:generate_local(count) abort
   " Phase D-1 Sub2.1: 設定の読み込み（フォールバック付き）
   let l:single_char_keys = s:get_config('singleCharKeys', s:default_single_char_keys)
   let l:multi_char_keys = s:get_config('multiCharKeys', s:default_multi_char_keys)

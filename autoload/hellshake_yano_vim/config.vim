@@ -215,6 +215,11 @@ function! hellshake_yano_vim#config#reload() abort
     " VimScript形式に変換して反映
     let g:hellshake_yano_vim_config = s:map_config_from_ts(l:config)
 
+    " Phase 1.3 Process 4: ヒントキャッシュをクリア（設定変更反映のため）
+    if exists('*hellshake_yano_vim#hint_generator#clear_cache')
+      call hellshake_yano_vim#hint_generator#clear_cache()
+    endif
+
     echohl MoreMsg
     echo '[hellshake-yano] Config reloaded'
     echohl None

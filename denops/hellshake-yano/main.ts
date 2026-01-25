@@ -8,7 +8,7 @@
  */
 import type { Denops } from "@denops/std";
 import { Config, DEFAULT_CONFIG } from "./config.ts";
-import type { DebugInfo, HintMapping, Word, WindowInfo } from "./types.ts";
+import type { DebugInfo, HintMapping, WindowInfo, Word } from "./types.ts";
 
 // 統合レイヤーのインポート
 import { Initializer } from "./integration/initializer.ts";
@@ -95,7 +95,10 @@ export async function main(denops: Denops): Promise<void> {
     // VimScript版の場合は既にcommand-registry経由でコマンド登録済み
   } catch (error) {
     // エラーログ（オプション）
-    console.error("main() initialization failed:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "main() initialization failed:",
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }
@@ -115,7 +118,10 @@ async function initializeDenopsUnified(denops: Denops): Promise<void> {
       await initializeVimLayer(denops);
     }
   } catch (error) {
-    console.error("initializeDenopsUnified failed:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "initializeDenopsUnified failed:",
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }
@@ -262,9 +268,33 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         }
         return false;
       },
+
+      // Phase 1.3 Process 1: generateHints API追加
+      async generateHints(wordCount: unknown): Promise<string[]> {
+        const startTime = performance.now();
+        try {
+          const count = typeof wordCount === "number" ? wordCount : 0;
+          if (count <= 0) {
+            return [];
+          }
+          const hintConfig = {
+            singleCharKeys: config.singleCharKeys,
+            multiCharKeys: config.multiCharKeys,
+            maxSingleCharHints: config.maxSingleCharHints,
+            useNumericMultiCharHints: config.useNumericMultiCharHints,
+            markers: config.markers || ["a", "s", "d", "f"],
+          };
+          return generateHints(count, hintConfig);
+        } finally {
+          recordPerformance("hintGeneration", performance.now() - startTime);
+        }
+      },
     };
   } catch (error) {
-    console.error("initializeVimLayer failed:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "initializeVimLayer failed:",
+      error instanceof Error ? error.message : String(error),
+    );
     throw error;
   }
 }
@@ -292,7 +322,10 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
     core.updateConfig(config);
 
     if (denops.meta.host === "nvim") {
-      extmarkNamespace = await denops.call("nvim_create_namespace", "hellshake_yano_hints") as number;
+      extmarkNamespace = await denops.call(
+        "nvim_create_namespace",
+        "hellshake_yano_hints",
+      ) as number;
     }
 
     await initializeDictionarySystem(denops);
@@ -592,7 +625,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
           }
           if (Array.isArray(u.multiWindowExcludeTypes)) {
             validUpdates.multiWindowExcludeTypes = u.multiWindowExcludeTypes.filter(
-              (t): t is string => typeof t === "string"
+              (t): t is string => typeof t === "string",
             );
           }
           if (typeof u.multiWindowMaxWindows === "number") {
@@ -718,4 +751,3 @@ export function highlightCandidateHintsAsync(
 
 // Re-export highlightCandidateHintsHybrid from display.ts
 export { highlightCandidateHintsHybrid };
-
