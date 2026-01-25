@@ -49,3 +49,12 @@ export async function validateDictionary(denops: Denops): Promise<void> {
     await denops.cmd(`echoerr "Failed to validate dictionary: ${error}"`);
   }
 }
+
+export async function isInDictionary(denops: Denops, word: string): Promise<boolean> {
+  try {
+    const core = await getCoreForDictionary(denops);
+    return await core.isInDictionary(denops, word);
+  } catch {
+    return false;
+  }
+}

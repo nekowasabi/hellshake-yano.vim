@@ -1912,6 +1912,37 @@ export class Core {
       await denops.cmd(`echoerr "Failed to add word to dictionary: ${error}"`);
     }
   }
+
+  /**
+   * Check if a word exists in the dictionary
+   * @param word - The word to check
+   * @returns boolean - True if word exists in dictionary
+   */
+  async isInDictionary(denops: Denops, word: string): Promise<boolean> {
+    try {
+      if (!this.dictionaryLoader || !this.vimConfigBridge) {
+        await this.initializeDictionarySystem(denops);
+      }
+      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
+      const dictionary = await this.dictionaryLoader!.loadUserDictionary(dictConfig);
+
+      // Check in customWords array
+      if (dictionary.customWords.includes(word)) {
+        return true;
+      }
+
+      // Check in preserveWords array
+      if (dictionary.preserveWords.includes(word)) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      // On error, return false (word not found)
+      return false;
+    }
+  }
+
   /* Vimのハイライトグループ名として有効かどうか検証する */
   static validateHighlightGroupName(groupName: string): boolean {
     if (!groupName || groupName.length === 0) {

@@ -31,6 +31,7 @@ import {
   addToDictionary,
   editDictionary,
   initializeDictionarySystem,
+  isInDictionary,
   reloadDictionary,
   showDictionary,
   validateDictionary,
@@ -254,6 +255,13 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
       async validateDictionary(): Promise<void> {
         await validateDictionary(denops);
       },
+
+      async isInDictionary(word: unknown): Promise<boolean> {
+        if (typeof word === "string") {
+          return await isInDictionary(denops, word);
+        }
+        return false;
+      },
     };
   } catch (error) {
     console.error("initializeVimLayer failed:", error instanceof Error ? error.message : String(error));
@@ -441,6 +449,13 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
 
       async validateDictionary(): Promise<void> {
         await validateDictionary(denops);
+      },
+
+      async isInDictionary(word: unknown): Promise<boolean> {
+        if (typeof word === "string") {
+          return await isInDictionary(denops, word);
+        }
+        return false;
       },
 
       async showHintsWithKey(key: unknown, mode?: unknown): Promise<void> {
