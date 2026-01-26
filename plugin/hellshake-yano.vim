@@ -66,6 +66,14 @@ if !has_key(g:hellshake_yano, 'motion_timeout')
   let g:hellshake_yano.motion_timeout = 2000
 endif
 
+" FocusGained / TermLeave 対応設定（マルチウィンドウ/ターミナル復帰時のちらつき防止）
+if !has_key(g:hellshake_yano, 'multiWindowRestoreDelay')
+  let g:hellshake_yano.multiWindowRestoreDelay = 500
+endif
+if !has_key(g:hellshake_yano, 'multiWindowDetectFocusGained')
+  let g:hellshake_yano.multiWindowDetectFocusGained = v:true
+endif
+
 " キー別最小文字数設定（process1追加）
 if !has_key(g:hellshake_yano, 'per_key_min_length')
   " デフォルト設定例：近距離精密移動は1文字から、頻繁なキーは2文字から
@@ -520,6 +528,9 @@ augroup HellshakeYano
   " バッファ変更時の処理
   autocmd BufEnter * call hellshake_yano#plugin#on_buf_enter()
   autocmd BufLeave * call hellshake_yano#plugin#on_buf_leave()
+  " ターミナルからファイルを開いた場合のちらつき防止（lazygit e キー対応）
+  autocmd BufLeave * call hellshake_yano#core#on_buf_leave()
+  autocmd BufEnter * call hellshake_yano#core#on_buf_enter_from_terminal()
   " denopsプラグインの遅延読み込み
   autocmd User DenopsPluginPost:hellshake-yano call s:on_denops_ready()
   " カラースキーム変更時にハイライトを再適用
@@ -533,6 +544,9 @@ function! s:on_denops_ready() abort
 
   " カスタムハイライト色の適用
   call s:apply_custom_highlights()
+
+  " FocusGained / TermLeave 対応の初期化
+  call hellshake_yano#core#init()
 
   " ユーザー設定をdenops側に送信（TypeScript側でデフォルト値とマージ）
   call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])

@@ -404,7 +404,9 @@ function! hellshake_yano_vim#motion#handle_with_count(motion_key, count) abort
 
     " Phase D-2 Sub1.1: カーソル位置を画面に反映してからヒント表示
     " ヒント表示前に画面を更新し、カーソルの移動を視覚的に確認できるようにする
-    redraw
+    if hellshake_yano_vim#core#should_redraw()
+      redraw
+    endif
 
     " 7. ヒント表示トリガー（閾値に達した場合）
     if l:should_trigger_hint
@@ -627,7 +629,9 @@ function! hellshake_yano_vim#motion#handle_visual_internal(motion_key) abort
     " （handle_visual_expr()がモーションキーを返すことで実行）
 
     " Phase D-2 Sub1.1: カーソル位置を画面に反映
-    redraw
+    if hellshake_yano_vim#core#should_redraw()
+      redraw
+    endif
 
     " 7. ヒント表示トリガー（閾値に達した場合）
     if l:should_trigger_hint
