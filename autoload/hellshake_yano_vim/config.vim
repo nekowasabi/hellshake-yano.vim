@@ -67,7 +67,10 @@ let s:default_config = {
   \
   \ 'multiWindowMode': v:false,
   \ 'multiWindowExcludeTypes': ['help', 'quickfix', 'terminal', 'popup'],
-  \ 'multiWindowMaxWindows': 4
+  \ 'multiWindowMaxWindows': 4,
+  \
+  \ 'multiWindowRestoreDelay': 50,
+  \ 'multiWindowDetectFocusGained': v:true
 \ }
 
 " hellshake_yano_vim#config#get(key) - 設定値の取得

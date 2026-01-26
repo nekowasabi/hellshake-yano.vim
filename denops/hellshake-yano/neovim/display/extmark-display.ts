@@ -164,7 +164,10 @@ export async function highlightCandidateHintsHybrid(
   const sc = cands.slice(0, SBS);
   const ac = cands.slice(SBS);
   await displayHintsBatched(denops, sc, config, extmarkNamespace, fallbackMatchIds);
-  await denops.cmd("redraw");
+  const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+  if (shouldRedraw) {
+    await denops.cmd("redraw");
+  }
   if (ac.length > 0) {
     queueMicrotask(async () => {
       try {
@@ -288,6 +291,12 @@ export async function displayHintsMultiBuffer(
   config: Config,
   extmarkNamespace: number,
 ): Promise<Map<number, number[]>> {
+  // フォーカス復帰直後は処理をスキップ（ちらつき防止）
+  const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+  if (!shouldRedraw) {
+    return new Map<number, number[]>();  // VimScript側の遅延処理後に再度呼ばれる
+  }
+
   _isRenderingHints = true;
   const extmarkIdsByBuffer = new Map<number, number[]>();
 

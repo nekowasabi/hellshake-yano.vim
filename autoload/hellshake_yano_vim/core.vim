@@ -25,6 +25,10 @@ let s:state = {
   \ 'input_timer': 0
 \ }
 
+" Focus Restore Feature: 画面ちらつき問題の修正
+" FocusGained 直後かどうかを示すフラグ
+let s:focus_just_restored = v:false
+
 " hellshake_yano_vim#core#init() - 状態変数の初期化
 "
 " 目的:
@@ -46,6 +50,9 @@ function! hellshake_yano_vim#core#init() abort
     \ 'input_timer': 0
   \ }
 
+  " Focus Restore Feature: フラグを初期化
+  let s:focus_just_restored = v:false
+
   " Phase A-4: モーション連打検出の初期化
   call hellshake_yano_vim#motion#init()
 
@@ -58,6 +65,9 @@ function! hellshake_yano_vim#core#init() abort
 
   call hellshake_yano_vim#motion#set_threshold(l:motion_threshold)
   call hellshake_yano_vim#motion#set_timeout(l:motion_timeout_ms)
+
+  " Focus Restore Feature: FocusGained autocmd の設定
+  call s:setup_focus_gained_autocmd()
 endfunction
 
 " hellshake_yano_vim#core#get_state() - 状態変数の取得（テスト用）
@@ -69,6 +79,153 @@ endfunction
 " @return Dictionary s:state のコピー
 function! hellshake_yano_vim#core#get_state() abort
   return deepcopy(s:state)
+endfunction
+
+" ========================================
+" Focus Restore Feature: 画面ちらつき問題の修正
+" ========================================
+
+" s:setup_focus_gained_autocmd() - FocusGained/TermLeave autocmd の設定
+"
+" 目的:
+"   - FocusGained イベントで on_focus_gained() を呼び出す autocmd を設定
+"   - TermLeave/TermClose イベントも監視（lazygit等のターミナル復帰対応）
+"   - multiWindowDetectFocusGained が有効な場合のみ設定
+"
+" 背景:
+"   - FocusGained は OS レベルのフォーカス変更時にのみ発火
+"   - lazygit 等の Neovim 内ターミナルからの復帰では FocusGained は発火しない
+"   - TermLeave（ターミナルモード離脱）と TermClose（ターミナル終了）を監視
+"
+" @return なし
+function! s:setup_focus_gained_autocmd() abort
+  " 既存の autocmd をクリア
+  augroup HellshakeYanoFocusRestore
+    autocmd!
+  augroup END
+
+  " 設定で有効化されている場合のみ autocmd を設定
+  if hellshake_yano_vim#config#get('multiWindowDetectFocusGained')
+    augroup HellshakeYanoFocusRestore
+      autocmd!
+      " OS レベルのフォーカス変更
+      autocmd FocusGained * call hellshake_yano_vim#core#on_focus_gained()
+      " Neovim 内ターミナルからの復帰（lazygit, terminal等）
+      if has('nvim')
+        autocmd TermLeave * call hellshake_yano_vim#core#on_terminal_leave()
+        autocmd TermClose * call hellshake_yano_vim#core#on_terminal_leave()
+      endif
+    augroup END
+  endif
+endfunction
+
+" hellshake_yano_vim#core#on_focus_gained() - FocusGained イベントハンドラ
+"
+" 目的:
+"   - FocusGained イベント時にフラグを設定
+"   - 一定時間後にフラグを自動リセット
+"
+" @return なし
+function! hellshake_yano_vim#core#on_focus_gained() abort
+  echom '[HY-DEBUG] on_focus_gained triggered at ' . strftime('%H:%M:%S')
+
+  " 設定で無効化されている場合は何もしない
+  if !hellshake_yano_vim#config#get('multiWindowDetectFocusGained')
+    echom '[HY-DEBUG] multiWindowDetectFocusGained is disabled, returning'
+    return
+  endif
+
+  " フラグを設定
+  let s:focus_just_restored = v:true
+  echom '[HY-DEBUG] focus_just_restored = true'
+
+  " 一定時間後にフラグをリセット（100ms）
+  call timer_start(100, {-> execute("let s:focus_just_restored = v:false | echom '[HY-DEBUG] focus_just_restored = false (timer reset 100ms)'")})
+endfunction
+
+" hellshake_yano_vim#core#on_terminal_leave() - TermLeave/TermClose イベントハンドラ
+"
+" 目的:
+"   - ターミナルバッファから離れた時にフラグを設定
+"   - lazygit 等の Neovim 内ターミナルからの復帰時のちらつき防止
+"   - FocusGained とは異なり、ターミナル専用の処理
+"
+" 背景:
+"   - TermLeave: ターミナルモードから離れた時（:terminal で開いたバッファ）
+"   - TermClose: ターミナルバッファが閉じられた時（lazygit終了等）
+"   - これらのイベントは FocusGained とは別に発火する
+"
+" @return なし
+function! hellshake_yano_vim#core#on_terminal_leave() abort
+  echom '[HY-DEBUG] on_terminal_leave triggered at ' . strftime('%H:%M:%S')
+
+  " 設定で無効化されている場合は何もしない
+  if !hellshake_yano_vim#config#get('multiWindowDetectFocusGained')
+    echom '[HY-DEBUG] multiWindowDetectFocusGained is disabled, returning'
+    return
+  endif
+
+  " フラグを設定
+  let s:focus_just_restored = v:true
+  echom '[HY-DEBUG] focus_just_restored = true (terminal leave)'
+
+  " ターミナル復帰は画面の再描画に時間がかかるため、長めの遅延を設定（150ms）
+  " FocusGained の 100ms より長くすることで、より確実にちらつきを防止
+  call timer_start(150, {-> execute("let s:focus_just_restored = v:false | echom '[HY-DEBUG] focus_just_restored = false (timer reset 150ms)'")})
+endfunction
+
+" hellshake_yano_vim#core#is_focus_just_restored() - フォーカス復帰フラグの取得
+"
+" 目的:
+"   - FocusGained 直後かどうかを返す
+"   - 他のモジュールからフラグの状態を確認するために使用
+"
+" @return Boolean フォーカス復帰直後なら true、そうでなければ false
+function! hellshake_yano_vim#core#is_focus_just_restored() abort
+  return s:focus_just_restored
+endfunction
+
+" hellshake_yano_vim#core#clear_focus_flag() - フォーカス復帰フラグのクリア
+"
+" 目的:
+"   - フォーカス復帰フラグを手動でクリア
+"   - テストやデバッグ用
+"
+" @return なし
+function! hellshake_yano_vim#core#clear_focus_flag() abort
+  let s:focus_just_restored = v:false
+endfunction
+
+" hellshake_yano_vim#core#should_redraw() - redraw すべきかどうかの判定
+"
+" 目的:
+"   - フォーカス復帰直後は redraw をスキップすべきかを判定
+"   - 画面ちらつき防止のため
+"
+" @return Boolean redraw すべきなら true、スキップすべきなら false
+function! hellshake_yano_vim#core#should_redraw() abort
+  return !s:focus_just_restored
+endfunction
+
+" hellshake_yano_vim#core#show_delayed() - 遅延付きヒント表示
+"
+" 目的:
+"   - フォーカス復帰直後は遅延を入れてヒントを表示
+"   - 通常時は即時実行
+"
+" @param delay_ms Number 遅延時間（ミリ秒）。省略時は設定値を使用
+" @return なし
+function! hellshake_yano_vim#core#show_delayed(...) abort
+  " 遅延時間を取得（引数があれば使用、なければ設定値）
+  let l:delay_ms = a:0 > 0 ? a:1 : hellshake_yano_vim#config#get('multiWindowRestoreDelay')
+
+  if s:focus_just_restored
+    " フォーカス復帰直後は遅延実行
+    call timer_start(l:delay_ms, {-> hellshake_yano_vim#core#show()})
+  else
+    " 通常時は即時実行
+    call hellshake_yano_vim#core#show()
+  endif
 endfunction
 
 " hellshake_yano_vim#core#is_denops_ready() - Denops初期化状態の確認
@@ -242,6 +399,20 @@ function! hellshake_yano_vim#core#show_with_motion_timer(timer) abort
 endfunction
 
 function! hellshake_yano_vim#core#show() abort
+  echom '[HY-DEBUG] show() called at ' . strftime('%H:%M:%S') . ', focus_just_restored = ' . s:focus_just_restored
+
+  " Focus Restore Feature: フォーカス復帰直後は遅延実行
+  " lazygit等の外部ツールから復帰直後は画面が不安定なため、遅延してから表示
+  if s:focus_just_restored
+    let l:delay_ms = hellshake_yano_vim#config#get('multiWindowRestoreDelay')
+    echom '[HY-DEBUG] Delaying show() by ' . l:delay_ms . 'ms due to focus_just_restored'
+    " フラグをクリアして無限ループを防止
+    let s:focus_just_restored = v:false
+    echom '[HY-DEBUG] focus_just_restored = false (cleared before delay)'
+    call timer_start(l:delay_ms, {-> hellshake_yano_vim#core#show()})
+    return
+  endif
+
   " Process 5: マルチウィンドウモード対応
   " multiWindowMode が true の場合は複数ウィンドウにヒントを表示
   let l:multi_window_mode = hellshake_yano_vim#config#get('multiWindowMode')
@@ -408,7 +579,10 @@ function! hellshake_yano_vim#core#show() abort
   let s:state.hints_visible = v:true
 
   " 画面を再描画してヒントが確実に表示されるようにする
-  redraw
+  " Focus Restore Feature: フォーカス復帰直後は redraw をスキップ（ちらつき防止）
+  if hellshake_yano_vim#core#should_redraw()
+    redraw
+  endif
 
   " 5. 入力処理開始（ブロッキング方式、複数文字対応）
   " wait_for_input() を使用することで、Vimの通常キーバインドより先に入力をキャプチャ

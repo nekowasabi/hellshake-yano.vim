@@ -1,5 +1,8 @@
 " License: MIT
 
+" 遅延実行中フラグ（ちらつき防止用）
+let s:delay_in_progress = v:false
+
 " キー別ヒント表示の必要性を判定
 function! hellshake_yano#hint#should_trigger_hints_for_key(bufnr, key) abort
   if hellshake_yano#state#is_key_repeating(a:bufnr)
@@ -19,7 +22,27 @@ function! hellshake_yano#hint#trigger_hints() abort
 endfunction
 
 " ヒントを表示（公開API）
+" Focus Restore Feature: FocusGained 直後は遅延実行
 function! hellshake_yano#hint#show() abort
+  " 遅延実行中はスキップ
+  if s:delay_in_progress
+    return
+  endif
+
+  " フォーカス復帰直後かチェック
+  if hellshake_yano#core#is_focus_just_restored()
+    let s:delay_in_progress = v:true
+    let l:delay_ms = hellshake_yano#config#get('multiWindowRestoreDelay', 50)
+    " フラグはクリアしない（5000msタイマーに任せる）
+    call timer_start(l:delay_ms, {-> hellshake_yano#hint#delayed_trigger_hints()})
+    return
+  endif
+  call hellshake_yano#hint#trigger_hints()
+endfunction
+
+" 遅延実行後のトリガー関数
+function! hellshake_yano#hint#delayed_trigger_hints() abort
+  let s:delay_in_progress = v:false
   call hellshake_yano#hint#trigger_hints()
 endfunction
 
@@ -31,7 +54,34 @@ function! hellshake_yano#hint#hide() abort
 endfunction
 
 " キー情報付きヒント表示関数
+" Focus Restore Feature: FocusGained 直後は遅延実行
 function! hellshake_yano#hint#show_hints_with_key(key) abort
+  " 遅延実行中はスキップ
+  if s:delay_in_progress
+    return
+  endif
+
+  " フォーカス復帰直後かチェック
+  if hellshake_yano#core#is_focus_just_restored()
+    let s:delay_in_progress = v:true
+    let l:delay_ms = hellshake_yano#config#get('multiWindowRestoreDelay', 50)
+    " フラグはクリアしない（5000msタイマーに任せる）
+    " キー情報を保持してタイマーで呼び出し
+    let l:key = a:key
+    call timer_start(l:delay_ms, {-> hellshake_yano#hint#delayed_show_hints_with_key(l:key)})
+    return
+  endif
+  call hellshake_yano#hint#show_hints_with_key_internal(a:key)
+endfunction
+
+" 遅延実行後のキー付きヒント表示関数
+function! hellshake_yano#hint#delayed_show_hints_with_key(key) abort
+  let s:delay_in_progress = v:false
+  call hellshake_yano#hint#show_hints_with_key_internal(a:key)
+endfunction
+
+" キー情報付きヒント表示関数（内部実装）
+function! hellshake_yano#hint#show_hints_with_key_internal(key) abort
   try
     if !hellshake_yano#utils#is_denops_ready()
       return

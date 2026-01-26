@@ -122,3 +122,12 @@ function! hellshake_yano#config#set_timeout(timeout) abort
     call hellshake_yano#utils#show_error('[hellshake-yano] Error: Timeout must be greater than 0')
   endif
 endfunction
+
+" 汎用設定取得関数
+" @param key String 設定キー
+" @param default any デフォルト値（省略時は v:null）
+" @return any 設定値
+function! hellshake_yano#config#get(key, ...) abort
+  let l:default = a:0 > 0 ? a:1 : v:null
+  return get(g:hellshake_yano, a:key, l:default)
+endfunction

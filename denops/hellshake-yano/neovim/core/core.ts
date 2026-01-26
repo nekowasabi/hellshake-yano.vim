@@ -1568,7 +1568,10 @@ export class Core {
         } catch (error) {
         }
       }
-      await denops.cmd("redraw");
+      const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+      if (shouldRedraw) {
+        await denops.cmd("redraw");
+      }
       const asyncNonCandidates = nonCandidateHints.slice(5);
       if (asyncCandidates.length > 0 || asyncNonCandidates.length > 0) {
         queueMicrotask(async () => {
@@ -2843,6 +2846,13 @@ export class Core {
    * @param mode - Display mode (default: "normal")
    */
   async showHintsMultiWindowInternal(denops: Denops, mode?: string): Promise<void> {
+    // フォーカス復帰直後は処理をスキップ（ちらつき防止）
+    // hideHints() より前にチェックすることで、画面クリアによるちらつきを防止
+    const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+    if (!shouldRedraw) {
+      return;  // VimScript側の遅延処理後に再度呼ばれる
+    }
+
     const modeString = mode || "normal";
     try {
       this.hideHints();
@@ -2938,6 +2948,13 @@ export class Core {
    * @returns Array of hint mappings for all visible windows
    */
   async showHintsMultiWindow(denops: Denops, config?: Partial<Config>): Promise<HintMapping[]> {
+    // フォーカス復帰直後は処理をスキップ（ちらつき防止）
+    // detectWordsMultiWindow() がウィンドウ切り替えを行うため、ここでブロック必要
+    const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+    if (!shouldRedraw) {
+      return [];  // VimScript側の遅延処理後に再度呼ばれる
+    }
+
     const effectiveConfig = { ...this.config, ...config };
     try {
       const { detectWordsMultiWindow } = await import("./word.ts");
