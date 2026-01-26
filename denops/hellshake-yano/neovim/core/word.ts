@@ -2142,46 +2142,50 @@ async function detectWordsInWindow(
 }
 
 /**
- * Get folded lines for a specific buffer/window
- *
- * @param denops - Denops instance
- * @param windowInfo - Window information
- * @returns Set of folded line numbers
+ * Get folded lines for a specific buffer/window using win_execute()
+ * win_execute() は noautocmd で実行されるため、再描画がトリガーされない
  */
 async function getFoldedLinesForBuffer(
   denops: Denops,
   windowInfo: WindowInfo,
 ): Promise<Set<number>> {
   const foldedLines = new Set<number>();
-  let currentLine = windowInfo.topline;
 
-  // We need to check folds in the context of the target window
-  // Save current window and switch to target
-  const currentWinid = await denops.call("win_getid") as number;
+  // win_execute() でウィンドウ切り替えなしで fold 情報を一括取得
+  // VimScript を文字列で渡し、結果を JSON で返す
+  const script = `
+    let result = []
+    for line in range(${windowInfo.topline}, ${windowInfo.botline})
+      let foldStart = foldclosed(line)
+      if foldStart != -1
+        call add(result, [foldStart, foldclosedend(line)])
+        let line = foldclosedend(line)
+      endif
+    endfor
+    echo json_encode(result)
+  `;
 
   try {
-    if (currentWinid !== windowInfo.winid) {
-      await denops.call("win_gotoid", windowInfo.winid);
-    }
+    const resultStr = await denops.call(
+      "win_execute",
+      windowInfo.winid,
+      script,
+      "silent"
+    ) as string;
 
-    while (currentLine <= windowInfo.botline) {
-      const foldStart = await denops.call("foldclosed", currentLine) as number;
-      if (foldStart !== -1) {
-        const foldEnd = await denops.call("foldclosedend", currentLine) as number;
-        // Add all lines in the fold to exclusion set
+    // 結果をパース
+    const trimmed = resultStr.trim();
+    if (trimmed && trimmed !== "[]") {
+      const foldInfo = JSON.parse(trimmed) as Array<[number, number]>;
+      for (const [foldStart, foldEnd] of foldInfo) {
         for (let line = foldStart; line <= foldEnd; line++) {
           foldedLines.add(line);
         }
-        currentLine = foldEnd + 1; // Skip to line after fold
-      } else {
-        currentLine++;
       }
     }
-  } finally {
-    // Restore original window
-    if (currentWinid !== windowInfo.winid) {
-      await denops.call("win_gotoid", currentWinid);
-    }
+  } catch (e) {
+    // フォールバック: エラー時は空のセットを返す（fold なしとして扱う）
+    console.error("getFoldedLinesForBuffer error:", e);
   }
 
   return foldedLines;
