@@ -55,7 +55,6 @@ function! hellshake_yano#plugin#on_buf_enter() abort
   " lazygit で e キーを押してファイルを開く場合など、
   " TermLeave より先に BufEnter が発火する場合に対応
   if s:last_buftype ==# 'terminal'
-    echom '[HY-DEBUG] on_buf_enter: detected transition from terminal buffer'
     " ターミナルからの遷移時はフラグを設定（ちらつき防止）
     if exists('*hellshake_yano#core#on_terminal_leave')
       call hellshake_yano#core#on_terminal_leave()

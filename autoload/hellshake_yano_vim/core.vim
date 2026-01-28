@@ -127,20 +127,16 @@ endfunction
 "
 " @return なし
 function! hellshake_yano_vim#core#on_focus_gained() abort
-  echom '[HY-DEBUG] on_focus_gained triggered at ' . strftime('%H:%M:%S')
-
   " 設定で無効化されている場合は何もしない
   if !hellshake_yano_vim#config#get('multiWindowDetectFocusGained')
-    echom '[HY-DEBUG] multiWindowDetectFocusGained is disabled, returning'
     return
   endif
 
   " フラグを設定
   let s:focus_just_restored = v:true
-  echom '[HY-DEBUG] focus_just_restored = true'
 
   " 一定時間後にフラグをリセット（100ms）
-  call timer_start(100, {-> execute("let s:focus_just_restored = v:false | echom '[HY-DEBUG] focus_just_restored = false (timer reset 100ms)'")})
+  call timer_start(100, {-> execute("let s:focus_just_restored = v:false")})
 endfunction
 
 " hellshake_yano_vim#core#on_terminal_leave() - TermLeave/TermClose イベントハンドラ
@@ -157,21 +153,17 @@ endfunction
 "
 " @return なし
 function! hellshake_yano_vim#core#on_terminal_leave() abort
-  echom '[HY-DEBUG] on_terminal_leave triggered at ' . strftime('%H:%M:%S')
-
   " 設定で無効化されている場合は何もしない
   if !hellshake_yano_vim#config#get('multiWindowDetectFocusGained')
-    echom '[HY-DEBUG] multiWindowDetectFocusGained is disabled, returning'
     return
   endif
 
   " フラグを設定
   let s:focus_just_restored = v:true
-  echom '[HY-DEBUG] focus_just_restored = true (terminal leave)'
 
   " ターミナル復帰は画面の再描画に時間がかかるため、長めの遅延を設定（150ms）
   " FocusGained の 100ms より長くすることで、より確実にちらつきを防止
-  call timer_start(150, {-> execute("let s:focus_just_restored = v:false | echom '[HY-DEBUG] focus_just_restored = false (timer reset 150ms)'")})
+  call timer_start(150, {-> execute("let s:focus_just_restored = v:false")})
 endfunction
 
 " hellshake_yano_vim#core#is_focus_just_restored() - フォーカス復帰フラグの取得
@@ -399,16 +391,12 @@ function! hellshake_yano_vim#core#show_with_motion_timer(timer) abort
 endfunction
 
 function! hellshake_yano_vim#core#show() abort
-  echom '[HY-DEBUG] show() called at ' . strftime('%H:%M:%S') . ', focus_just_restored = ' . s:focus_just_restored
-
   " Focus Restore Feature: フォーカス復帰直後は遅延実行
   " lazygit等の外部ツールから復帰直後は画面が不安定なため、遅延してから表示
   if s:focus_just_restored
     let l:delay_ms = hellshake_yano_vim#config#get('multiWindowRestoreDelay')
-    echom '[HY-DEBUG] Delaying show() by ' . l:delay_ms . 'ms due to focus_just_restored'
     " フラグをクリアして無限ループを防止
     let s:focus_just_restored = v:false
-    echom '[HY-DEBUG] focus_just_restored = false (cleared before delay)'
     call timer_start(l:delay_ms, {-> hellshake_yano_vim#core#show()})
     return
   endif
