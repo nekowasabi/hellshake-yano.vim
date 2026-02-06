@@ -8,4 +8,4 @@
  */
 
 // Re-export from word.ts for convenience
-export type { VimScriptWord, DenopsWord } from "./word.ts";
+export type { DenopsWord, VimScriptWord } from "./word.ts";

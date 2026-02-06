@@ -124,11 +124,26 @@ export type HintPositionType = "start" | "end" | "overlay" | "same" | "both";
 export type HintDisplayMode = "before" | "after" | "overlay";
 export type DetectionStrategy = "regex" | "tinysegmenter" | "hybrid";
 export type MotionKey =
-  | "f" | "F" | "t" | "T"
-  | "w" | "W" | "b" | "B" | "e" | "E"
-  | "/" | "?" | "n" | "N"
-  | "h" | "j" | "k" | "l"
-  | ";" | ","
+  | "f"
+  | "F"
+  | "t"
+  | "T"
+  | "w"
+  | "W"
+  | "b"
+  | "B"
+  | "e"
+  | "E"
+  | "/"
+  | "?"
+  | "n"
+  | "N"
+  | "h"
+  | "j"
+  | "k"
+  | "l"
+  | ";"
+  | ","
   | string;
 export type CacheKey = string;
 export type Timestamp = number;
@@ -241,7 +256,76 @@ export type RequiredProperties<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type SafeKeys<T> = keyof T;
 export type ValueOf<T> = T[keyof T];
 export function createMinimalConfig(): Config {
-  return {enabled:true,markers:["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"],motionCount:3,motionTimeout:2000,hintPosition:"start",triggerOnHjkl:true,countedMotions:[],maxHints:100,debounceDelay:50,useNumbers:false,directionalHintFilter:false,highlightSelected:false,debugCoordinates:false,singleCharKeys:[],multiCharKeys:[],useHintGroups:false,continuousHintMode:false,recenterCommand:"normal! zz",maxContinuousJumps:50,highlightHintMarker:"DiffAdd",highlightHintMarkerCurrent:"DiffText",suppressOnKeyRepeat:true,keyRepeatThreshold:50,useJapanese:false,wordDetectionStrategy:"hybrid",enableTinySegmenter:true,segmenterThreshold:4,japaneseMinWordLength:2,japaneseMergeParticles:true,japaneseMergeThreshold:2,defaultMinWordLength:3,defaultMotionCount:3,debugMode:false,performanceLog:false,motionCounterEnabled:true,motionCounterThreshold:3,motionCounterTimeout:2000,showHintOnMotionThreshold:true,multiWindowMode:false,multiWindowExcludeTypes:["help","quickfix","terminal","popup","nofile"],multiWindowMaxWindows:4};
+  return {
+    enabled: true,
+    markers: [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "U",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z",
+    ],
+    motionCount: 3,
+    motionTimeout: 2000,
+    hintPosition: "start",
+    triggerOnHjkl: true,
+    countedMotions: [],
+    maxHints: 100,
+    debounceDelay: 50,
+    useNumbers: false,
+    directionalHintFilter: false,
+    highlightSelected: false,
+    debugCoordinates: false,
+    singleCharKeys: [],
+    multiCharKeys: [],
+    useHintGroups: false,
+    continuousHintMode: false,
+    recenterCommand: "normal! zz",
+    maxContinuousJumps: 50,
+    highlightHintMarker: "DiffAdd",
+    highlightHintMarkerCurrent: "DiffText",
+    suppressOnKeyRepeat: true,
+    keyRepeatThreshold: 50,
+    useJapanese: false,
+    wordDetectionStrategy: "hybrid",
+    enableTinySegmenter: true,
+    segmenterThreshold: 4,
+    japaneseMinWordLength: 2,
+    japaneseMergeParticles: true,
+    japaneseMergeThreshold: 2,
+    defaultMinWordLength: 3,
+    defaultMotionCount: 3,
+    debugMode: false,
+    performanceLog: false,
+    motionCounterEnabled: true,
+    motionCounterThreshold: 3,
+    motionCounterTimeout: 2000,
+    showHintOnMotionThreshold: true,
+    multiWindowMode: false,
+    multiWindowExcludeTypes: ["help", "quickfix", "terminal", "popup", "nofile"],
+    multiWindowMaxWindows: 4,
+  };
 }
 export interface WordDetectionConfig {
   minLength?: number;
@@ -276,7 +360,11 @@ export interface HintOperationsDependencies {
   detectWordsOptimized: (denops: Denops, bufnr?: number) => Promise<Word[]>;
   generateHintsOptimized: (wordCount: number, config?: Partial<Config>) => string[];
   assignHintsToWords: (words: Word[], hints: string[]) => HintMapping[];
-  displayHintsAsync: (denops: Denops, hints: HintMapping[], config?: Partial<Config>) => Promise<void>;
+  displayHintsAsync: (
+    denops: Denops,
+    hints: HintMapping[],
+    config?: Partial<Config>,
+  ) => Promise<void>;
   hideHints: (denops: Denops) => Promise<void>;
   recordPerformance: (operation: string, startTime: number, endTime: number) => void;
   clearHintCache: () => void;
@@ -314,18 +402,25 @@ export interface DebugController {
   toggleDebugMode: () => void;
 }
 export interface ExtendedDebugInfo extends DebugInfo {
-  performanceDetails?: {minExecutionTime?: number; maxExecutionTime?: number; avgExecutionTime?: number;};
-  cacheDetails?: {wordCacheSize?: number; hintCacheSize?: number; cacheHitRate?: number;};
+  performanceDetails?: {
+    minExecutionTime?: number;
+    maxExecutionTime?: number;
+    avgExecutionTime?: number;
+  };
+  cacheDetails?: { wordCacheSize?: number; hintCacheSize?: number; cacheHitRate?: number };
 }
 export interface InitializeOptions {
   force?: boolean;
   debug?: boolean;
   config?: Partial<Config>;
-  cacheSizes?: {words?: number; hints?: number;};
+  cacheSizes?: { words?: number; hints?: number };
 }
 export interface InitializeResult {
   extmarkNamespace: number | null;
-  caches: {words: import("./cache.ts").LRUCache<string, Word[]>; hints: import("./cache.ts").LRUCache<string, string[]>;};
+  caches: {
+    words: import("./cache.ts").LRUCache<string, Word[]>;
+    hints: import("./cache.ts").LRUCache<string, string[]>;
+  };
 }
 export interface HealthCheckResult {
   healthy: boolean;
@@ -344,7 +439,15 @@ export interface PerformanceStats {
   min: number;
 }
 export interface PluginStatistics {
-  cacheStats: {words: import("./cache.ts").CacheStatistics; hints: import("./cache.ts").CacheStatistics;};
-  performanceStats: {showHints: PerformanceStats; hideHints: PerformanceStats; wordDetection: PerformanceStats; hintGeneration: PerformanceStats;};
-  currentState: {initialized: boolean; hintsVisible: boolean; currentHintsCount: number;};
+  cacheStats: {
+    words: import("./cache.ts").CacheStatistics;
+    hints: import("./cache.ts").CacheStatistics;
+  };
+  performanceStats: {
+    showHints: PerformanceStats;
+    hideHints: PerformanceStats;
+    wordDetection: PerformanceStats;
+    hintGeneration: PerformanceStats;
+  };
+  currentState: { initialized: boolean; hintsVisible: boolean; currentHintsCount: number };
 }

@@ -8,8 +8,12 @@ export const HIGHLIGHT_BATCH_SIZE = 15;
 let _isRenderingHints = false;
 let pendingHighlightTimerId: number | undefined;
 
-export function isRenderingHints(): boolean { return _isRenderingHints; }
-export function abortCurrentRendering(): void { _isRenderingHints = false; }
+export function isRenderingHints(): boolean {
+  return _isRenderingHints;
+}
+export function abortCurrentRendering(): void {
+  _isRenderingHints = false;
+}
 
 function getTimeoutDelay(): number {
   const isDeno = typeof Deno !== "undefined";
@@ -53,7 +57,10 @@ export async function displayHintsOptimized(
     hintPosition: config.hintPosition,
     bothMinWordLength: config.bothMinWordLength,
   });
-  if (currentHints) { currentHints.length = 0; currentHints.push(...nh); }
+  if (currentHints) {
+    currentHints.length = 0;
+    currentHints.push(...nh);
+  }
   if (hintsVisible) hintsVisible.value = true;
   await displayHintsBatched(denops, nh, config, extmarkNamespace, fallbackMatchIds);
   return nh;
@@ -102,7 +109,9 @@ async function clearHintDisplay(
     await denops.call("nvim_buf_clear_namespace", 0, extmarkNamespace, 0, -1);
   } else if (fallbackMatchIds) {
     for (const mid of fallbackMatchIds) {
-      try { await denops.call("matchdelete", mid); } catch { /* ignore */ }
+      try {
+        await denops.call("matchdelete", mid);
+      } catch { /* ignore */ }
     }
     fallbackMatchIds.length = 0;
   }
@@ -142,9 +151,20 @@ export function highlightCandidateHintsAsync(
   const delay = getTimeoutDelay();
   pendingHighlightTimerId = setTimeout(() => {
     pendingHighlightTimerId = undefined;
-    highlightCandidateHintsOptimized(denops, input, hints, config, extmarkNamespace, fallbackMatchIds)
-      .then(() => { if (onComplete) onComplete(); })
-      .catch(() => { if (onComplete) onComplete(); });
+    highlightCandidateHintsOptimized(
+      denops,
+      input,
+      hints,
+      config,
+      extmarkNamespace,
+      fallbackMatchIds,
+    )
+      .then(() => {
+        if (onComplete) onComplete();
+      })
+      .catch(() => {
+        if (onComplete) onComplete();
+      });
   }, delay) as unknown as number;
 }
 
@@ -160,11 +180,14 @@ export async function highlightCandidateHintsHybrid(
   const SBS = 15;
   const cands = hints.filter((h) => h.hint.startsWith(input));
   await clearHintDisplay(denops, extmarkNamespace, fallbackMatchIds);
-  if (cands.length === 0) { if (onComplete) onComplete(); return; }
+  if (cands.length === 0) {
+    if (onComplete) onComplete();
+    return;
+  }
   const sc = cands.slice(0, SBS);
   const ac = cands.slice(SBS);
   await displayHintsBatched(denops, sc, config, extmarkNamespace, fallbackMatchIds);
-  const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+  const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
   if (shouldRedraw) {
     await denops.cmd("redraw");
   }
@@ -173,7 +196,9 @@ export async function highlightCandidateHintsHybrid(
       try {
         await displayHintsBatched(denops, ac, config, extmarkNamespace, fallbackMatchIds);
         if (onComplete) onComplete();
-      } catch { if (onComplete) onComplete(); }
+      } catch {
+        if (onComplete) onComplete();
+      }
     });
   } else {
     if (onComplete) onComplete();
@@ -207,8 +232,8 @@ async function processExtmarksBatched(
     const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
       ? h.hintByteCol - 1
       : (h.word.byteCol !== undefined && h.word.byteCol > 0)
-        ? h.word.byteCol - 1
-        : h.word.col - 1;
+      ? h.word.byteCol - 1
+      : h.word.col - 1;
 
     try {
       await denops.call("nvim_buf_set_extmark", 0, extmarkNamespace, line, col, {
@@ -236,15 +261,24 @@ async function processMatchaddBatched(
       try {
         if (await denops.call("exists", "*prop_type_add") === 1) {
           try {
-            await denops.call("prop_type_add", "HellshakeYanoSymbol", { highlight: highlightGroup });
+            await denops.call("prop_type_add", "HellshakeYanoSymbol", {
+              highlight: highlightGroup,
+            });
           } catch { /* exists */ }
-          await denops.call("prop_add", p.line, p.col, { type: "HellshakeYanoSymbol", length: h.hint.length, text: h.hint });
+          await denops.call("prop_add", p.line, p.col, {
+            type: "HellshakeYanoSymbol",
+            length: h.hint.length,
+            text: h.hint,
+          });
         } else {
-          let eh = h.hint;
-          const ne = ['\\', '.', '[', ']', '^', '$', '*'];
-          if (ne.some(c => h.hint.includes(c))) {
-            eh = h.hint.replace(/\\/g, '\\\\').replace(/\./g, '\\.').replace(/\[/g, '\\[')
-              .replace(/\]/g, '\\]').replace(/\^/g, '\\^').replace(/\$/g, '\\$').replace(/\*/g, '\\*');
+          const _eh = h.hint;
+          const ne = ["\\", ".", "[", "]", "^", "$", "*"];
+          if (ne.some((c) => h.hint.includes(c))) {
+            eh = h.hint.replace(/\\/g, "\\\\").replace(/\./g, "\\.").replace(/\[/g, "\\[")
+              .replace(/\]/g, "\\]").replace(/\^/g, "\\^").replace(/\$/g, "\\$").replace(
+                /\*/g,
+                "\\*",
+              );
           }
           const pat = `\\%${p.line}l\\%${p.col}c.`;
           const mid = await denops.call("matchadd", highlightGroup, pat, 10) as number;
@@ -292,9 +326,9 @@ export async function displayHintsMultiBuffer(
   extmarkNamespace: number,
 ): Promise<Map<number, number[]>> {
   // フォーカス復帰直後は処理をスキップ（ちらつき防止）
-  const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+  const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
   if (!shouldRedraw) {
-    return new Map<number, number[]>();  // VimScript側の遅延処理後に再度呼ばれる
+    return new Map<number, number[]>(); // VimScript側の遅延処理後に再度呼ばれる
   }
 
   _isRenderingHints = true;
@@ -385,8 +419,8 @@ async function processExtmarksForBuffer(
     const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
       ? h.hintByteCol - 1
       : (h.word.byteCol !== undefined && h.word.byteCol > 0)
-        ? h.word.byteCol - 1
-        : h.word.col - 1;
+      ? h.word.byteCol - 1
+      : h.word.col - 1;
 
     // Validate line and col to prevent E5555 (col out of range) errors
     if (line < 0 || col < 0) {
@@ -397,7 +431,13 @@ async function processExtmarksForBuffer(
     let lineLength = lineLengthCache.get(line);
     if (lineLength === undefined) {
       try {
-        const lineContent = await denops.call("nvim_buf_get_lines", bufnr, line, line + 1, false) as string[];
+        const lineContent = await denops.call(
+          "nvim_buf_get_lines",
+          bufnr,
+          line,
+          line + 1,
+          false,
+        ) as string[];
         lineLength = lineContent.length > 0 ? new TextEncoder().encode(lineContent[0]).length : 0;
         lineLengthCache.set(line, lineLength);
       } catch {
@@ -429,7 +469,12 @@ async function processExtmarksForBuffer(
       extmarkIds.push(extmarkId);
     } catch (error) {
       // Buffer might not exist, line/col out of range, or byte column mismatch
-      console.warn(`[hellshake-yano] Failed to set extmark in buffer ${bufnr} at line ${line + 1}, col ${col + 1}:`, error);
+      console.warn(
+        `[hellshake-yano] Failed to set extmark in buffer ${bufnr} at line ${line + 1}, col ${
+          col + 1
+        }:`,
+        error,
+      );
     }
   }
 

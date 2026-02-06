@@ -315,5 +315,59 @@ prop_find(denops, props, direction?): Promise<unknown>
 
 ---
 
+## 11. Phase 2.1 で発見された座標系の問題
+
+### 11.1 col の不一致問題
+
+Phase 2.1 (word_detector 統合) で、VimScript と TypeScript の `col` 座標の意味が異なることが判明。
+
+| 項目 | VimScript | TypeScript |
+|------|-----------|------------|
+| `col` | バイト位置 (1-indexed) | 表示列 (1-indexed) |
+| `byteCol` | なし | バイト位置 (1-indexed) |
+
+**問題**: マルチバイト文字（日本語など）を含む行で、座標が一致しない。
+
+**例**: `"abc日本語def"` の `"本"` の位置
+- VimScript `col`: 7 (byte)
+- TypeScript `col`: 6 (display) ← **不一致!**
+- TypeScript `byteCol`: 7 (byte) ← 一致
+
+### 11.2 実装パターン: byteCol 優先
+
+TypeScript側で `word.byteCol ?? word.col` パターンを使用し、バイト位置を優先取得。
+
+```typescript
+function toVimWordData(word: Word): Record<string, unknown> {
+  const encoder = new TextEncoder();
+  const byteLen = encoder.encode(word.text).length;
+  const col = word.byteCol ?? word.col;  // byteCol 優先
+  return {
+    text: word.text,
+    lnum: word.line,
+    col: col,
+    end_col: col + byteLen,
+  };
+}
+```
+
+**実装箇所**: `denops/hellshake-yano/main.ts` lines 137-150
+
+### 11.3 回避策
+
+1. **TypeScript側**: `byteCol` フィールドを明示的に設定
+2. **VimScript側**: `col` をそのまま使用（バイト位置として扱う）
+3. **変換関数**: `toVimWordData()` で `byteCol` を優先
+
+### 11.4 教訓
+
+- VimScript と TypeScript で同じフィールド名でも意味が異なる場合がある
+- マルチバイト文字を扱う場合は必ず座標系の確認が必要
+- Phase 1.1-1.3 では辞書・設定・ヒント生成のため、この問題は顕在化しなかった
+- Phase 2.1 (単語検出) で初めて座標の正確性が要求され、問題が発見された
+
+---
+
 **更新履歴**
 - 2026-01-25: 初版作成
+- 2026-02-06: Phase 2.1 座標系問題の文書化追加

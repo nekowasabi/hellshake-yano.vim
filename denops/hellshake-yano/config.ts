@@ -1,4 +1,4 @@
-import type { HighlightColor, HintPositionType } from "./types.ts";
+import type { HighlightColor } from "./types.ts";
 import { validateHighlightGroupName } from "./validation-utils.ts";
 
 export interface Config {
@@ -512,7 +512,7 @@ export function cloneConfig(c: Config): Config {
   return JSON.parse(JSON.stringify(c));
 }
 export function getPerKeyValue<T>(
-  c: Config,
+  _c: Config,
   k: string,
   p: Record<string, T> | undefined,
   d: T | undefined,

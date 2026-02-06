@@ -75,7 +75,7 @@ export async function withFallback<T>(
     return await fn();
   } catch (error) {
     console.error(
-      `[${context}] ${error instanceof Error ? error.message : String(error)}`
+      `[${context}] ${error instanceof Error ? error.message : String(error)}`,
     );
     return fallback;
   }

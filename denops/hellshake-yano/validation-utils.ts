@@ -4,14 +4,28 @@ export function validateHighlightGroupName(groupName: string): boolean {
 }
 export function isValidColorName(colorName: string): boolean {
   if (typeof colorName !== "string") return false;
-  const standardColors = ["black","red","green","yellow","blue","magenta","cyan","white","gray","grey","none"];
+  const standardColors = [
+    "black",
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "white",
+    "gray",
+    "grey",
+    "none",
+  ];
   return standardColors.includes(colorName.toLowerCase());
 }
 export function isValidHexColor(hexColor: string): boolean {
   if (typeof hexColor !== "string") return false;
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hexColor);
 }
-export function validateHighlightColorObject(color: HighlightColor): { valid: boolean; errors: string[] } {
+export function validateHighlightColorObject(
+  color: HighlightColor,
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!color || typeof color !== "object") {
     errors.push("Invalid highlight color object");
@@ -27,7 +41,9 @@ export function validateHighlightColorObject(color: HighlightColor): { valid: bo
     } else {
       const fg = color.fg;
       if (fg === "") errors.push("fg cannot be empty string");
-      else if (!isValidColorName(fg) && !isValidHexColor(fg) && fg.toLowerCase() !== "none") errors.push(`Invalid fg color: ${fg}`);
+      else if (!isValidColorName(fg) && !isValidHexColor(fg) && fg.toLowerCase() !== "none") {
+        errors.push(`Invalid fg color: ${fg}`);
+      }
     }
   }
   if (color.bg !== undefined && color.bg !== null) {
@@ -36,12 +52,16 @@ export function validateHighlightColorObject(color: HighlightColor): { valid: bo
     } else {
       const bg = color.bg;
       if (bg === "") errors.push("bg cannot be empty string");
-      else if (!isValidColorName(bg) && !isValidHexColor(bg) && bg.toLowerCase() !== "none") errors.push(`Invalid bg color: ${bg}`);
+      else if (!isValidColorName(bg) && !isValidHexColor(bg) && bg.toLowerCase() !== "none") {
+        errors.push(`Invalid bg color: ${bg}`);
+      }
     }
   }
   return { valid: errors.length === 0, errors };
 }
-export function validateHighlightColor(colorConfig: string | HighlightColor): { valid: boolean; errors: string[] } {
+export function validateHighlightColor(
+  colorConfig: string | HighlightColor,
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (colorConfig === null) {
     errors.push("highlight_hint_marker must be a string");
@@ -61,18 +81,39 @@ export function validateHighlightColor(colorConfig: string | HighlightColor): { 
       return { valid: false, errors };
     }
     if (!validateHighlightGroupName(colorConfig)) {
-      if (!/^[a-zA-Z_]/.test(colorConfig)) errors.push("highlight_hint_marker must start with a letter or underscore");
-      else if (!/^[a-zA-Z0-9_]+$/.test(colorConfig)) errors.push("highlight_hint_marker must contain only alphanumeric characters and underscores");
-      else if (colorConfig.length > 100) errors.push("highlight_hint_marker must be 100 characters or less");
-      else errors.push(`Invalid highlight group name: ${colorConfig}`);
+      if (!/^[a-zA-Z_]/.test(colorConfig)) {
+        errors.push("highlight_hint_marker must start with a letter or underscore");
+      } else if (!/^[a-zA-Z0-9_]+$/.test(colorConfig)) {
+        errors.push(
+          "highlight_hint_marker must contain only alphanumeric characters and underscores",
+        );
+      } else if (colorConfig.length > 100) {
+        errors.push("highlight_hint_marker must be 100 characters or less");
+      } else errors.push(`Invalid highlight group name: ${colorConfig}`);
     }
     return { valid: errors.length === 0, errors };
   }
-  if (typeof colorConfig === "object" && colorConfig !== null) return validateHighlightColorObject(colorConfig);
+  if (typeof colorConfig === "object" && colorConfig !== null) {
+    return validateHighlightColorObject(colorConfig);
+  }
   errors.push("Color configuration must be a string or object");
   return { valid: false, errors };
 }
-const VALID_SYMBOL_SET = new Set([";", ":", "[", "]", "'", '"', ",", ".", "/", "\\", "-", "=", "`"]);
+const VALID_SYMBOL_SET = new Set([
+  ";",
+  ":",
+  "[",
+  "]",
+  "'",
+  '"',
+  ",",
+  ".",
+  "/",
+  "\\",
+  "-",
+  "=",
+  "`",
+]);
 export function isValidSymbol(char: string): boolean {
   return VALID_SYMBOL_SET.has(char);
 }

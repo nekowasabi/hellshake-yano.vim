@@ -204,11 +204,11 @@ export function validateHighlightColor(
     if (!validateHighlightGroupName(colorConfig)) {
       if (!/^[a-zA-Z_]/.test(colorConfig)) {
         errors.push(
-          "highlight_hint_marker must start with a letter or underscore"
+          "highlight_hint_marker must start with a letter or underscore",
         );
       } else if (!/^[a-zA-Z0-9_]+$/.test(colorConfig)) {
         errors.push(
-          "highlight_hint_marker must contain only alphanumeric characters and underscores"
+          "highlight_hint_marker must contain only alphanumeric characters and underscores",
         );
       } else if (colorConfig.length > 100) {
         errors.push("highlight_hint_marker must be 100 characters or less");
@@ -294,12 +294,11 @@ export function generateHighlightCommand(
   const parts = [`highlight ${groupName}`];
 
   if (color.fg) {
-    const fg =
-      color.fg.toLowerCase() === "none"
-        ? "None"
-        : isValidHexColor(color.fg)
-          ? color.fg
-          : color.fg.charAt(0).toUpperCase() + color.fg.slice(1).toLowerCase();
+    const fg = color.fg.toLowerCase() === "none"
+      ? "None"
+      : isValidHexColor(color.fg)
+      ? color.fg
+      : color.fg.charAt(0).toUpperCase() + color.fg.slice(1).toLowerCase();
 
     if (isValidHexColor(color.fg)) {
       parts.push(`guifg=${fg}`);
@@ -310,12 +309,11 @@ export function generateHighlightCommand(
   }
 
   if (color.bg) {
-    const bg =
-      color.bg.toLowerCase() === "none"
-        ? "None"
-        : isValidHexColor(color.bg)
-          ? color.bg
-          : color.bg.charAt(0).toUpperCase() + color.bg.slice(1).toLowerCase();
+    const bg = color.bg.toLowerCase() === "none"
+      ? "None"
+      : isValidHexColor(color.bg)
+      ? color.bg
+      : color.bg.charAt(0).toUpperCase() + color.bg.slice(1).toLowerCase();
 
     if (isValidHexColor(color.bg)) {
       parts.push(`guibg=${bg}`);
@@ -463,8 +461,7 @@ export function validateConfig(cfg: Partial<Config>): {
   // Vim の v:true/v:false は数値 (1/0) として渡されるため、数値の 0/1 も許容
   if (c.continuousHintMode !== undefined) {
     const isBool = typeof c.continuousHintMode === "boolean";
-    const isVimBool =
-      typeof c.continuousHintMode === "number" &&
+    const isVimBool = typeof c.continuousHintMode === "number" &&
       (c.continuousHintMode === 0 || c.continuousHintMode === 1);
     if (!isBool && !isVimBool) {
       errors.push("continuousHintMode must be a boolean");
@@ -494,11 +491,11 @@ export function validateConfig(cfg: Partial<Config>): {
   if (typeof c.highlightHintMarker === "string" && c.highlightHintMarker !== "") {
     if (/^[0-9]/.test(c.highlightHintMarker)) {
       errors.push(
-        "highlightHintMarker must start with a letter or underscore"
+        "highlightHintMarker must start with a letter or underscore",
       );
     } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.highlightHintMarker)) {
       errors.push(
-        "highlightHintMarker must contain only alphanumeric characters and underscores"
+        "highlightHintMarker must contain only alphanumeric characters and underscores",
       );
     } else if (c.highlightHintMarker.length > 100) {
       errors.push("highlightHintMarker must be 100 characters or less");
@@ -511,11 +508,11 @@ export function validateConfig(cfg: Partial<Config>): {
   ) {
     if (/^[0-9]/.test(c.highlightHintMarkerCurrent)) {
       errors.push(
-        "highlightHintMarkerCurrent must start with a letter or underscore"
+        "highlightHintMarkerCurrent must start with a letter or underscore",
       );
     } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c.highlightHintMarkerCurrent)) {
       errors.push(
-        "highlightHintMarkerCurrent must contain only alphanumeric characters and underscores"
+        "highlightHintMarkerCurrent must contain only alphanumeric characters and underscores",
       );
     } else if (c.highlightHintMarkerCurrent.length > 100) {
       errors.push("highlightHintMarkerCurrent must be 100 characters or less");

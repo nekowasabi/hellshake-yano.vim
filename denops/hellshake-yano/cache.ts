@@ -53,7 +53,13 @@ export class LRUCache<K, V> {
   }
   getStats(): CacheStatistics {
     const total = this.hits + this.misses;
-    return {hits: this.hits, misses: this.misses, size: this.cache.size, maxSize: this.maxSize, hitRate: total > 0 ? this.hits / total : 0};
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      size: this.cache.size,
+      maxSize: this.maxSize,
+      hitRate: total > 0 ? this.hits / total : 0,
+    };
   }
   keys(): IterableIterator<K> {
     return this.cache.keys();
@@ -105,7 +111,36 @@ export class GlobalCache {
   private readonly cacheConfigs: Record<CacheType, CacheConfig>;
   private constructor() {
     this.caches = new Map();
-    this.cacheConfigs = {[CacheType.WORDS]:{size:1000,description:"単語検出結果のキャッシュ"},[CacheType.HINTS]:{size:500,description:"ヒント生成結果のキャッシュ"},[CacheType.DISPLAY]:{size:200,description:"表示情報のキャッシュ"},[CacheType.ANALYSIS]:{size:300,description:"解析結果のキャッシュ"},[CacheType.TEMP]:{size:100,description:"一時的なデータのキャッシュ"},[CacheType.HINT_ASSIGNMENT_NORMAL]:{size:100,description:"ノーマルモード用ヒント割り当てキャッシュ"},[CacheType.HINT_ASSIGNMENT_VISUAL]:{size:100,description:"ビジュアルモード用ヒント割り当てキャッシュ"},[CacheType.HINT_ASSIGNMENT_OTHER]:{size:100,description:"その他モード用ヒント割り当てキャッシュ"},[CacheType.LANGUAGE_RULES]:{size:50,description:"言語ルールのキャッシュ"},[CacheType.SYNTAX_CONTEXT]:{size:200,description:"シンタックスコンテキストのキャッシュ"},[CacheType.DICTIONARY]:{size:2000,description:"辞書データのキャッシュ"},[CacheType.CHAR_WIDTH]:{size:500,description:"文字幅計算のキャッシュ"},[CacheType.CHAR_TYPE]:{size:1000,description:"文字種判定のキャッシュ"},[CacheType.BYTE_LENGTH]:{size:300,description:"バイト長計算のキャッシュ"},[CacheType.ADJACENCY]:{size:200,description:"隣接単語のキャッシュ"},[CacheType.WORD_DETECTION]:{size:100,description:"単語検出のキャッシュ"}};
+    this.cacheConfigs = {
+      [CacheType.WORDS]: { size: 1000, description: "単語検出結果のキャッシュ" },
+      [CacheType.HINTS]: { size: 500, description: "ヒント生成結果のキャッシュ" },
+      [CacheType.DISPLAY]: { size: 200, description: "表示情報のキャッシュ" },
+      [CacheType.ANALYSIS]: { size: 300, description: "解析結果のキャッシュ" },
+      [CacheType.TEMP]: { size: 100, description: "一時的なデータのキャッシュ" },
+      [CacheType.HINT_ASSIGNMENT_NORMAL]: {
+        size: 100,
+        description: "ノーマルモード用ヒント割り当てキャッシュ",
+      },
+      [CacheType.HINT_ASSIGNMENT_VISUAL]: {
+        size: 100,
+        description: "ビジュアルモード用ヒント割り当てキャッシュ",
+      },
+      [CacheType.HINT_ASSIGNMENT_OTHER]: {
+        size: 100,
+        description: "その他モード用ヒント割り当てキャッシュ",
+      },
+      [CacheType.LANGUAGE_RULES]: { size: 50, description: "言語ルールのキャッシュ" },
+      [CacheType.SYNTAX_CONTEXT]: {
+        size: 200,
+        description: "シンタックスコンテキストのキャッシュ",
+      },
+      [CacheType.DICTIONARY]: { size: 2000, description: "辞書データのキャッシュ" },
+      [CacheType.CHAR_WIDTH]: { size: 500, description: "文字幅計算のキャッシュ" },
+      [CacheType.CHAR_TYPE]: { size: 1000, description: "文字種判定のキャッシュ" },
+      [CacheType.BYTE_LENGTH]: { size: 300, description: "バイト長計算のキャッシュ" },
+      [CacheType.ADJACENCY]: { size: 200, description: "隣接単語のキャッシュ" },
+      [CacheType.WORD_DETECTION]: { size: 100, description: "単語検出のキャッシュ" },
+    };
     this.initializeCaches();
   }
   public static getInstance(): GlobalCache {
@@ -119,7 +154,13 @@ export class GlobalCache {
   }
   public getCache<K, V>(type: CacheType): LRUCache<K, V> {
     const cache = this.caches.get(type);
-    if (!cache) throw new Error(`Cache for type '${type}' not found. Available types: ${Array.from(this.caches.keys()).join(", ")}`);
+    if (!cache) {
+      throw new Error(
+        `Cache for type '${type}' not found. Available types: ${
+          Array.from(this.caches.keys()).join(", ")
+        }`,
+      );
+    }
     return cache as LRUCache<K, V>;
   }
   public getAllStats(): Record<string, CacheStatistics> {

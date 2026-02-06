@@ -166,9 +166,7 @@ export async function detectWordsOptimized(
   if (cached) return cached;
 
   const result = await detectWordsWithManager(denops, {});
-  const words = Array.isArray(result)
-    ? result
-    : (result as { words?: Word[] }).words || [];
+  const words = Array.isArray(result) ? result : (result as { words?: Word[] }).words || [];
   wordsCache.set(cacheKey, words);
   return words;
 }
