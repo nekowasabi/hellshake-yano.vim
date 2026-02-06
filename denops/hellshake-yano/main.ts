@@ -26,6 +26,11 @@ import {
   recordPerformance,
   resetPerformanceMetrics,
 } from "./common/utils/performance.ts";
+import {
+  detectWordsMultiWindow,
+  detectWordsWithManager,
+  type EnhancedWordConfig,
+} from "./neovim/core/word.ts";
 import { validateConfig } from "./config.ts";
 import {
   addToDictionary,
@@ -127,6 +132,24 @@ async function initializeDenopsUnified(denops: Denops): Promise<void> {
 }
 
 /**
+ * TypeScript Word -> VimScript互換データへの変換
+ */
+function toVimWordData(word: Word): Record<string, unknown> {
+  const encoder = new TextEncoder();
+  const byteLen = encoder.encode(word.text).length;
+  const col = word.byteCol ?? word.col; // byteCol 優先
+  const result: Record<string, unknown> = {
+    text: word.text,
+    lnum: word.line, // キー名変換: line -> lnum
+    col: col,
+    end_col: col + byteLen,
+  };
+  if (word.winid !== undefined) result.winid = word.winid;
+  if (word.bufnr !== undefined) result.bufnr = word.bufnr;
+  return result;
+}
+
+/**
  * Vim環境初期化関数
  * vim/レイヤーのコンポーネント初期化とdispatcher登録
  */
@@ -160,17 +183,20 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         core.enable();
       },
 
+      // deno-lint-ignore require-await
       async disable(): Promise<void> {
         const core = Core.getInstance(config);
         core.disable();
       },
 
+      // deno-lint-ignore require-await
       async toggle(): Promise<void> {
         const core = Core.getInstance(config);
         core.toggle();
       },
 
       // 設定管理
+      // deno-lint-ignore require-await
       async updateConfig(cfg: unknown): Promise<void> {
         if (typeof cfg === "object" && cfg !== null) {
           const core = Core.getInstance(config);
@@ -180,10 +206,12 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // deno-lint-ignore require-await
       async getConfig(): Promise<Config> {
         return config;
       },
 
+      // deno-lint-ignore require-await
       async validateConfig(cfg: unknown): Promise<{ valid: boolean; errors: string[] }> {
         return validateConfig(cfg as Partial<Config>);
       },
@@ -218,16 +246,19 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         await core.getHealthStatus(denops);
       },
 
+      // deno-lint-ignore require-await
       async getStatistics(): Promise<unknown> {
         const core = Core.getInstance(config);
         return core.getStatistics();
       },
 
+      // deno-lint-ignore require-await
       async debug(): Promise<DebugInfo> {
         const core = Core.getInstance(config);
         return core.collectDebugInfo();
       },
 
+      // deno-lint-ignore require-await
       async clearCache(): Promise<void> {
         const core = Core.getInstance(config);
         core.clearCache();
@@ -269,7 +300,46 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         return false;
       },
 
+      // 1. detectWordsVisible: 画面内単語検出
+      async detectWordsVisible(): Promise<Record<string, unknown>[]> {
+        const startTime = performance.now();
+        try {
+          const result = await detectWordsWithManager(denops, config as EnhancedWordConfig);
+          return result.words.map(toVimWordData);
+        } catch (_error) {
+          return []; // フォールバック: 空配列（VimScript側のローカル実装が使われる）
+        } finally {
+          recordPerformance("wordDetection", performance.now() - startTime);
+        }
+      },
+
+      // 2. detectWordsMultiWindow: マルチウィンドウ単語検出
+      async detectWordsMultiWindow(_windows: unknown): Promise<Record<string, unknown>[]> {
+        const startTime = performance.now();
+        try {
+          const words = await detectWordsMultiWindow(denops, config as Config);
+          return words.map(toVimWordData);
+        } catch (_error) {
+          return [];
+        } finally {
+          recordPerformance("wordDetectionMultiWindow", performance.now() - startTime);
+        }
+      },
+
+      // 3. getMinWordLength: キー別最小単語長取得
+      // deno-lint-ignore require-await
+      async getMinWordLength(key: unknown): Promise<number> {
+        if (typeof key !== "string") return 3;
+        const perKey = config.perKeyMinLength;
+        if (perKey && typeof perKey === "object" && key in perKey) {
+          const val = (perKey as Record<string, number>)[key];
+          if (typeof val === "number" && val > 0) return val;
+        }
+        return config.defaultMinWordLength ?? 3;
+      },
+
       // Phase 1.3 Process 1: generateHints API追加
+      // deno-lint-ignore require-await
       async generateHints(wordCount: unknown): Promise<string[]> {
         const startTime = performance.now();
         try {
@@ -337,16 +407,19 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         core.enable();
       },
 
+      // deno-lint-ignore require-await
       async disable(): Promise<void> {
         const core = Core.getInstance(config);
         core.disable();
       },
 
+      // deno-lint-ignore require-await
       async toggle(): Promise<void> {
         const core = Core.getInstance(config);
         core.toggle();
       },
 
+      // deno-lint-ignore require-await
       async setCount(count: unknown): Promise<void> {
         if (typeof count === "number") {
           const core = Core.getInstance(config);
@@ -354,6 +427,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // deno-lint-ignore require-await
       async setTimeout(timeout: unknown): Promise<void> {
         if (typeof timeout === "number") {
           const core = Core.getInstance(config);
@@ -390,6 +464,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         hintsVisible = false;
       },
 
+      // deno-lint-ignore require-await
       async highlightCandidateHints(input: unknown): Promise<void> {
         if (typeof input !== "string") return;
         highlightCandidateHintsAsyncInternal(
@@ -412,6 +487,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // deno-lint-ignore require-await
       async generateHints(wordCount: unknown): Promise<string[]> {
         const startTime = performance.now();
         try {
@@ -431,18 +507,22 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // deno-lint-ignore require-await
       async getDebugInfo(): Promise<DebugInfo> {
         return collectDebugInfo(hintsVisible, currentHints, config);
       },
 
+      // deno-lint-ignore require-await
       async clearDebugInfo(): Promise<void> {
         clearDebugInfoPerformance();
       },
 
+      // deno-lint-ignore require-await
       async getConfig(): Promise<Config> {
         return config;
       },
 
+      // deno-lint-ignore require-await
       async validateConfig(cfg: unknown): Promise<{ valid: boolean; errors: string[] }> {
         return validateConfig(cfg as Partial<Config>);
       },
@@ -452,6 +532,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         await core.getHealthStatus(denops);
       },
 
+      // deno-lint-ignore require-await
       async getStatistics(): Promise<unknown> {
         const core = Core.getInstance(config);
         return core.getStatistics();
@@ -508,6 +589,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         );
       },
 
+      // deno-lint-ignore require-await
       async updateConfig(cfg: unknown): Promise<void> {
         if (typeof cfg === "object" && cfg !== null) {
           const core = Core.getInstance(config);
@@ -518,17 +600,20 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // deno-lint-ignore require-await
       async clearCache(): Promise<void> {
         const core = Core.getInstance(config);
         core.clearCache();
         clearCaches();
       },
 
+      // deno-lint-ignore require-await
       async debug(): Promise<DebugInfo> {
         const core = Core.getInstance(config);
         return core.collectDebugInfo();
       },
 
+      // deno-lint-ignore require-await
       async clearPerformanceLog(): Promise<void> {
         resetPerformanceMetrics();
       },
@@ -666,6 +751,70 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
       async isMultiWindowModeEnabled(): Promise<boolean> {
         const core = Core.getInstance(config);
         return core.isMultiWindowModeEnabled();
+      },
+
+      // 1. detectWordsVisible: 画面内単語検出
+      async detectWordsVisible(): Promise<Record<string, unknown>[]> {
+        const startTime = performance.now();
+        try {
+          const result = await detectWordsWithManager(denops, config as EnhancedWordConfig);
+          return result.words.map((word: Word) => {
+            const encoder = new TextEncoder();
+            const byteLen = encoder.encode(word.text).length;
+            const col = word.byteCol ?? word.col;
+            const resultData: Record<string, unknown> = {
+              text: word.text,
+              lnum: word.line,
+              col: col,
+              end_col: col + byteLen,
+            };
+            if (word.winid !== undefined) resultData.winid = word.winid;
+            if (word.bufnr !== undefined) resultData.bufnr = word.bufnr;
+            return resultData;
+          });
+        } catch (_error) {
+          return [];
+        } finally {
+          recordPerformance("wordDetection", performance.now() - startTime);
+        }
+      },
+
+      // 2. detectWordsMultiWindow: マルチウィンドウ単語検出
+      async detectWordsMultiWindow(_windows: unknown): Promise<Record<string, unknown>[]> {
+        const startTime = performance.now();
+        try {
+          const words = await detectWordsMultiWindow(denops, config as Config);
+          return words.map((word: Word) => {
+            const encoder = new TextEncoder();
+            const byteLen = encoder.encode(word.text).length;
+            const col = word.byteCol ?? word.col;
+            const resultData: Record<string, unknown> = {
+              text: word.text,
+              lnum: word.line,
+              col: col,
+              end_col: col + byteLen,
+            };
+            if (word.winid !== undefined) resultData.winid = word.winid;
+            if (word.bufnr !== undefined) resultData.bufnr = word.bufnr;
+            return resultData;
+          });
+        } catch (_error) {
+          return [];
+        } finally {
+          recordPerformance("wordDetectionMultiWindow", performance.now() - startTime);
+        }
+      },
+
+      // 3. getMinWordLength: キー別最小単語長取得
+      // deno-lint-ignore require-await
+      async getMinWordLength(key: unknown): Promise<number> {
+        if (typeof key !== "string") return 3;
+        const perKey = config.perKeyMinLength;
+        if (perKey && typeof perKey === "object" && key in perKey) {
+          const val = (perKey as Record<string, number>)[key];
+          if (typeof val === "number" && val > 0) return val;
+        }
+        return config.defaultMinWordLength ?? 3;
       },
     };
     // updatePluginStateはcore.tsに統合されたため、必要に応じてCoreクラス経由で呼び出し

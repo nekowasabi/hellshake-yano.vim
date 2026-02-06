@@ -223,6 +223,11 @@ function! hellshake_yano_vim#config#reload() abort
       call hellshake_yano_vim#hint_generator#clear_cache()
     endif
 
+    " Phase 2.1 Process 4: 単語検出キャッシュをクリア（設定変更反映のため）
+    if exists('*hellshake_yano_vim#word_detector#clear_cache')
+      call hellshake_yano_vim#word_detector#clear_cache()
+    endif
+
     echohl MoreMsg
     echo '[hellshake-yano] Config reloaded'
     echohl None

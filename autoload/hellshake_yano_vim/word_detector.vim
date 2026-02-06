@@ -15,7 +15,245 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 " ======================================
-" Phase D-7: Process4 Sub2 - Dictionary Integration
+" 最小単語長キャッシュ（高頻度呼び出し対策）
+" ======================================
+let s:min_length_cache = {}
+
+" ======================================
+" 単語検出キャッシュ（高頻度呼び出し対策）
+" ======================================
+let s:word_cache = {}
+let s:cache_timestamp = 0
+let s:cache_ttl = 100  " 100ms TTL
+let s:cache_max_size = 10  " キャッシュエントリ上限
+
+" ======================================
+" PUBLIC API - 公開インターフェース
+" ======================================
+
+" hellshake_yano_vim#word_detector#has_denops() - Denops利用可能チェック
+"
+" 目的:
+"   - Denopsプラグインが利用可能かチェック
+"   - hint_generator.vimの統合パターンに準拠
+"
+" 応用例:
+"   if hellshake_yano_vim#word_detector#has_denops()
+"     " Denops経由で高速処理
+"   else
+"     " フォールバック処理
+"   endif
+"
+" @return v:true: Denops利用可能 / v:false: 利用不可
+function! hellshake_yano_vim#word_detector#has_denops() abort
+  if !exists('*denops#plugin#is_loaded')
+    return v:false
+  endif
+  try
+    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
+  catch
+    return v:false
+  endtry
+endfunction
+
+" hellshake_yano_vim#word_detector#detect_visible() - 画面内の単語検出
+"
+" Process2: Denops優先構造 (Green Phase)
+" Phase D-6: Process3 Sub2 - 日本語対応拡張
+" Phase D-7: Process4 Sub2 - Dictionary Integration (辞書統合)
+"
+" 目的:
+"   - 画面内に表示されている範囲（line('w0') ～ line('w$')）の単語を検出
+"   - Denops利用可能な場合はDenops経由で検出
+"   - Denops利用不可の場合はローカル実装にフォールバック
+"   - 日本語を含む行はTinySegmenterでセグメント化
+"   - 英数字のみの行は正規表現パターン \w\+ で検出
+"   - 辞書単語は最小長チェックをスキップ
+"
+" 処理フロー:
+"   1. has_denops() で Denops 利用可否をチェック
+"   2. 利用可能 → denops#request('detectWordsVisible') を呼び出し
+"   3. 利用不可 → s:detect_visible_local() でローカル処理
+"
+" エラーハンドリング:
+"   - Denops呼び出し失敗時は自動的にフォールバック
+"   - 空バッファでも安全に動作
+"   - 単語が見つからない場合は空配列を返す
+"
+" @return List<Dictionary> 単語データのリスト
+"   各要素は以下の構造:
+"   {
+"     'text': 'word',      " 単語文字列
+"     'lnum': 10,          " 行番号（1-indexed）
+"     'col': 5,            " 開始列（1-indexed）
+"     'end_col': 10        " 終了列（1-indexed）
+"   }
+"
+" パフォーマンス:
+"   - Denops利用時: O(L * W) で高速処理（Denops側で最適化）
+"   - ローカル処理: O(L * W * S) - L: 画面内の行数、W: 行あたりの平均単語数、S: セグメント化時間
+"   - 通常20-50行の画面内処理で数ミリ秒
+function! hellshake_yano_vim#word_detector#detect_visible() abort
+  " キャッシュキー生成
+  let l:bufnr = bufnr('%')
+  let l:topline = line('w0')
+  let l:botline = line('w$')
+  let l:cache_key = printf('%d:%d:%d', l:bufnr, l:topline, l:botline)
+
+  " キャッシュヒット時は即座に返却（TTLチェック）
+  let l:now = reltime()
+  if has_key(s:word_cache, l:cache_key)
+    let l:cached = s:word_cache[l:cache_key]
+    let l:elapsed_ms = reltimefloat(reltime(l:cached.timestamp)) * 1000
+    if l:elapsed_ms < s:cache_ttl
+      return copy(l:cached.data)
+    endif
+    " TTL切れ: キャッシュ削除
+    unlet s:word_cache[l:cache_key]
+  endif
+
+  " Denops優先 + フォールバック（既存ロジック）
+  let l:result = []
+  if hellshake_yano_vim#word_detector#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'detectWordsVisible', [])
+      if type(l:result) != v:t_list
+        let l:result = []
+      endif
+    catch
+      let l:result = []
+    endtry
+  endif
+
+  if empty(l:result)
+    let l:result = s:detect_visible_local()
+  endif
+
+  " キャッシュに保存（上限チェック）
+  if len(s:word_cache) >= s:cache_max_size
+    " 最も古いエントリを削除（簡易LRU）
+    let l:keys = keys(s:word_cache)
+    if !empty(l:keys)
+      unlet s:word_cache[l:keys[0]]
+    endif
+  endif
+  let s:word_cache[l:cache_key] = {'data': l:result, 'timestamp': l:now}
+
+  return copy(l:result)
+endfunction
+
+" hellshake_yano_vim#word_detector#clear_cache() - キャッシュクリア
+"
+" 目的:
+"   - 単語検出キャッシュと最小単語長キャッシュをクリア
+"   - 設定変更時やテスト時に呼び出す
+"
+" 使用例:
+"   call hellshake_yano_vim#word_detector#clear_cache()
+"
+" @return void
+function! hellshake_yano_vim#word_detector#clear_cache() abort
+  let s:word_cache = {}
+  let s:cache_timestamp = 0
+  let s:min_length_cache = {}
+endfunction
+
+" hellshake_yano_vim#word_detector#get_min_length(key) - キー別最小単語長の取得
+"
+" Process2: Denops優先構造 + キャッシュ (Green Phase)
+" Phase D-2 Sub2: Per-Key最小単語長機能
+"
+" 目的:
+"   - モーションキー（'w', 'b', 'e' など）に対応した最小単語長を取得
+"   - Denops利用可能な場合はDenops経由で取得
+"   - キャッシュ機能で高頻度呼び出しに対応
+"   - Denops利用不可の場合はローカル実装にフォールバック
+"
+" キャッシュ戦略:
+"   - s:min_length_cache に キー → 最小単語長 をマッピング
+"   - キャッシュヒット時は即座に返す（O(1)）
+"   - キャッシュミス時は Denops/ローカルで取得後にキャッシュ
+"
+" @param key String モーションキー（例: 'w', 'b', 'e', 'h', 'j', 'k', 'l'）
+" @return Number 最小単語長（デフォルト: 3）
+"
+" 使用例:
+"   let min_len = hellshake_yano_vim#word_detector#get_min_length('w')
+"   " => perKeyMinLength.w が設定されていれば その値
+"   " => なければ defaultMinWordLength
+"   " => それも未設定なら 3
+function! hellshake_yano_vim#word_detector#get_min_length(key) abort
+  " キャッシュチェック
+  if has_key(s:min_length_cache, a:key)
+    return s:min_length_cache[a:key]
+  endif
+
+  " Denops優先
+  if hellshake_yano_vim#word_detector#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'getMinWordLength', [a:key])
+      if type(l:result) == v:t_number && l:result > 0
+        let s:min_length_cache[a:key] = l:result
+        return l:result
+      endif
+    catch
+      " Denops呼び出し失敗時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装
+  let l:result = s:get_min_length_local(a:key)
+  let s:min_length_cache[a:key] = l:result
+  return l:result
+endfunction
+
+" hellshake_yano_vim#word_detector#detect_multi_window(windows) - 複数ウィンドウから単語検出
+"
+" Process2: Denops優先構造 (Green Phase)
+"
+" 目的:
+"   - 複数ウィンドウから同時に単語を検出
+"   - 各単語にウィンドウID(winid) とバッファ番号(bufnr) を付与
+"   - ウィンドウ特定と複数バッファの処理が可能
+"   - Denops利用可能な場合はDenops経由で検出
+"   - Denops利用不可の場合はローカル実装にフォールバック
+"
+" アルゴリズム:
+"   1. Denops経由で denops#request('detectWordsMultiWindow', [windows]) を呼び出し
+"   2. または s:detect_multi_window_local() でローカル処理
+"   3. 各ウィンドウの topline ～ botline の行を走査
+"   4. 日本語/英数字判定して単語を検出
+"   5. 各単語に winid と bufnr を付与して返す
+"
+" @param windows List ウィンドウ情報のリスト
+"   各要素は辞書形式: {winid, bufnr, topline, botline, ...}
+" @return List 単語リスト（各単語は {text, lnum, col, end_col, winid, bufnr} を含む）
+"
+" 使用例:
+"   let windows = getwininfo()  " 全ウィンドウ情報を取得
+"   let words = hellshake_yano_vim#word_detector#detect_multi_window(windows)
+"   for word in words
+"     echo word.text . ' in window ' . word.winid . ' at line ' . word.lnum
+"   endfor
+function! hellshake_yano_vim#word_detector#detect_multi_window(windows) abort
+  " Denops優先
+  if hellshake_yano_vim#word_detector#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'detectWordsMultiWindow', [a:windows])
+      if type(l:result) == v:t_list
+        return l:result
+      endif
+    catch
+      " Denops呼び出し失敗時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装
+  return s:detect_multi_window_local(a:windows)
+endfunction
+
+" ======================================
+" INTERNAL FUNCTIONS - 内部実装
 " ======================================
 
 " s:is_in_dictionary(word) - 辞書に単語が含まれるかチェック
@@ -25,13 +263,12 @@ set cpo&vim
 "   - キャッシュ機能を活用した高速チェック
 "   - Denops未起動時もエラーを出さずにv:falseを返す
 "
-" アルゴリズム:
-"   1. dictionary#has_denops()でDenops利用可否をチェック
-"   2. Denops利用可能ならdictionary#is_in_dictionary()を呼び出し
-"   3. Denops利用不可ならv:falseを返す（辞書にないものとして扱う）
+" 責務:
+"   - dictionary#has_denops()でDenops利用可否をチェック
+"   - Denops利用可能ならdictionary#is_in_dictionary()を呼び出し
+"   - Denops利用不可ならv:falseを返す（辞書にないものとして扱う）
 "
-" パフォーマンス:
-"   - dictionary.vimのキャッシュ機能を活用
+" パフォーマンス（dictionary.vimの内部キャッシュを活用）:
 "   - キャッシュヒット時: O(1)
 "   - キャッシュミス時: Denops経由でチェック → キャッシュに保存
 "
@@ -56,15 +293,12 @@ function! s:is_in_dictionary(word) abort
   endtry
 endfunction
 
-" ======================================
-" Phase D-6: Process3 Sub2 - サブ関数
-" ======================================
-
 " s:detect_japanese_words(line, lnum) - 日本語単語の検出
 "
 " 目的:
 "   - TinySegmenterを使って日本語テキストをセグメント化
 "   - 各セグメントの位置情報を計算して返す
+"   - 辞書に含まれる単語は最小長チェックをスキップ
 "
 " アルゴリズム:
 "   1. hellshake_yano_vim#japanese#segment()でセグメント化
@@ -74,10 +308,12 @@ endfunction
 "      c. end_col: match_start + len(segment) + 1
 "      d. offset更新でセグメントの重複検出を防ぐ
 "   3. 空白のみのセグメントを除外
+"   4. 辞書単語は最小長チェックをスキップ
 "
 " エラーハンドリング:
 "   - segment()失敗時は空配列を返す
 "   - stridx()が-1を返す場合はスキップ
+"   - dictionary呼び出し失敗時は最小長フィルタを適用
 "
 " @param line String 行の内容
 " @param lnum Number 行番号（1-indexed）
@@ -159,14 +395,20 @@ endfunction
 " s:detect_english_words(line, lnum) - 英数字単語の検出
 "
 " 目的:
-"   - 既存のmatchstrpos()ロジックで英数字単語を検出
-"   - 後方互換性を維持
-"   - Phase D-7 Process4 Sub2: 辞書単語は最小長チェックをスキップ
+"   - matchstrpos()で英数字単語を検出
+"   - 既存のロジックとの後方互換性を維持
+"   - 辞書単語は最小長チェックをスキップ
 "
 " アルゴリズム:
-"   - matchstrpos()で英数字単語（\w\+）を順次検出
-"   - 座標計算（0-indexed → 1-indexed変換）
-"   - 最小長フィルタリング（辞書単語は除外）
+"   1. matchstrpos()で英数字単語（\w\+）を順次検出
+"   2. 座標計算（0-indexed → 1-indexed変換）
+"   3. 辞書単語チェック
+"   4. 最小長フィルタリング（辞書単語は除外）
+"   5. 無限ループ防止チェック
+"
+" パフォーマンス:
+"   - matchstrpos()は最適化された組み込み関数
+"   - O(行の長さ) の線形時間処理
 "
 " @param line String 行の内容
 " @param lnum Number 行番号（1-indexed）
@@ -232,7 +474,7 @@ function! s:detect_english_words(line, lnum) abort
   return l:words
 endfunction
 
-" hellshake_yano_vim#word_detector#detect_visible() - 画面内の単語検出
+" s:detect_visible_local() - ローカル実装（フォールバック用）
 "
 " Phase D-6: Process3 Sub2 - 日本語対応拡張
 " Phase D-7: Process4 Sub2 - Dictionary Integration (辞書統合)
@@ -266,37 +508,15 @@ endfunction
 " エラーハンドリング:
 "   - 空のバッファでも安全に動作（line('w0') と line('w$') が同じになる）
 "   - 単語が見つからない場合は空配列を返す
-"   - 空行は自動的にスキップされる（matchstrpos が空文字列を返す）
-"
-" @return List<Dictionary> 単語データのリスト
-"
-" 使用例:
-"   let words = hellshake_yano_vim#word_detector#detect_visible()
-"   for word in words
-"     echo word.text . ' at line ' . word.lnum . ', col ' . word.col
-"   endfor
-"
-" 注意事項:
-"   - Phase D-6: Process3 Sub2 で日本語対応完了
-"   - 検出単語数に制限なし（呼び出し側で最大7個に制限）
-"   - 日本語を含む行は TinySegmenter でセグメント化
-"   - 英数字のみの行は matchstrpos() で検出（後方互換性維持）
-"   - matchstrpos() の戻り値は [match, start, end] の形式
-"     - match: マッチした文字列
-"     - start: 開始位置（0-indexed）
-"     - end: 終了位置（0-indexed、マッチ文字列の次の位置）
+"   - 空行は自動的にスキップされる
 "
 " パフォーマンス特性:
 "   - 時間計算量: O(L * W) - L: 画面内の行数、W: 行あたりの平均単語数
 "   - matchstrpos() は最適化された組み込み関数を使用
-"   - 画面内に限定することで大きなバッファでも高速動作
-"   - 1000行のバッファでも数ミリ秒で処理完了（画面内は通常20-50行）
+"   - 画面内に限定することで大きなバッファでも高速動作（通常20-50行で数ミリ秒）
 "
-" 最適化の設計判断:
-"   - matchstrpos() を使用（正規表現エンジンのネイティブ実装）
-"   - 空行を明示的にスキップ（空行が多い場合の最適化）
-"   - 無限ループ防止チェックを実装（安全性とパフォーマンスのバランス）
-function! hellshake_yano_vim#word_detector#detect_visible() abort
+" @return List<Dictionary> 単語データのリスト
+function! s:detect_visible_local() abort
   " 1. 画面内の表示範囲を取得
   let l:w0 = line('w0')
   let l:wlast = line('w$')
@@ -336,7 +556,7 @@ function! hellshake_yano_vim#word_detector#detect_visible() abort
   return l:words
 endfunction
 
-" hellshake_yano_vim#word_detector#get_min_length() - キー別最小単語長の取得
+" s:get_min_length_local() - ローカル実装（フォールバック用）
 "
 " Phase D-2 Sub2: Per-Key最小単語長機能
 "
@@ -345,31 +565,26 @@ endfunction
 "   - perKeyMinLengthに設定がない場合はdefaultMinWordLengthにフォールバック
 "   - どちらも未設定の場合はハードコードされたデフォルト値（3）を返す
 "
-" アルゴリズム:
-"   1. g:hellshake_yano.perKeyMinLength[key]をチェック
-"   2. 存在しない、または無効な値（0以下）の場合はdefaultMinWordLengthを使用
-"   3. defaultMinWordLengthも未設定の場合はデフォルト値3を返す
+" 設定の優先順位:
+"   1. g:hellshake_yano.perKeyMinLength[key] （キー別設定）
+"   2. g:hellshake_yano.defaultMinWordLength （デフォルト最小長）
+"   3. 3 （ハードコード値）
 "
 " エラーハンドリング:
-"   - perKeyMinLengthが辞書でない場合はdefaultMinWordLengthにフォールバック
-"   - 0以下の値はdefaultMinWordLengthにフォールバック
-"   - すべて未設定の場合はデフォルト値3を返す
+"   - perKeyMinLengthが辞書でない場合 → defaultMinWordLength を使用
+"   - 0以下の値 → 次の優先度の設定を使用
+"   - すべて未設定 → デフォルト値3を返す
 "
 " @param key String モーションキー（例: 'w', 'b', 'e', 'h', 'j', 'k', 'l'）
 " @return Number 最小単語長
 "
 " 使用例:
-"   let l:min_length = hellshake_yano_vim#word_detector#get_min_length('w')
+"   let l:min_length = s:get_min_length_local('w')
 "   " => 3 (perKeyMinLength.w が 3 の場合)
 "
-"   let l:min_length = hellshake_yano_vim#word_detector#get_min_length('h')
+"   let l:min_length = s:get_min_length_local('h')
 "   " => 2 (perKeyMinLengthに'h'がなく、defaultMinWordLengthが2の場合)
-"
-" 注意事項:
-"   - PLAN.md Process2 Sub2 の仕様に基づく実装
-"   - word_filter.vimと組み合わせて使用することを想定
-"   - original_index保持のためword_filter#apply()を使用
-function! hellshake_yano_vim#word_detector#get_min_length(key) abort
+function! s:get_min_length_local(key) abort
   " Phase D-2 Sub2: Per-Key最小単語長設定の取得
 
   " デフォルト値（すべて未設定の場合）
@@ -406,11 +621,7 @@ function! hellshake_yano_vim#word_detector#get_min_length(key) abort
   return l:default_value
 endfunction
 
-" ======================================
-" Process2: Multi-Window Word Detection
-" ======================================
-"
-" hellshake_yano_vim#word_detector#detect_multi_window(windows) - 複数ウィンドウから単語検出
+" s:detect_multi_window_local(windows) - ローカル実装（フォールバック用）
 "
 " 目的:
 "   - PLAN.md Process2 に基づき、複数ウィンドウから同時に単語を検出
@@ -421,14 +632,18 @@ endfunction
 "   1. windows 引数の各ウィンドウ情報を反復処理
 "   2. 各ウィンドウの topline ～ botline の行を取得
 "   3. getbufline() を使って指定バッファの行内容を取得
-"   4. 日本語判定して detect_japanese_words() または detect_english_words() を呼び出し
+"   4. 日本語判定して s:detect_japanese_words() または s:detect_english_words() を呼び出し
 "   5. 検出された各単語に winid と bufnr を付与
 "   6. すべてのウィンドウの単語を集約して返す
 "
+" エラーハンドリング:
+"   - 無効なウィンドウ情報は自動的にスキップ
+"   - 空行は自動的にスキップ
+"
 " @param windows List ウィンドウ情報のリスト
 "   各要素は辞書形式: {winid, bufnr, topline, botline, ...}
-" @return List 単語リスト（各単語は {text, lnum, col, winid, bufnr} を含む）
-function! hellshake_yano_vim#word_detector#detect_multi_window(windows) abort
+" @return List 単語リスト（各単語は {text, lnum, col, end_col, winid, bufnr} を含む）
+function! s:detect_multi_window_local(windows) abort
   let l:all_words = []
 
   for l:wininfo in a:windows
