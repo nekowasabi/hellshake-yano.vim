@@ -339,3 +339,4 @@ deno test denops/hellshake-yano/
 | 2026-01-25 | Phase 1.1 dictionary統合 完了（1.1.1〜1.1.7 全タスク✅） |
 | 2026-01-25 | Phase 1.2 config統合 完了（1.2.1〜1.2.8 全タスク✅） |
 | 2026-01-26 | Phase 1.3 hint_generator統合 完了（1.3.1〜1.3.8 全タスク✅） |
+| 2026-02-06 | Phase 2.1 word_detector統合 完了（2.1.1〜2.1.8 全タスク✅） |
