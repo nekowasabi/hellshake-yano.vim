@@ -239,6 +239,7 @@ async function processExtmarksBatched(
       await denops.call("nvim_buf_set_extmark", 0, extmarkNamespace, line, col, {
         virt_text: [[h.hint, highlightGroup]],
         virt_text_pos: "overlay",
+        priority: 200,
       });
     } catch (error) {
       // Skip if col is out of range (e.g., due to display column vs byte column mismatch)
@@ -325,11 +326,9 @@ export async function displayHintsMultiBuffer(
   config: Config,
   extmarkNamespace: number,
 ): Promise<Map<number, number[]>> {
-  // フォーカス復帰直後は処理をスキップ（ちらつき防止）
-  const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
-  if (!shouldRedraw) {
-    return new Map<number, number[]>(); // VimScript側の遅延処理後に再度呼ばれる
-  }
+  // Clear existing hints before displaying new ones
+  await clearHintsMultiBuffer(denops, extmarkNamespace);
+  await denops.call("nvim_buf_clear_namespace", 0, extmarkNamespace, 0, -1);
 
   _isRenderingHints = true;
   const extmarkIdsByBuffer = new Map<number, number[]>();
@@ -463,6 +462,7 @@ async function processExtmarksForBuffer(
           // id オプションを省略してNeovimに自動割り当てさせる
           virt_text: [[h.hint, highlightGroup]],
           virt_text_pos: "overlay",
+          priority: 200,
         },
       ) as number;
 
@@ -619,20 +619,37 @@ export async function displayHintsAutoMultiBuffer(
       ah = generateHintsFromConfig(words.length, config);
     }
 
-    const nh = assignHintsToWords(words, ah, cl, cc, "normal", {
+    // Apply distance penalty for non-current windows
+    const currentWinId = await denops.call("win_getid") as number;
+    const adjustedWords = words.map(w => ({
+      ...w,
+      line: w.winid !== currentWinId ? w.line + 10000 : w.line,
+      originalLine: w.line,
+    }));
+
+    const nh = assignHintsToWords(adjustedWords, ah, cl, cc, "normal", {
       hintPosition: config.hintPosition,
       bothMinWordLength: config.bothMinWordLength,
     });
 
+    // Restore original line values to prevent hint spacing issues
+    const restoredHints = nh.map(h => ({
+      ...h,
+      word: {
+        ...h.word,
+        line: h.word.originalLine ?? h.word.line,
+      }
+    }));
+
     if (currentHints) {
       currentHints.length = 0;
-      currentHints.push(...nh);
+      currentHints.push(...restoredHints);
     }
     if (hintsVisible) hintsVisible.value = true;
 
-    await displayHintsMultiBuffer(denops, nh, config, extmarkNamespace);
+    await displayHintsMultiBuffer(denops, restoredHints, config, extmarkNamespace);
 
-    return nh;
+    return restoredHints;
   } else {
     // Fall back to standard display
     return displayHintsOptimized(

@@ -11,6 +11,8 @@ export interface Word {
   winid?: number;
   /** Buffer number for multi-window support (optional) */
   bufnr?: number;
+  /** Original line number before adjustment (optional) */
+  originalLine?: number;
 }
 
 /**
