@@ -25,6 +25,8 @@ export interface PerformanceMetrics {
   hideHints: number[];
   wordDetection: number[];
   hintGeneration: number[];
+  wordDetectionMultiWindow: number[];
+  wordDetectionVisual: number[];
 }
 
 /**
@@ -44,6 +46,8 @@ let performanceMetrics: PerformanceMetrics = {
   hideHints: [],
   wordDetection: [],
   hintGeneration: [],
+  wordDetectionMultiWindow: [],
+  wordDetectionVisual: [],
 };
 
 // グローバルキャッシュ
@@ -85,6 +89,8 @@ export function resetPerformanceMetrics(): void {
     hideHints: [],
     wordDetection: [],
     hintGeneration: [],
+    wordDetectionMultiWindow: [],
+    wordDetectionVisual: [],
   };
 }
 

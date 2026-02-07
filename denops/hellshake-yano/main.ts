@@ -50,6 +50,15 @@ import {
   highlightCandidateHintsHybrid,
 } from "./neovim/display/extmark-display.ts";
 
+// Phase 2.2: Vim display統合
+import { VimPopupDisplay } from "./vim/display/popup-display.ts";
+
+// Phase 2.3: Vim visual統合
+import { VimVisual } from "./vim/features/visual.ts";
+
+// Phase 3.1: Motion統合
+import { VimMotionDetector, type KeyRepeatConfig } from "./vim/features/motion.ts";
+
 // 設定関連のエクスポート
 export { getDefaultConfig } from "./config.ts";
 export type { Config } from "./config.ts";
@@ -173,6 +182,15 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
 
     // Dictionary初期化
     await initializeDictionarySystem(denops);
+
+    // Phase 2.2: Vim display統合 - VimPopupDisplay初期化
+    const vimDisplay = new VimPopupDisplay(denops);
+
+    // Phase 3.1: Motion統合 - VimMotionDetector初期化
+    const motionDetector = new VimMotionDetector(
+      config.motionTimeout ?? 2000,
+      config.motionCount ?? 2
+    );
 
     // Dispatcher登録（Vim環境用の最小実装）
     denops.dispatcher = {
@@ -357,6 +375,178 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
           return generateHints(count, hintConfig);
         } finally {
           recordPerformance("hintGeneration", performance.now() - startTime);
+        }
+      },
+
+      // Phase 2.2: Display統合メソッド
+
+      // displayShowHint: 現在ウィンドウにヒント表示
+      async displayShowHint(lnum: unknown, col: unknown, hint: unknown): Promise<number> {
+        if (typeof lnum !== "number" || typeof col !== "number" || typeof hint !== "string") {
+          return -1;
+        }
+        try {
+          // screenpos()で論理座標を画面座標に変換（Vim popup_create()は画面座標を期待）
+          const screen = await denops.call("screenpos", await denops.call("win_getid"), lnum, col) as { row: number; col: number };
+          if (screen.row === 0 || screen.col === 0) {
+            return -1; // 画面外
+          }
+          return await vimDisplay.showHint(screen.row, screen.col, hint);
+        } catch {
+          return -1;
+        }
+      },
+
+      // displayShowHintWithWindow: 指定ウィンドウにヒント表示
+      async displayShowHintWithWindow(winid: unknown, lnum: unknown, col: unknown, hint: unknown): Promise<number> {
+        if (typeof winid !== "number" || typeof lnum !== "number" || typeof col !== "number" || typeof hint !== "string") {
+          return -1;
+        }
+        try {
+          // screenpos()で論理座標を画面座標に変換
+          const screen = await denops.call("screenpos", winid, lnum, col) as { row: number; col: number };
+          if (screen.row === 0 || screen.col === 0) {
+            return -1; // 画面外
+          }
+          return await vimDisplay.showHint(screen.row, screen.col, hint);
+        } catch {
+          return -1;
+        }
+      },
+
+      // displayHideAll: 全ヒント非表示
+      async displayHideAll(): Promise<void> {
+        await vimDisplay.hideAll();
+      },
+
+      // displayHighlightPartialMatches: 部分マッチハイライト
+      async displayHighlightPartialMatches(matches: unknown): Promise<void> {
+        if (!Array.isArray(matches)) return;
+        const validMatches = matches.filter((m): m is string => typeof m === "string");
+        await vimDisplay.highlightPartialMatches(validMatches);
+      },
+
+      // displayGetPopupCount: 表示中ヒント数（テスト用）
+      // deno-lint-ignore require-await
+      async displayGetPopupCount(): Promise<number> {
+        return vimDisplay.getPopupCount();
+      },
+
+      // Phase 3.1: Motion統合メソッド
+
+      // motionDetect: モーション連打検出
+      // deno-lint-ignore require-await
+      async motionDetect(
+        motionKey: unknown,
+        count: unknown,
+        keyRepeatConfig: unknown
+      ): Promise<{
+        shouldShowHints: boolean;
+        skipReason?: string;
+        newCount: number;
+      }> {
+        if (typeof motionKey !== "string" || typeof count !== "number") {
+          return { shouldShowHints: false, skipReason: "invalid_params", newCount: 0 };
+        }
+
+        // keyRepeatConfig の型検証
+        const defaultKeyRepeatConfig: KeyRepeatConfig = {
+          enabled: true,
+          threshold: 50,
+          resetDelay: 300,
+        };
+
+        let validConfig = defaultKeyRepeatConfig;
+        if (typeof keyRepeatConfig === "object" && keyRepeatConfig !== null) {
+          const cfg = keyRepeatConfig as Record<string, unknown>;
+          validConfig = {
+            enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : true,
+            threshold: typeof cfg.threshold === "number" ? cfg.threshold : 50,
+            resetDelay: typeof cfg.resetDelay === "number" ? cfg.resetDelay : 300,
+          };
+        }
+
+        return motionDetector.detectMotion(motionKey, count, validConfig);
+      },
+
+      // motionResetState: 状態リセット
+      // deno-lint-ignore require-await
+      async motionResetState(): Promise<void> {
+        motionDetector.resetState();
+      },
+
+      // motionSetThreshold: 閾値設定
+      // deno-lint-ignore require-await
+      async motionSetThreshold(threshold: unknown): Promise<void> {
+        if (typeof threshold === "number" && threshold > 0) {
+          motionDetector.setThreshold(threshold);
+        }
+      },
+
+      // motionSetTimeout: タイムアウト設定
+      // deno-lint-ignore require-await
+      async motionSetTimeout(timeoutMs: unknown): Promise<void> {
+        if (typeof timeoutMs === "number" && timeoutMs > 0) {
+          motionDetector.setTimeout(timeoutMs);
+        }
+      },
+
+      // motionGetState: 現在状態取得（テスト用）
+      // deno-lint-ignore require-await
+      async motionGetState(): Promise<{
+        lastMotion: string;
+        lastMotionTime: number;
+        motionCount: number;
+        timeoutMs: number;
+        threshold: number;
+      }> {
+        return motionDetector.getState();
+      },
+
+      // Phase 2.3: Visual統合メソッド
+
+      // getVisualRange: ビジュアル選択範囲を取得
+      async getVisualRange(): Promise<Record<string, unknown>> {
+        try {
+          const visual = new VimVisual(denops);
+          const range = await visual.getVisualRange();
+          return {
+            mode: range.mode,
+            start_line: range.startLine,
+            start_col: range.startCol,
+            end_line: range.endLine,
+            end_col: range.endCol,
+          };
+        } catch (_error) {
+          return {
+            mode: "none",
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 0,
+          };
+        }
+      },
+
+      // detectWordsInVisualRange: ビジュアル選択範囲内の単語検出
+      async detectWordsInVisualRange(): Promise<Record<string, unknown>[]> {
+        const startTime = performance.now();
+        try {
+          // 1. ビジュアル選択範囲を取得
+          const visual = new VimVisual(denops);
+          const range = await visual.getVisualRange();
+
+          // 2. 全画面内の単語を検出
+          const result = await detectWordsWithManager(denops, config as EnhancedWordConfig);
+
+          // 3. 選択範囲内の単語のみにフィルタリング
+          const filteredWords = VimVisual.filterWordsInRange(result.words, range);
+
+          return filteredWords.map(toVimWordData);
+        } catch (_error) {
+          return [];
+        } finally {
+          recordPerformance("wordDetectionVisual", performance.now() - startTime);
         }
       },
     };

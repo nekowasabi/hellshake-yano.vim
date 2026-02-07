@@ -105,6 +105,24 @@ function! s:handle_key_repeat_detection(bufnr, current_time, config) abort
 endfunction
 
 " ============================================================================
+" Phase 3.1: Denops統合
+" ============================================================================
+
+" hellshake_yano_vim#motion#has_denops() - Denops利用可能性チェック
+"
+" @return Boolean Denopsが利用可能な場合v:true
+function! hellshake_yano_vim#motion#has_denops() abort
+  if !exists('*denops#plugin#is_loaded')
+    return v:false
+  endif
+  try
+    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
+  catch
+    return v:false
+  endtry
+endfunction
+
+" ============================================================================
 " 既存のモーション連打検出機能
 " ============================================================================
 
@@ -314,6 +332,40 @@ endfunction
 "   - Phase D-7 Process2: カウント値を'normal!'コマンドに含める
 "
 function! hellshake_yano_vim#motion#handle_with_count(motion_key, count) abort
+  " Phase 3.1: Denops優先パス
+  if hellshake_yano_vim#motion#has_denops()
+    try
+      " キーリピート設定を取得
+      let l:key_repeat_config = s:get_key_repeat_config()
+
+      " Denops APIで検出処理
+      let l:result = denops#request('hellshake-yano', 'motionDetect',
+        \ [a:motion_key, a:count, l:key_repeat_config])
+
+      " 型チェック（Denopsからの戻り値検証）
+      if type(l:result) == v:t_dict && has_key(l:result, 'shouldShowHints')
+        " モーション実行
+        execute 'normal! ' . a:count . a:motion_key
+
+        " ヒント表示判定
+        if l:result.shouldShowHints
+          " redraw でカーソル位置を画面に反映
+          redraw
+
+          " ヒント表示
+          if exists('*hellshake_yano_vim#core#show')
+            call hellshake_yano_vim#core#show()
+          endif
+        endif
+
+        return
+      endif
+    catch
+      " Denopsエラー時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装（既存コードそのまま）
   " 不正なモーションキーのチェック
   " Phase D-2 Sub1.1: h/j/k/l モーション対応
   " Process 101 Refactor: util.vim の共通関数を使用

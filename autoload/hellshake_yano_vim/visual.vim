@@ -27,6 +27,21 @@ let s:initial_visual_state = {
 " ビジュアルモード状態変数（スクリプトローカル）
 let s:visual_state = copy(s:initial_visual_state)
 
+" s:has_denops() - Denops利用可能チェック
+"
+" 目的:
+"   - hellshake-yanoプラグインがDenops上でロード済みかを判定
+"   - Denops優先ロジックの分岐に使用
+"
+" @return Boolean Denops利用可能ならv:true
+function! s:has_denops() abort
+  try
+    return denops#plugin#is_loaded('hellshake-yano')
+  catch
+    return v:false
+  endtry
+endfunction
+
 " hellshake_yano_vim#visual#init() - 状態変数の初期化
 "
 " 目的:
@@ -95,9 +110,24 @@ function! hellshake_yano_vim#visual#show() abort
     return
   endif
 
-  " 3. 選択範囲を取得
-  let l:start_pos = getpos("'<")
-  let l:end_pos = getpos("'>")
+  " 3. 選択範囲を取得（Denops優先 + フォールバック）
+  let l:range = {}
+  if s:has_denops()
+    try
+      let l:range = denops#request('hellshake-yano', 'getVisualRange', [])
+    catch
+      let l:range = {}
+    endtry
+  endif
+
+  if !empty(l:range) && has_key(l:range, 'start_line') && l:range.start_line > 0
+    let l:start_pos = [0, l:range.start_line, l:range.start_col, 0]
+    let l:end_pos = [0, l:range.end_line, l:range.end_col, 0]
+  else
+    " フォールバック: ローカルでgetpos使用
+    let l:start_pos = getpos("'<")
+    let l:end_pos = getpos("'>")
+  endif
 
   " 4. 選択範囲の妥当性チェック
   if l:start_pos[1] > l:end_pos[1]
@@ -135,6 +165,33 @@ endfunction
 "
 " 目的:
 "   - 指定された行範囲内の単語を検出
+"   - Denops利用可能時は detectWordsInVisualRange API を使用
+"   - Denops利用不可 or エラー時はローカル実装にフォールバック
+"
+" @param start_line Number 開始行番号（1-indexed）
+" @param end_line Number 終了行番号（1-indexed）
+" @return List<Dictionary> 範囲内の単語リスト
+function! s:detect_words_in_range(start_line, end_line) abort
+  " Denops優先
+  if s:has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'detectWordsInVisualRange', [])
+      if type(l:result) == v:t_list && !empty(l:result)
+        return l:result
+      endif
+    catch
+      " フォールバック
+    endtry
+  endif
+
+  " ローカル実装（既存ロジック）
+  return s:detect_words_in_range_local(a:start_line, a:end_line)
+endfunction
+
+" s:detect_words_in_range_local(start_line, end_line) - 範囲内の単語を検出（ローカル実装）
+"
+" 目的:
+"   - 指定された行範囲内の単語を検出
 "   - word_detector#detect_visible() を利用し、範囲外の単語を除外
 "
 " アルゴリズム:
@@ -150,7 +207,7 @@ endfunction
 "   - 空配列チェックを追加
 "   - word_filter.vim との互換性を確保
 "   - Sub2実装時に word_filter#apply() を使用する準備
-function! s:detect_words_in_range(start_line, end_line) abort
+function! s:detect_words_in_range_local(start_line, end_line) abort
   " 全画面内の単語を取得
   let l:all_words = hellshake_yano_vim#word_detector#detect_visible()
 

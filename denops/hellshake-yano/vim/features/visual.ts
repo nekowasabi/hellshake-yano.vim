@@ -7,6 +7,7 @@
  */
 
 import type { Denops } from "@denops/std";
+import type { Word } from "../../types.ts";
 
 /**
  * ビジュアルモード タイプ
@@ -100,6 +101,27 @@ export class VimVisual {
   async exitVisualMode(): Promise<void> {
     await this.denops.call("feedkeys", "\\<Esc>", "n");
     this.currentMode = VisualMode.None;
+  }
+
+  /**
+   * ビジュアル選択範囲内の単語を検出
+   *
+   * detectWordsVisible() の結果から、選択範囲内の単語のみをフィルタリング
+   * VimScript の s:detect_words_in_range() に対応
+   *
+   * @param words - 検出された全単語
+   * @param range - ビジュアル選択範囲
+   * @returns 範囲内の単語のみ
+   */
+  static filterWordsInRange(words: Word[], range: VisualRange): Word[] {
+    // mode が None の場合は全単語をそのまま返す
+    if (range.mode === VisualMode.None) {
+      return words;
+    }
+
+    return words.filter((word) =>
+      word.line >= range.startLine && word.line <= range.endLine
+    );
   }
 
   /**

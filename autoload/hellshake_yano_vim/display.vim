@@ -36,6 +36,18 @@ let s:ns_id = -1
 " Phase D-1 Sub3: カスタムハイライト設定の初期化フラグ
 let s:highlight_initialized = v:false
 
+" Denops 利用可能性チェック（Phase 2.2 統合）
+function! hellshake_yano_vim#display#has_denops() abort
+  if !exists('*denops#plugin#is_loaded')
+    return v:false
+  endif
+  try
+    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
+  catch
+    return v:false
+  endtry
+endfunction
+
 " hellshake_yano_vim#display#get_highlight_group(type) - ハイライトグループ名の取得
 "
 " 目的:
@@ -137,10 +149,12 @@ endfunction
 "   - Vim では popup_create() を使用
 "   - Neovim では nvim_buf_set_extmark() を使用
 "   - Phase MW-3: マルチウィンドウ対応により show_hint_with_window() をラップ
+"   - Phase 2.2: Denops統合 - Denops利用可能時はDenops APIを優先使用
 "
 " アルゴリズム:
-"   1. 現在ウィンドウIDを取得（win_getid()）
-"   2. show_hint_with_window() を呼び出し（統一実装）
+"   1. Denops利用可能ならDenops APIで表示（Phase 2.2）
+"   2. フォールバック: 現在ウィンドウIDを取得（win_getid()）
+"   3. show_hint_with_window() を呼び出し（統一実装）
 "
 " @param lnum Number 行番号（1-indexed）
 " @param col Number 列番号（1-indexed）
@@ -155,6 +169,21 @@ endfunction
 "   - Neovim では nvim_buf_set_extmark() が必要（Neovim 0.5+）
 "   - 内部的には show_hint_with_window() を使用
 function! hellshake_yano_vim#display#show_hint(lnum, col, hint) abort
+  " Phase 2.2: Denops優先パス
+  if hellshake_yano_vim#display#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'displayShowHint', [a:lnum, a:col, a:hint])
+      if type(l:result) == v:t_number && l:result >= 0
+        " Denops側でpopup_ids管理するので、VimScript側にも記録
+        call add(s:popup_ids, {'id': l:result, 'hint': a:hint})
+        return l:result
+      endif
+    catch
+      " Denopsエラー時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装
   let l:current_winid = win_getid()
   return hellshake_yano_vim#display#show_hint_with_window(l:current_winid, a:lnum, a:col, a:hint)
 endfunction
@@ -246,6 +275,7 @@ endfunction
 " 目的:
 "   - 指定されたウィンドウにヒントを表示
 "   - Phase MW-3: Multi-Window Support - Window-specific Hint Display
+"   - Phase 2.2: Denops統合 - Denops利用可能時はDenops APIを優先使用
 "   - screenpos()でウィンドウ座標を画面座標に変換
 "
 " パラメータ:
@@ -264,6 +294,20 @@ endfunction
 "   - screenpos() で画面外（row=0 or col=0）の場合は -1 を返す
 "   - ウィンドウID は getwininfo() や win_getid() で取得可能
 function! hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hint) abort
+  " Phase 2.2: Denops優先パス
+  if hellshake_yano_vim#display#has_denops()
+    try
+      let l:result = denops#request('hellshake-yano', 'displayShowHintWithWindow', [a:winid, a:lnum, a:col, a:hint])
+      if type(l:result) == v:t_number && l:result >= 0
+        call add(s:popup_ids, {'id': l:result, 'hint': a:hint, 'winid': a:winid})
+        return l:result
+      endif
+    catch
+      " Denopsエラー時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装（既存コードそのまま）
   " 画面座標に変換（ウィンドウIDを指定）
   let l:screen = screenpos(a:winid, a:lnum, a:col)
 
@@ -326,11 +370,13 @@ endfunction
 " 目的:
 "   - 表示中の全ての popup/extmark を削除
 "   - s:popup_ids 配列をクリア
+"   - Phase 2.2: Denops統合 - Denops利用可能時はDenops APIを優先使用
 "
 " アルゴリズム:
-"   1. Vim/Neovim の判定
-"   2. 該当するAPIを使用して全 popup/extmark を削除
-"   3. s:popup_ids をクリア
+"   1. Denops利用可能ならDenops APIで全削除（Phase 2.2）
+"   2. フォールバック: Vim/Neovim の判定
+"   3. 該当するAPIを使用して全 popup/extmark を削除
+"   4. s:popup_ids をクリア
 "
 " 使用例:
 "   call hellshake_yano_vim#display#hide_all()
@@ -344,6 +390,19 @@ endfunction
 "     bufnr情報を使用して各バッファのextmarkを個別にクリア
 "   - nvim_buf_clear_namespace(0, ...) はカレントバッファのみ削除するため不十分
 function! hellshake_yano_vim#display#hide_all() abort
+  " Phase 2.2: Denops優先パス
+  if hellshake_yano_vim#display#has_denops()
+    try
+      call denops#request('hellshake-yano', 'displayHideAll', [])
+      " Denops側でクリアされるが、VimScript側の状態もクリア
+      let s:popup_ids = []
+      return
+    catch
+      " Denopsエラー時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装（既存コードそのまま）
   if has('nvim')
     " Neovim の場合: 各バッファのextmarkを個別にクリア（Process 100 Fix）
     if s:ns_id != -1
@@ -386,14 +445,16 @@ endfunction
 " 目的:
 "   - 部分マッチしたヒントのみを表示し、マッチしないヒントを非表示にする
 "   - Phase A-3: 複数文字ヒント入力時の視覚的フィードバック機能
+"   - Phase 2.2: Denops統合 - Denops利用可能時はDenops APIを優先使用
 "
 " @param a:matches (List<String>): 部分マッチするヒントのリスト
 " @return void
 "
 " アルゴリズム:
-"   1. s:popup_ids に格納された全ポップアップをループ
-"   2. matches に含まれないヒントのポップアップを非表示
-"   3. matches に含まれるヒントはそのまま表示を維持
+"   1. Denops利用可能ならDenops APIでフィルタリング（Phase 2.2）
+"   2. フォールバック: s:popup_ids に格納された全ポップアップをループ
+"   3. matches に含まれないヒントのポップアップを非表示
+"   4. matches に含まれるヒントはそのまま表示を維持
 "
 " 使用例:
 "   " 'a', 'aa', 'as' のみ表示し、's', 'sa' を非表示にする
@@ -407,6 +468,25 @@ endfunction
 " Process 100 Fix:
 "   - Neovim: bufnr情報を使用して正しいバッファのextmarkを削除
 function! hellshake_yano_vim#display#highlight_partial_matches(matches) abort
+  " Phase 2.2: Denops優先パス
+  if hellshake_yano_vim#display#has_denops()
+    try
+      call denops#request('hellshake-yano', 'displayHighlightPartialMatches', [a:matches])
+      " Denops側でフィルタリングされるが、VimScript側の状態も更新
+      let l:new_popup_ids = []
+      for l:popup_info in s:popup_ids
+        if index(a:matches, l:popup_info.hint) >= 0
+          call add(l:new_popup_ids, l:popup_info)
+        endif
+      endfor
+      let s:popup_ids = l:new_popup_ids
+      return
+    catch
+      " Denopsエラー時はフォールバック
+    endtry
+  endif
+
+  " フォールバック: ローカル実装（既存コードそのまま）
   " 新しい popup_ids リスト（マッチしたヒントのみ保持）
   let l:new_popup_ids = []
 
