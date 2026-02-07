@@ -47,8 +47,8 @@ let performanceMetrics: PerformanceMetrics = {
 };
 
 // グローバルキャッシュ
-const wordsCache = new LRUCache<string, Word[]>(100);
-const hintsCache = new LRUCache<string, string[]>(50);
+const WORDS_CACHE = new LRUCache<string, Word[]>(100);
+const HINTS_CACHE = new LRUCache<string, string[]>(50);
 
 // ========== パフォーマンス記録 ==========
 
@@ -96,7 +96,7 @@ export function resetPerformanceMetrics(): void {
  * @returns 単語キャッシュ
  */
 export function getWordsCache(): LRUCache<string, Word[]> {
-  return wordsCache;
+  return WORDS_CACHE;
 }
 
 /**
@@ -105,15 +105,15 @@ export function getWordsCache(): LRUCache<string, Word[]> {
  * @returns ヒントキャッシュ
  */
 export function getHintsCache(): LRUCache<string, string[]> {
-  return hintsCache;
+  return HINTS_CACHE;
 }
 
 /**
  * キャッシュをクリア
  */
 export function clearCaches(): void {
-  wordsCache.clear();
-  hintsCache.clear();
+  WORDS_CACHE.clear();
+  HINTS_CACHE.clear();
 }
 
 // ========== デバッグ情報 ==========
@@ -162,12 +162,12 @@ export async function detectWordsOptimized(
   bufnr: number,
 ): Promise<Word[]> {
   const cacheKey = `detectWords:${bufnr}`;
-  const cached = wordsCache.get(cacheKey);
+  const cached = WORDS_CACHE.get(cacheKey);
   if (cached) return cached;
 
   const result = await detectWordsWithManager(denops, {});
   const words = Array.isArray(result) ? result : (result as { words?: Word[] }).words || [];
-  wordsCache.set(cacheKey, words);
+  WORDS_CACHE.set(cacheKey, words);
   return words;
 }
 
@@ -183,11 +183,11 @@ export function generateHintsOptimized(
   markers: string[],
 ): string[] {
   const cacheKey = `generateHints:${wordCount}:${markers.join("")}`;
-  const cached = hintsCache.get(cacheKey);
+  const cached = HINTS_CACHE.get(cacheKey);
   if (cached) return cached;
 
   const hints = generateHints(wordCount, markers);
-  hintsCache.set(cacheKey, hints);
+  HINTS_CACHE.set(cacheKey, hints);
   return hints;
 }
 
@@ -210,14 +210,14 @@ export function generateHintsFromConfigOptimized(
     markers: config.markers,
   };
   const cacheKey = `generateHints:${wordCount}:${JSON.stringify(hintConfig)}`;
-  const cached = hintsCache.get(cacheKey);
+  const cached = HINTS_CACHE.get(cacheKey);
   if (cached) return cached;
 
   const hints = generateHints(wordCount, {
     groups: true,
     ...hintConfig,
   });
-  hintsCache.set(cacheKey, hints);
+  HINTS_CACHE.set(cacheKey, hints);
   return hints;
 }
 

@@ -271,7 +271,7 @@ async function processMatchaddBatched(
             text: h.hint,
           });
         } else {
-          const _eh = h.hint;
+          let eh = h.hint;
           const ne = ["\\", ".", "[", "]", "^", "$", "*"];
           if (ne.some((c) => h.hint.includes(c))) {
             eh = h.hint.replace(/\\/g, "\\\\").replace(/\./g, "\\.").replace(/\[/g, "\\[")
@@ -305,7 +305,7 @@ async function processMatchaddBatched(
  * State tracking for multi-buffer extmarks
  * Maps bufnr -> Set of extmark IDs for cleanup
  */
-const multiBufferExtmarkState = new Map<number, Set<number>>();
+const MULTI_BUFFER_EXTMARK_STATE = new Map<number, Set<number>>();
 
 /**
  * Display hints across multiple buffers using extmarks
@@ -353,11 +353,11 @@ export async function displayHintsMultiBuffer(
       extmarkIdsByBuffer.set(bufnr, extmarkIds);
 
       // Track for cleanup
-      if (!multiBufferExtmarkState.has(bufnr)) {
-        multiBufferExtmarkState.set(bufnr, new Set());
+      if (!MULTI_BUFFER_EXTMARK_STATE.has(bufnr)) {
+        MULTI_BUFFER_EXTMARK_STATE.set(bufnr, new Set());
       }
       for (const id of extmarkIds) {
-        multiBufferExtmarkState.get(bufnr)!.add(id);
+        MULTI_BUFFER_EXTMARK_STATE.get(bufnr)!.add(id);
       }
     }
   } finally {
@@ -491,7 +491,7 @@ export async function clearHintsMultiBuffer(
   denops: Denops,
   extmarkNamespace: number,
 ): Promise<void> {
-  for (const [bufnr, _extmarkIds] of multiBufferExtmarkState) {
+  for (const [bufnr, _extmarkIds] of MULTI_BUFFER_EXTMARK_STATE) {
     try {
       // Check if buffer still exists
       const bufExists = await denops.call("bufexists", bufnr) as number;
@@ -505,7 +505,7 @@ export async function clearHintsMultiBuffer(
   }
 
   // Clear tracking state
-  multiBufferExtmarkState.clear();
+  MULTI_BUFFER_EXTMARK_STATE.clear();
 }
 
 /**
@@ -526,7 +526,7 @@ export async function clearHintsForBuffers(
       if (bufExists) {
         await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
       }
-      multiBufferExtmarkState.delete(bufnr);
+      MULTI_BUFFER_EXTMARK_STATE.delete(bufnr);
     } catch (error) {
       console.error(`[hellshake-yano] Failed to clear namespace in buffer ${bufnr}:`, error);
     }
@@ -654,5 +654,5 @@ export async function displayHintsAutoMultiBuffer(
  * @returns Map of bufnr -> Set of extmark IDs
  */
 export function getMultiBufferExtmarkState(): Map<number, Set<number>> {
-  return new Map(multiBufferExtmarkState);
+  return new Map(MULTI_BUFFER_EXTMARK_STATE);
 }

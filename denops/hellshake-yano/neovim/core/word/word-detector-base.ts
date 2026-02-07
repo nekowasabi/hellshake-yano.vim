@@ -3,11 +3,7 @@ import type { DetectionContext, Word } from "../../../types.ts";
 import type { Config } from "../../../config.ts";
 import { Core } from "../core.ts";
 import type { WordDetector, WordDetectionConfig } from "./word-detector-strategies.ts";
-export function resolveConfigType(gc?: Config | Config): [Config | undefined, Config | undefined] {
-  if (!gc) return [undefined, undefined];
-  if ('perKeyMinLength' in gc || 'defaultMinWordLength' in gc) return [gc as Config, undefined];
-  return [undefined, gc as Config];
-}
+import { resolveConfigType } from "../../../common/utils/config.ts";
 export abstract class BaseWordDetector implements WordDetector {
   abstract readonly name: string;
   abstract readonly priority: number;

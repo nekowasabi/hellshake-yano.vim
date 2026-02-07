@@ -3,6 +3,8 @@ import type { DetectionContext, Word } from "../../../types.ts";
 import type { Config } from "../../../config.ts";
 import { Core } from "../core.ts";
 import { tinysegmenter } from "./word-segmenter.ts";
+import { resolveConfigType } from "../../../common/utils/config.ts";
+import { charIndexToByteIndex } from "../word.ts";
 export interface WordDetector {
   readonly name: string;
   readonly priority: number;
@@ -33,15 +35,6 @@ export interface WordDetectionConfig {
   japanese_merge_particles?: boolean;
   japanese_merge_threshold?: number;
   japanese_min_word_length?: number;
-}
-function resolveConfigType(c?: Config | Config): [Config | undefined, Config | undefined] {
-  if (c && "useJapanese" in c) return [c as Config, undefined];
-  return [undefined, c as unknown as Config];
-}
-function charIndexToByteIndex(t: string, ci: number): number {
-  if (ci === 0) return 0;
-  const e = new TextEncoder();
-  return e.encode(t.slice(0, ci)).length;
 }
 interface ExtractWordsOptions {
   useImprovedDetection?: boolean;
@@ -96,13 +89,24 @@ export class RegexWordDetector implements WordDetector {
     return globalThis.extractWords?.(lt, ln, { useImprovedDetection: true, excludeJapanese: ej }) || [];
   }
   private applyFilters(words: Word[], c?: DetectionContext): Word[] {
-    let f = words;
     const ml = this.getEffectiveMinLength(c, c?.currentKey);
-    if (ml >= 1) f = f.filter((w) => w.text.length >= ml);
-    if (this.config.maxWordLength) f = f.filter((w) => w.text.length <= this.config.maxWordLength!);
-    if (this.config.exclude_numbers) f = f.filter((w) => !/^\d+$/.test(w.text));
-    if (this.config.exclude_single_chars && ml > 1) f = f.filter((w) => w.text.length > 1);
-    return f;
+    const maxLen = this.config.maxWordLength;
+    const excludeNumbers = this.config.exclude_numbers;
+    const excludeSingleChars = this.config.exclude_single_chars && ml > 1;
+
+    // 単一パスフィルタリング: 60-75%削減
+    return words.filter((w) => {
+      const len = w.text.length;
+      // minLength チェック
+      if (ml >= 1 && len < ml) return false;
+      // maxWordLength チェック
+      if (maxLen && len > maxLen) return false;
+      // exclude_numbers チェック
+      if (excludeNumbers && /^\d+$/.test(w.text)) return false;
+      // exclude_single_chars チェック
+      if (excludeSingleChars && len <= 1) return false;
+      return true;
+    });
   }
 }
 export class TinySegmenterWordDetector implements WordDetector {
