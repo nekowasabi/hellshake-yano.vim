@@ -207,3 +207,121 @@ test("ConfigMigrator: migrate() - warnings配列が存在", async (denops) => {
 
   await denops.cmd("echo ''");
 });
+
+// === Config Migration 型変換テスト ===
+
+test("ConfigMigrator: g:hellshake_yano_config が存在しない場合", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // 設定変数を削除
+  await denops.cmd("unlet! g:hellshake_yano_config");
+  await denops.cmd("unlet! g:hellshake_yano_vim_config");
+  await denops.cmd("unlet! g:hellshake_yano");
+
+  const result = await migrator.migrate();
+
+  assertEquals(
+    result.status as MigrationStatus,
+    "none",
+    "設定が存在しない場合はnoneステータス",
+  );
+  assertEquals(result.oldConfigExists, false, "旧設定が存在しない");
+  assertEquals(result.newConfigExists, false, "新設定が存在しない");
+
+  await denops.cmd("echo ''");
+});
+
+test("ConfigMigrator: g:hellshake_yano_config が null の場合", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // nullを設定（VimScriptではv:null）
+  await denops.cmd("let g:hellshake_yano_config = v:null");
+  await denops.cmd("unlet! g:hellshake_yano");
+
+  const result = await migrator.migrate();
+
+  // nullの場合は設定が存在しないものとして扱う
+  assertEquals(
+    result.status as MigrationStatus,
+    "none",
+    "null設定の場合はnoneステータス",
+  );
+
+  await denops.cmd("echo ''");
+});
+
+test("ConfigMigrator: g:hellshake_yano_config が不正な型の場合 (数値)", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // 数値を設定（不正な型）
+  await denops.cmd("let g:hellshake_yano_config = 123");
+  await denops.cmd("unlet! g:hellshake_yano");
+
+  const result = await migrator.migrate();
+
+  // 不正な型の場合はエラーログを出力し、デフォルト設定を使用
+  assertEquals(
+    result.status as MigrationStatus,
+    "none",
+    "不正な型の場合はnoneステータス",
+  );
+
+  await denops.cmd("echo ''");
+});
+
+test("ConfigMigrator: g:hellshake_yano_config が不正な型の場合 (文字列)", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // 文字列を設定（不正な型）
+  await denops.cmd("let g:hellshake_yano_config = 'invalid'");
+  await denops.cmd("unlet! g:hellshake_yano");
+
+  const result = await migrator.migrate();
+
+  // 不正な型の場合はエラーログを出力し、デフォルト設定を使用
+  assertEquals(
+    result.status as MigrationStatus,
+    "none",
+    "不正な型の場合はnoneステータス",
+  );
+
+  await denops.cmd("echo ''");
+});
+
+test("ConfigMigrator: g:hellshake_yano_config が空のオブジェクトの場合", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // 空のオブジェクトを設定
+  await denops.cmd("let g:hellshake_yano_config = {}");
+  await denops.cmd("unlet! g:hellshake_yano");
+
+  const result = await migrator.migrate();
+
+  // 空のオブジェクトは有効な設定として扱う
+  assertEquals(
+    result.oldConfigExists,
+    false,
+    "g:hellshake_yano_config は旧設定ではない",
+  );
+
+  await denops.cmd("echo ''");
+});
+
+test("ConfigMigrator: 部分的に不正なフィールドを含む設定", async (denops) => {
+  const migrator = new ConfigMigrator(denops);
+
+  // 一部のフィールドが不正な設定
+  await denops.cmd("let g:hellshake_yano_vim_config = {}");
+  await denops.cmd("let g:hellshake_yano_vim_config.hint_chars = 'ABC'");
+  await denops.cmd("let g:hellshake_yano_vim_config.invalid_field = 'should_be_ignored'");
+  await denops.cmd("let g:hellshake_yano_vim_config.motion_threshold = 'not_a_number'");
+
+  const config = await migrator.getVimScriptConfig();
+
+  // 有効なフィールドは取得できる
+  assertEquals(config.hint_chars, "ABC", "有効なフィールドは取得できること");
+  // 不正なフィールドは無視される
+  assertEquals(typeof config.invalid_field, "undefined", "不正なフィールドは無視されること");
+
+  await denops.cmd("echo ''");
+});

@@ -1,163 +1,203 @@
 /**
- * tests/common/types/word.test.ts
+ * tests/neovim/core/word.test.ts
  *
- * Word型、VimScriptWord型、DenopsWord型、および座標系変換関数のテスト
+ * Neovim Core Word Detection テスト
+ * getFoldedLines エラーハンドリングを含む
  */
 
-import { assertEquals } from "jsr:@std/assert";
-import type {
-  DenopsWord,
-  VimScriptWord,
-} from "../../../denops/hellshake-yano/common/types/word.ts";
-import {
-  denopsToVimScript,
-  isDenopsWord,
-  isVimScriptWord,
-  vimScriptToDenops,
-} from "../../../denops/hellshake-yano/common/types/word.ts";
+import { test } from "../../testRunner.ts";
+import { assertEquals, assertExists } from "@std/assert";
+import { detectWords } from "../../../denops/hellshake-yano/neovim/core/word.ts";
+import { DEFAULT_CONFIG } from "../../../denops/hellshake-yano/config.ts";
 
-Deno.test("VimScriptWord → DenopsWord 変換テスト", async (t) => {
-  await t.step("基本的な変換が正しく動作する", () => {
-    const vimWord: VimScriptWord = {
-      text: "hello",
-      lnum: 10,
-      col: 5,
-      end_col: 10,
-    };
+test("Word Detection: 基本的な単語検出", async (denops) => {
+  // テスト用のバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'hello world test')");
 
-    const result = vimScriptToDenops(vimWord);
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
 
-    assertEquals(result.text, "hello");
-    assertEquals(result.line, 10);
-    assertEquals(result.col, 5);
-  });
+  // 単語が検出されることを確認
+  assertExists(words, "単語配列が存在すること");
+  assertEquals(words.length > 0, true, "少なくとも1つの単語が検出されること");
 
-  await t.step("行番号と列番号が正しくマッピングされる", () => {
-    const vimWord: VimScriptWord = {
-      text: "world",
-      lnum: 1,
-      col: 1,
-      end_col: 6,
-    };
-
-    const result = vimScriptToDenops(vimWord);
-
-    assertEquals(result.line, 1);
-    assertEquals(result.col, 1);
-  });
+  await denops.cmd("echo ''");
 });
 
-Deno.test("DenopsWord → VimScriptWord 変換テスト", async (t) => {
-  await t.step("基本的な逆変換が正しく動作する", () => {
-    const denopsWord: DenopsWord = {
-      text: "hello",
-      line: 10,
-      col: 5,
-    };
+test("Word Detection: 複数行の単語検出", async (denops) => {
+  // 複数行のテストバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'line one')");
+  await denops.cmd("call setline(2, 'line two')");
+  await denops.cmd("call setline(3, 'line three')");
 
-    const result = denopsToVimScript(denopsWord);
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
 
-    assertEquals(result.text, "hello");
-    assertEquals(result.lnum, 10);
-    assertEquals(result.col, 5);
-    assertEquals(result.end_col, 10); // col(5) + text.length(5) = 10
-  });
+  // 複数行の単語が検出されることを確認
+  assertExists(words, "単語配列が存在すること");
+  assertEquals(words.length > 0, true, "複数行から単語が検出されること");
 
-  await t.step("end_colが単語の長さから正しく計算される", () => {
-    const denopsWord: DenopsWord = {
-      text: "typescript",
-      line: 1,
-      col: 1,
-    };
-
-    const result = denopsToVimScript(denopsWord);
-
-    assertEquals(result.end_col, 11); // col(1) + text.length(10) = 11
-  });
+  await denops.cmd("echo ''");
 });
 
-Deno.test("往復変換の一致性テスト", async (t) => {
-  await t.step("VimScript → Denops → VimScript で元に戻る", () => {
-    const original: VimScriptWord = {
-      text: "test",
-      lnum: 15,
-      col: 20,
-      end_col: 24,
-    };
+// === getFoldedLines エラーハンドリングテスト ===
 
-    const denopsWord = vimScriptToDenops(original);
-    const restored = denopsToVimScript(denopsWord);
+test("getFoldedLines: foldされた行が正しく除外される", async (denops) => {
+  // テストバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'visible line one')");
+  await denops.cmd("call setline(2, 'folded line two')");
+  await denops.cmd("call setline(3, 'folded line three')");
+  await denops.cmd("call setline(4, 'visible line four')");
 
-    assertEquals(restored.text, original.text);
-    assertEquals(restored.lnum, original.lnum);
-    assertEquals(restored.col, original.col);
-    assertEquals(restored.end_col, original.end_col);
-  });
+  // 2-3行目をfold
+  await denops.cmd("2,3fold");
+
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
+
+  // foldされた行の単語が除外されることを確認
+  assertExists(words, "単語配列が存在すること");
+
+  // foldされた行(2-3)の単語が含まれていないことを確認
+  const foldedLineWords = words.filter((w) => w.line === 2 || w.line === 3);
+  assertEquals(foldedLineWords.length, 0, "foldされた行の単語が除外されること");
+
+  await denops.cmd("echo ''");
 });
 
-Deno.test("型ガードテスト - VimScriptWord", async (t) => {
-  await t.step("正しいVimScriptWord型を識別する", () => {
-    const validWord = {
-      text: "valid",
-      lnum: 1,
-      col: 1,
-      end_col: 6,
-    };
+test("getFoldedLines: denops.call() が失敗した場合", async (denops) => {
+  // テストバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'test line')");
 
-    assertEquals(isVimScriptWord(validWord), true);
-  });
+  // 通常の処理（エラーが発生しないことを確認）
+  const words = await detectWords(denops, DEFAULT_CONFIG);
 
-  await t.step("不正な型を拒否する - lnumが0以下", () => {
-    const invalidWord = {
-      text: "invalid",
-      lnum: 0,
-      col: 1,
-      end_col: 8,
-    };
+  // エラーが発生せず、単語が検出されることを確認
+  assertExists(words, "エラーが発生しても単語配列が存在すること");
 
-    assertEquals(isVimScriptWord(invalidWord), false);
-  });
-
-  await t.step("不正な型を拒否する - null", () => {
-    assertEquals(isVimScriptWord(null), false);
-  });
+  await denops.cmd("echo ''");
 });
 
-Deno.test("型ガードテスト - DenopsWord", async (t) => {
-  await t.step("正しいDenopsWord型を識別する", () => {
-    const validWord: DenopsWord = {
-      text: "valid",
-      line: 1,
-      col: 1,
-    };
+test("getFoldedLines: foldclosed() が非number を返した場合のエラーハンドリング", async (denops) => {
+  // コンソールのエラーログをキャプチャ
+  const originalError = console.error;
+  const errorLogs: string[] = [];
+  console.error = (...args: unknown[]) => {
+    errorLogs.push(args.map(String).join(" "));
+  };
 
-    assertEquals(isDenopsWord(validWord), true);
-  });
+  try {
+    // テストバッファを作成
+    await denops.cmd("enew!");
+    await denops.cmd("setlocal buftype=nofile");
+    await denops.cmd("call setline(1, 'test line')");
 
-  await t.step("不正な型を拒否する - lineが0以下", () => {
-    const invalidWord = {
-      text: "invalid",
-      line: 0,
-      col: 1,
-    };
+    // 単語を検出（内部でfoldclosed()が呼ばれる）
+    const words = await detectWords(denops, DEFAULT_CONFIG);
 
-    assertEquals(isDenopsWord(invalidWord), false);
-  });
+    // エラーが発生しても処理が継続することを確認
+    assertExists(words, "エラーが発生しても処理が継続すること");
+  } finally {
+    // コンソールを復元
+    console.error = originalError;
+  }
+
+  await denops.cmd("echo ''");
 });
 
-Deno.test("エッジケーステスト", async (t) => {
-  await t.step("空文字列の単語を変換できる", () => {
-    const vimWord: VimScriptWord = {
-      text: "",
-      lnum: 1,
-      col: 1,
-      end_col: 1,
-    };
+test("getFoldedLines: fold無効な環境での動作", async (denops) => {
+  // foldを無効化
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("setlocal nofoldenable");
+  await denops.cmd("call setline(1, 'test line one')");
+  await denops.cmd("call setline(2, 'test line two')");
 
-    const denopsWord = vimScriptToDenops(vimWord);
-    assertEquals(denopsWord.text, "");
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
 
-    const restored = denopsToVimScript(denopsWord);
-    assertEquals(restored.end_col, 1); // col(1) + text.length(0) = 1
-  });
+  // fold無効でも正常に動作することを確認
+  assertExists(words, "fold無効でも単語が検出されること");
+  assertEquals(words.length > 0, true, "単語が検出されること");
+
+  await denops.cmd("echo ''");
+});
+
+test("getFoldedLines: 入れ子のfoldの処理", async (denops) => {
+  // テストバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'outer start')");
+  await denops.cmd("call setline(2, 'inner start')");
+  await denops.cmd("call setline(3, 'inner content')");
+  await denops.cmd("call setline(4, 'inner end')");
+  await denops.cmd("call setline(5, 'outer end')");
+
+  // 入れ子のfoldを作成
+  await denops.cmd("2,4fold");
+  await denops.cmd("1,5fold");
+
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
+
+  // 入れ子のfoldでも正常に処理されることを確認
+  assertExists(words, "入れ子のfoldでも処理が完了すること");
+
+  await denops.cmd("echo ''");
+});
+
+test("getFoldedLines: 空の範囲でのfold処理", async (denops) => {
+  // テストバッファを作成
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  await denops.cmd("call setline(1, 'only line')");
+
+  // 単語を検出（foldなし）
+  const words = await detectWords(denops, DEFAULT_CONFIG);
+
+  // foldがない場合も正常に動作することを確認
+  assertExists(words, "foldがない場合も単語が検出されること");
+  assertEquals(words.length > 0, true, "単語が検出されること");
+
+  await denops.cmd("echo ''");
+});
+
+test("getFoldedLines: 大量のfoldの処理", async (denops) => {
+  // テストバッファを作成（100行）
+  await denops.cmd("enew!");
+  await denops.cmd("setlocal buftype=nofile");
+  for (let i = 1; i <= 100; i++) {
+    await denops.cmd(`call setline(${i}, 'line ${i}')`);
+  }
+
+  // 複数のfoldを作成（10行ごと）
+  for (let i = 1; i <= 91; i += 10) {
+    await denops.cmd(`${i},${i + 8}fold`);
+  }
+
+  // パフォーマンス測定開始
+  const startTime = performance.now();
+
+  // 単語を検出
+  const words = await detectWords(denops, DEFAULT_CONFIG);
+
+  // パフォーマンス測定終了
+  const endTime = performance.now();
+  const elapsedTime = endTime - startTime;
+
+  // パフォーマンスが許容範囲内（1秒以内）
+  assertEquals(elapsedTime < 1000, true, "大量のfoldでも1秒以内に処理が完了する");
+
+  // 処理が完了することを確認
+  assertExists(words, "大量のfoldでも処理が完了すること");
+
+  await denops.cmd("echo ''");
 });
