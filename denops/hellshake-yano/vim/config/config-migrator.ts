@@ -92,11 +92,20 @@ export class ConfigMigrator {
       return {};
     }
 
-    const config = await this.denops.eval(
-      ConfigMigrator.OLD_CONFIG_VAR,
-    ) as Record<string, unknown>;
+    let configResult: unknown;
+    try {
+      configResult = await this.denops.eval(ConfigMigrator.OLD_CONFIG_VAR);
+    } catch (error) {
+      console.error(`Failed to eval ${ConfigMigrator.OLD_CONFIG_VAR}:`, error);
+      return {};
+    }
 
-    return config;
+    if (typeof configResult !== "object" || configResult === null) {
+      console.error(`${ConfigMigrator.OLD_CONFIG_VAR} is not an object: ${typeof configResult}`);
+      return {};
+    }
+
+    return configResult as Record<string, unknown>;
   }
 
   /**
@@ -245,10 +254,20 @@ export class ConfigMigrator {
    * @returns 旧設定オブジェクト
    */
   private async readOldConfig(): Promise<Record<string, unknown>> {
-    const config = await this.denops.eval(
-      ConfigMigrator.OLD_CONFIG_VAR,
-    ) as Record<string, unknown>;
-    return config;
+    let configResult: unknown;
+    try {
+      configResult = await this.denops.eval(ConfigMigrator.OLD_CONFIG_VAR);
+    } catch (error) {
+      console.error(`Failed to eval ${ConfigMigrator.OLD_CONFIG_VAR}:`, error);
+      return {};
+    }
+
+    if (typeof configResult !== "object" || configResult === null) {
+      console.error(`${ConfigMigrator.OLD_CONFIG_VAR} is not an object: ${typeof configResult}`);
+      return {};
+    }
+
+    return configResult as Record<string, unknown>;
   }
 
   /**

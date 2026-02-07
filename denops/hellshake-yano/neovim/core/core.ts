@@ -1734,8 +1734,11 @@ export class Core {
       if (!this.dictionaryLoader || !this.vimConfigBridge) {
         await this.initializeDictionarySystem(denops);
       }
-      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
-      const dictionary = await this.dictionaryLoader!.loadUserDictionary(dictConfig);
+      if (!this.vimConfigBridge || !this.dictionaryLoader) {
+        throw new Error("Dictionary system not initialized");
+      }
+      const dictConfig = await this.vimConfigBridge.getConfig(denops);
+      const dictionary = await this.dictionaryLoader.loadUserDictionary(dictConfig);
       await denops.cmd('echo "Dictionary reloaded successfully"');
     } catch (error) {
       await denops.cmd(`echoerr "Failed to reload dictionary: ${error}"`);
@@ -1749,7 +1752,10 @@ export class Core {
       if (!this.dictionaryLoader || !this.vimConfigBridge) {
         await this.initializeDictionarySystem(denops);
       }
-      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
+      if (!this.vimConfigBridge) {
+        throw new Error("Dictionary system not initialized");
+      }
+      const dictConfig = await this.vimConfigBridge.getConfig(denops);
       const dictionaryPath = dictConfig.dictionaryPath || ".hellshake-yano/dictionary.json";
 
       if (dictionaryPath) {
@@ -1792,8 +1798,11 @@ export class Core {
       if (!this.dictionaryLoader || !this.vimConfigBridge) {
         await this.initializeDictionarySystem(denops);
       }
-      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
-      const dictionary = await this.dictionaryLoader!.loadUserDictionary(dictConfig);
+      if (!this.vimConfigBridge || !this.dictionaryLoader) {
+        throw new Error("Dictionary system not initialized");
+      }
+      const dictConfig = await this.vimConfigBridge.getConfig(denops);
+      const dictionary = await this.dictionaryLoader.loadUserDictionary(dictConfig);
       await denops.cmd("new");
       await denops.cmd("setlocal buftype=nofile");
       await denops.cmd("setlocal bufhidden=wipe");
@@ -1814,7 +1823,10 @@ export class Core {
       if (!this.dictionaryLoader || !this.vimConfigBridge) {
         await this.initializeDictionarySystem(denops);
       }
-      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
+      if (!this.vimConfigBridge) {
+        throw new Error("Dictionary system not initialized");
+      }
+      const dictConfig = await this.vimConfigBridge.getConfig(denops);
       if (dictConfig.dictionaryPath) {
         try {
           await Deno.stat(dictConfig.dictionaryPath);
@@ -1848,11 +1860,14 @@ export class Core {
       if (!this.dictionaryLoader || !this.vimConfigBridge) {
         await this.initializeDictionarySystem(denops);
       }
-      const dictConfig = await this.vimConfigBridge!.getConfig(denops);
+      if (!this.vimConfigBridge || !this.dictionaryLoader) {
+        throw new Error("Dictionary system not initialized");
+      }
+      const dictConfig = await this.vimConfigBridge.getConfig(denops);
       const dictionaryPath = dictConfig.dictionaryPath || ".hellshake-yano/dictionary.json";
       let dictionary: UserDictionary;
       try {
-        dictionary = await this.dictionaryLoader!.loadUserDictionary(dictConfig);
+        dictionary = await this.dictionaryLoader.loadUserDictionary(dictConfig);
       } catch (_) {
         dictionary = {
           customWords: [],

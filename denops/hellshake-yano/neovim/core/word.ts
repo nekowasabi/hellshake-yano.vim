@@ -5,6 +5,7 @@ import { parse as parseYaml } from "https://deno.land/std@0.212.0/yaml/parse.ts"
 import { CacheType, GlobalCache } from "../../cache.ts";
 import type { Config } from "../../types.ts";
 import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../../config.ts";
+import { resolveConfigType } from "../../common/utils/config.ts";
 import type {
   DetectionContext,
   Word,
@@ -80,15 +81,34 @@ async function getFoldedLines(
   let currentLine = topLine;
 
   while (currentLine <= bottomLine) {
-    const foldStart = await denops.call("foldclosed", currentLine) as number;
-    if (foldStart !== -1) {
-      const foldEnd = await denops.call("foldclosedend", currentLine) as number;
-      // foldの範囲内のすべての行を除外対象に追加
-      for (let line = foldStart; line <= foldEnd; line++) {
-        foldedLines.add(line);
+    try {
+      const foldStartResult = await denops.call("foldclosed", currentLine);
+      if (typeof foldStartResult !== "number") {
+        console.error(`foldclosed(${currentLine}) returned non-number: ${typeof foldStartResult}`);
+        currentLine++;
+        continue;
       }
-      currentLine = foldEnd + 1; // foldの次の行へスキップ
-    } else {
+      const foldStart = foldStartResult;
+
+      if (foldStart !== -1) {
+        const foldEndResult = await denops.call("foldclosedend", currentLine);
+        if (typeof foldEndResult !== "number") {
+          console.error(`foldclosedend(${currentLine}) returned non-number: ${typeof foldEndResult}`);
+          currentLine++;
+          continue;
+        }
+        const foldEnd = foldEndResult;
+
+        // foldの範囲内のすべての行を除外対象に追加
+        for (let line = foldStart; line <= foldEnd; line++) {
+          foldedLines.add(line);
+        }
+        currentLine = foldEnd + 1; // foldの次の行へスキップ
+      } else {
+        currentLine++;
+      }
+    } catch (error) {
+      console.error(`getFoldedLines error at line ${currentLine}:`, error);
       currentLine++;
     }
   }
@@ -1369,16 +1389,7 @@ export class HintPatternProcessor {
     });
   }
 }
-/**
- */
-function resolveConfigType(
-  config?: Config | Config,
-): [Config | undefined, Config | undefined] {
-  if (config && "useJapanese" in config) {
-    return [config as Config, undefined];
-  }
-  return [undefined, config as unknown as Config];
-}
+
 /**
  */
 export interface WordDetectionManagerConfig extends ImportedWordDetectionConfig {
