@@ -49,6 +49,9 @@ import {
   validateHighlightColor,
   validateHighlightGroupName,
 } from "../../validation-utils.ts";
+import {
+  MULTI_BUFFER_EXTMARK_STATE,
+} from "../display/extmark-display.ts";
 
 /** Neovim extmark namespace name */
 const EXTMARK_NAMESPACE = "hellshake_yano_hints";
@@ -1555,7 +1558,15 @@ export class Core {
         if (signal.aborted) return;
         try {
           const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+          const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+
+          // MULTI_BUFFER_EXTMARK_STATE に追跡登録
+          if (extmarkId !== undefined) {
+            if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
+              MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
+            }
+            MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+          }
         } catch (error) {
         }
       }
@@ -1564,7 +1575,15 @@ export class Core {
         if (signal.aborted) return;
         try {
           const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+          const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+
+          // MULTI_BUFFER_EXTMARK_STATE に追跡登録
+          if (extmarkId !== undefined) {
+            if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
+              MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
+            }
+            MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+          }
         } catch (error) {
         }
       }
@@ -1580,7 +1599,15 @@ export class Core {
               if (signal.aborted) return;
               try {
                 const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+                const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+
+                // MULTI_BUFFER_EXTMARK_STATE に追跡登録
+                if (extmarkId !== undefined) {
+                  if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
+                    MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
+                  }
+                  MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+                }
               } catch (error) {
               }
             }
@@ -1588,7 +1615,15 @@ export class Core {
               if (signal.aborted) return;
               try {
                 const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+                const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+
+                // MULTI_BUFFER_EXTMARK_STATE に追跡登録
+                if (extmarkId !== undefined) {
+                  if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
+                    MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
+                  }
+                  MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+                }
               } catch (error) {
               }
             }
@@ -1614,25 +1649,32 @@ export class Core {
     bufnr: number,
     extmarkNamespace: number,
     isCandidate: boolean = true,
-  ): Promise<void> {
+  ): Promise<number | undefined> {
     const { word, hint } = mapping;
     const hintLine = word.line;
     const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
     const nvimLine = hintLine - 1;
     const nvimCol = hintByteCol - 1;
     const highlightGroup = this.getHighlightGroupName(isCandidate);
-    await denops.call(
-      "nvim_buf_set_extmark",
-      bufnr,
-      extmarkNamespace,
-      nvimLine,
-      nvimCol,
-      {
-        "virt_text": [[hint, highlightGroup]],
-        "virt_text_pos": "overlay",
-        "priority": 1001,
-      },
-    );
+
+    try {
+      const extmarkId = await denops.call(
+        "nvim_buf_set_extmark",
+        bufnr,
+        extmarkNamespace,
+        nvimLine,
+        nvimCol,
+        {
+          "virt_text": [[hint, highlightGroup]],
+          "virt_text_pos": "overlay",
+          "priority": 1001,
+        },
+      ) as number;
+      return extmarkId;
+    } catch (error) {
+      console.error(`[hellshake-yano] Failed to set hint extmark in buffer ${bufnr}:`, error);
+      return undefined;
+    }
   }
   private async processBatchedExtmarks(
     denops: Denops,

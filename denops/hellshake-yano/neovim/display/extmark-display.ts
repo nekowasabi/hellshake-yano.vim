@@ -315,7 +315,7 @@ async function processMatchaddBatched(
  * State tracking for multi-buffer extmarks
  * Maps bufnr -> Set of extmark IDs for cleanup
  */
-const MULTI_BUFFER_EXTMARK_STATE = new Map<number, Set<number>>();
+export const MULTI_BUFFER_EXTMARK_STATE = new Map<number, Set<number>>();
 
 /**
  * Display hints across multiple buffers using extmarks
