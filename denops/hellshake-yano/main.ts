@@ -916,21 +916,35 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
       /**
        * Enable multi-window mode
        */
-      // deno-lint-ignore require-await
       async enableMultiWindowMode(): Promise<void> {
         const core = Core.getInstance(config);
         core.enableMultiWindowMode();
         config = { ...config, multiWindowMode: true };
+
+        // VimScript側のキャッシュもクリア（設定変更を即時反映）
+        try {
+          await denops.call("hellshake_yano_vim#word_detector#clear_cache");
+          await denops.call("hellshake_yano_vim#hint_generator#clear_cache");
+        } catch {
+          // キャッシュクリア失敗は無視（VimScript側が未初期化の可能性）
+        }
       },
 
       /**
        * Disable multi-window mode
        */
-      // deno-lint-ignore require-await
       async disableMultiWindowMode(): Promise<void> {
         const core = Core.getInstance(config);
         core.disableMultiWindowMode();
         config = { ...config, multiWindowMode: false };
+
+        // VimScript側のキャッシュもクリア（設定変更を即時反映）
+        try {
+          await denops.call("hellshake_yano_vim#word_detector#clear_cache");
+          await denops.call("hellshake_yano_vim#hint_generator#clear_cache");
+        } catch {
+          // キャッシュクリア失敗は無視（VimScript側が未初期化の可能性）
+        }
       },
 
       /**

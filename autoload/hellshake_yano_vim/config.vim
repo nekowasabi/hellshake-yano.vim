@@ -181,6 +181,14 @@ function! hellshake_yano_vim#config#set(key, value) abort
       endif
     endtry
   endif
+
+  " キャッシュクリア（設定変更時に古いキャッシュを無効化）
+  if exists('*hellshake_yano_vim#word_detector#clear_cache')
+    call hellshake_yano_vim#word_detector#clear_cache()
+  endif
+  if exists('*hellshake_yano_vim#hint_generator#clear_cache')
+    call hellshake_yano_vim#hint_generator#clear_cache()
+  endif
 endfunction
 
 " hellshake_yano_vim#config#reload() - 設定の再読み込み
