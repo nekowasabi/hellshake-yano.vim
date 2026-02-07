@@ -401,6 +401,13 @@ function! hellshake_yano_vim#core#show() abort
     return
   endif
 
+  " 前回のヒントが表示中の場合のみクリア
+  " これにより連続実行時のpopup残存問題を回避しつつ、
+  " 初回実行時のウィンドウコンテキスト変更を防ぐ
+  if s:state.hints_visible
+    call hellshake_yano_vim#core#hide()
+  endif
+
   " Process 5: マルチウィンドウモード対応
   " multiWindowMode が true の場合は複数ウィンドウにヒントを表示
   let l:multi_window_mode = hellshake_yano_vim#config#get('multiWindowMode')

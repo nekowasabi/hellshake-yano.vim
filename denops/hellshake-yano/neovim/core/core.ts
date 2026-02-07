@@ -912,7 +912,7 @@ export class Core {
         return;
       }
 
-      this.hideHints();
+      await this.hideHintsOptimized(denops);
 
       const detectedWords = await this.detectWordsOptimized(denops, bufnr);
 
@@ -2870,7 +2870,7 @@ export class Core {
 
     const modeString = mode || "normal";
     try {
-      this.hideHints();
+      await this.hideHintsMultiWindow(denops);
 
       const hintMappings = await this.showHintsMultiWindow(denops);
 
@@ -2963,13 +2963,6 @@ export class Core {
    * @returns Array of hint mappings for all visible windows
    */
   async showHintsMultiWindow(denops: Denops, config?: Partial<Config>): Promise<HintMapping[]> {
-    // フォーカス復帰直後は処理をスキップ（ちらつき防止）
-    // detectWordsMultiWindow() がウィンドウ切り替えを行うため、ここでブロック必要
-    const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
-    if (!shouldRedraw) {
-      return [];  // VimScript側の遅延処理後に再度呼ばれる
-    }
-
     const effectiveConfig = { ...this.config, ...config };
     try {
       const { detectWordsMultiWindow } = await import("./word.ts");

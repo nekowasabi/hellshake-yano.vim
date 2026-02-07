@@ -82,8 +82,8 @@ if !has_key(g:hellshake_yano, 'per_key_min_length')
         \ 'b': 1,
         \ }
 endif
-if !has_key(g:hellshake_yano, 'default_min_word_length')
-  let g:hellshake_yano.default_min_word_length = 2
+if !has_key(g:hellshake_yano, 'min_word_length')
+  let g:hellshake_yano.min_word_length = 3
 endif
 
 " キー別motion_count設定（process1追加）

@@ -120,6 +120,9 @@ export async function getVisibleWindows(
     console.error("[window.ts] getVisibleWindows error:", error);
   }
 
+  // カレントウィンドウを先頭に配置
+  result.sort((a, b) => (b.isCurrent ? 1 : 0) - (a.isCurrent ? 1 : 0));
+
   return result;
 }
 
