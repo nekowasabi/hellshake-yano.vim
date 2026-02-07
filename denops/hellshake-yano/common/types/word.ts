@@ -103,7 +103,7 @@ export function isVimScriptWord(obj: unknown): obj is VimScriptWord {
     typeof (obj as VimScriptWord).col === "number" &&
     typeof (obj as VimScriptWord).end_col === "number" &&
     (obj as VimScriptWord).lnum > 0 &&
-    (obj as VimScriptWord).col > 0 &&
+    (obj as VimScriptWord).col >= 0 &&
     (obj as VimScriptWord).end_col > 0
   );
 }
@@ -122,6 +122,6 @@ export function isDenopsWord(obj: unknown): obj is DenopsWord {
     typeof (obj as DenopsWord).line === "number" &&
     typeof (obj as DenopsWord).col === "number" &&
     (obj as DenopsWord).line > 0 &&
-    (obj as DenopsWord).col > 0
+    (obj as DenopsWord).col >= 0
   );
 }

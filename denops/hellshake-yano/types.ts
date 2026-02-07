@@ -183,10 +183,11 @@ export function isWord(obj: unknown): obj is Word {
     typeof (obj as Word).line === "number" &&
     typeof (obj as Word).col === "number" &&
     (obj as Word).line > 0 &&
-    (obj as Word).col > 0 &&
+    (obj as Word).col >= 0 &&
     ((obj as Word).byteCol === undefined || typeof (obj as Word).byteCol === "number") &&
     ((obj as Word).winid === undefined || typeof (obj as Word).winid === "number") &&
-    ((obj as Word).bufnr === undefined || typeof (obj as Word).bufnr === "number")
+    ((obj as Word).bufnr === undefined || typeof (obj as Word).bufnr === "number") &&
+    ((obj as Word).originalLine === undefined || (typeof (obj as Word).originalLine === "number" && ((obj as Word).originalLine as number) >= 1))
   );
 }
 
