@@ -5,6 +5,15 @@ import { generateHintsFromConfig, recordPerformance } from "../../common/utils/p
 import { clearDetectionCache } from "../core/word.ts";
 
 export const HIGHLIGHT_BATCH_SIZE = 15;
+/** Maximum hint length for small batch synchronous display */
+export const MAX_HINT_LENGTH = 15;
+/** Default priority for extmark hints */
+export const DEFAULT_HINT_PRIORITY = 200;
+/** Line offset for multi-window hint distance penalty calculation */
+export const MULTI_WINDOW_LINE_OFFSET = 10000;
+/** Default hint count for batch processing */
+export const DEFAULT_HINT_COUNT = 10;
+
 let _isRenderingHints = false;
 let pendingHighlightTimerId: number | undefined;
 
@@ -177,7 +186,7 @@ export async function highlightCandidateHintsHybrid(
   fallbackMatchIds?: number[],
   onComplete?: () => void,
 ): Promise<void> {
-  const SBS = 15;
+  const SBS = MAX_HINT_LENGTH;
   const cands = hints.filter((h) => h.hint.startsWith(input));
   await clearHintDisplay(denops, extmarkNamespace, fallbackMatchIds);
   if (cands.length === 0) {
@@ -239,7 +248,7 @@ async function processExtmarksBatched(
       await denops.call("nvim_buf_set_extmark", 0, extmarkNamespace, line, col, {
         virt_text: [[h.hint, highlightGroup]],
         virt_text_pos: "overlay",
-        priority: 200,
+        priority: DEFAULT_HINT_PRIORITY,
       });
     } catch (error) {
       // Skip if col is out of range (e.g., due to display column vs byte column mismatch)
@@ -462,7 +471,7 @@ async function processExtmarksForBuffer(
           // id オプションを省略してNeovimに自動割り当てさせる
           virt_text: [[h.hint, highlightGroup]],
           virt_text_pos: "overlay",
-          priority: 200,
+          priority: DEFAULT_HINT_PRIORITY,
         },
       ) as number;
 
@@ -623,7 +632,7 @@ export async function displayHintsAutoMultiBuffer(
     const currentWinId = await denops.call("win_getid") as number;
     const adjustedWords = words.map(w => ({
       ...w,
-      line: w.winid !== currentWinId ? w.line + 10000 : w.line,
+      line: w.winid !== currentWinId ? w.line + MULTI_WINDOW_LINE_OFFSET : w.line,
       originalLine: w.line,
     }));
 

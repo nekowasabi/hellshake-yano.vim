@@ -6,6 +6,11 @@
 import type { Denops } from "jsr:@denops/std@7.4.0";
 import { withFallback } from "../common/utils/base.ts";
 
+/** Multiplier to extract major version from Neovim v:version */
+const NEOVIM_VERSION_MAJOR_MULTIPLIER = 10000;
+/** Multiplier to extract minor version from Neovim v:version */
+const NEOVIM_VERSION_MINOR_MULTIPLIER = 100;
+
 /** Denopsの利用可能性情報 */
 export interface DenopsAvailability {
   available: boolean;
@@ -143,9 +148,9 @@ export class EnvironmentDetector {
         }
 
         // フォールバック: v:versionから推定
-        const major = Math.floor(versionNum / 10000);
-        const minor = Math.floor((versionNum % 10000) / 100);
-        const patch = versionNum % 100;
+        const major = Math.floor(versionNum / NEOVIM_VERSION_MAJOR_MULTIPLIER);
+        const minor = Math.floor((versionNum % NEOVIM_VERSION_MAJOR_MULTIPLIER) / NEOVIM_VERSION_MINOR_MULTIPLIER);
+        const patch = versionNum % NEOVIM_VERSION_MINOR_MULTIPLIER;
         return `${major}.${minor}.${patch}`;
       },
       "0.8.0",
