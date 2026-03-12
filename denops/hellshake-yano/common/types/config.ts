@@ -46,6 +46,7 @@ export type WordDetectionStrategy = "regex" | "tinysegmenter" | "hybrid";
  * @property singleCharKeys - 1文字ヒントに使用するキー
  * @property multiCharKeys - 複数文字ヒントに使用するキー
  * @property maxSingleCharHints - 1文字ヒントの最大数
+ * @property cancelKeys - ヒント選択中に通常入力へ戻すキー
  * @property useHintGroups - ヒントグループを使用するか
  * @property continuousHintMode - 連続ヒントモード
  * @property recenterCommand - 再センタリングコマンド
@@ -93,6 +94,7 @@ export interface Config {
   singleCharKeys: string[];
   multiCharKeys: string[];
   maxSingleCharHints?: number;
+  cancelKeys?: string[];
   useHintGroups: boolean;
   continuousHintMode: boolean;
   recenterCommand: string;
@@ -188,6 +190,7 @@ export const DEFAULT_CONFIG: Config = {
     "Z",
   ],
   maxSingleCharHints: 21,
+  cancelKeys: [],
   useHintGroups: true,
   continuousHintMode: false,
   recenterCommand: "normal! zz",

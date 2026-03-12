@@ -49,9 +49,7 @@ import {
   validateHighlightColor,
   validateHighlightGroupName,
 } from "../../validation-utils.ts";
-import {
-  MULTI_BUFFER_EXTMARK_STATE,
-} from "../display/extmark-display.ts";
+import { MULTI_BUFFER_EXTMARK_STATE } from "../display/extmark-display.ts";
 
 /** Neovim extmark namespace name */
 const EXTMARK_NAMESPACE = "hellshake_yano_hints";
@@ -190,6 +188,34 @@ const DEFAULT_MULTI_KEYS = [
   "Y",
   "Z",
 ];
+
+function normalizeCancelKey(result: number | string): string | null {
+  if (typeof result === "string") {
+    return result === "\r" ? "<CR>" : (/^[A-Za-z]$/.test(result) ? result.toUpperCase() : result);
+  }
+  if (result === 13) {
+    return "<CR>";
+  }
+  if (result >= 32 && result <= 126) {
+    const char = String.fromCharCode(result);
+    return /^[A-Za-z]$/.test(char) ? char.toUpperCase() : char;
+  }
+  return null;
+}
+
+function isConfiguredCancelKey(result: number | string, cancelKeys?: string[]): boolean {
+  if (!cancelKeys || cancelKeys.length === 0) {
+    return false;
+  }
+  const normalized = normalizeCancelKey(result);
+  if (normalized === null) {
+    return false;
+  }
+  const configured = cancelKeys.map((key) =>
+    key === "\r" ? "<CR>" : (/^[A-Za-z]$/.test(key) ? key.toUpperCase() : key)
+  );
+  return configured.includes(normalized);
+}
 
 interface PluginState {
   /** プラグインの現在のステータス */
@@ -1178,6 +1204,12 @@ export class Core {
       }
       // 特殊キー（文字列）の場合、静かに終了してキーを送り返す
       if (typeof result === "string") {
+        if (isConfiguredCancelKey(result, config.cancelKeys)) {
+          await this.hideHintsOptimized(denops);
+          await denops.cmd(`call feedkeys(${JSON.stringify(result)}, 'm')`);
+          this.resetContinuousModeState();
+          return;
+        }
         await this.hideHintsOptimized(denops);
         await denops.cmd(`call feedkeys(${JSON.stringify(result)}, 'm')`);
         this.resetContinuousModeState();
@@ -1237,6 +1269,13 @@ export class Core {
       const normalizedKeys = allKeys.map((k) => /[a-zA-Z]/.test(k) ? k.toUpperCase() : k);
       const validKeysSet = new Set(normalizedKeys);
       if (!validKeysSet.has(inputChar)) {
+        if (isConfiguredCancelKey(char, config.cancelKeys)) {
+          this.resetContinuousModeState();
+          await this.hideHintsOptimized(denops);
+          const originalChar = String.fromCharCode(char);
+          await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
+          return;
+        }
         // ヒント以外のキーが入力された場合、ヒントを非表示にしてキーを通常処理に送る
         this.resetContinuousModeState();
         await this.hideHintsOptimized(denops);
@@ -1325,6 +1364,12 @@ export class Core {
 
       // 特殊キー（文字列）の場合、静かに終了してキーを送り返す
       if (typeof secondResult === "string") {
+        if (isConfiguredCancelKey(secondResult, config.cancelKeys)) {
+          await this.hideHintsOptimized(denops);
+          await denops.cmd(`call feedkeys(${JSON.stringify(secondResult)}, 'm')`);
+          this.resetContinuousModeState();
+          return;
+        }
         await this.hideHintsOptimized(denops);
         await denops.cmd(`call feedkeys(${JSON.stringify(secondResult)}, 'm')`);
         this.resetContinuousModeState();
@@ -1379,6 +1424,13 @@ export class Core {
         : "Second character must be alphabetic";
 
       if (!secondValidPattern.test(secondInputChar)) {
+        if (isConfiguredCancelKey(secondChar, config.cancelKeys)) {
+          await this.hideHintsOptimized(denops);
+          const originalChar = String.fromCharCode(secondChar);
+          await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
+          this.resetContinuousModeState();
+          return;
+        }
         await this.showErrorFeedback(denops, secondErrorMessage, false);
         this.resetContinuousModeState();
         await this.hideHintsOptimized(denops);
@@ -1390,6 +1442,12 @@ export class Core {
       if (target) {
         await this.jumpToHintTarget(denops, target, `hint "${fullHint}"`);
         await this.postJumpHandler(denops, target);
+        return;
+      } else if (isConfiguredCancelKey(secondChar, config.cancelKeys)) {
+        await this.hideHintsOptimized(denops);
+        const originalChar = String.fromCharCode(secondChar);
+        await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
+        this.resetContinuousModeState();
         return;
       } else {
         await this.showErrorFeedback(denops, `Invalid hint combination: ${fullHint}`);
@@ -1558,7 +1616,13 @@ export class Core {
         if (signal.aborted) return;
         try {
           const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+          const extmarkId = await this.setHintExtmark(
+            denops,
+            mapping,
+            targetBufnr,
+            extmarkNamespace,
+            true,
+          );
 
           // MULTI_BUFFER_EXTMARK_STATE に追跡登録
           if (extmarkId !== undefined) {
@@ -1575,7 +1639,13 @@ export class Core {
         if (signal.aborted) return;
         try {
           const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+          const extmarkId = await this.setHintExtmark(
+            denops,
+            mapping,
+            targetBufnr,
+            extmarkNamespace,
+            false,
+          );
 
           // MULTI_BUFFER_EXTMARK_STATE に追跡登録
           if (extmarkId !== undefined) {
@@ -1587,7 +1657,7 @@ export class Core {
         } catch (error) {
         }
       }
-      const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+      const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
       if (shouldRedraw) {
         await denops.cmd("redraw");
       }
@@ -1599,7 +1669,13 @@ export class Core {
               if (signal.aborted) return;
               try {
                 const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, true);
+                const extmarkId = await this.setHintExtmark(
+                  denops,
+                  mapping,
+                  targetBufnr,
+                  extmarkNamespace,
+                  true,
+                );
 
                 // MULTI_BUFFER_EXTMARK_STATE に追跡登録
                 if (extmarkId !== undefined) {
@@ -1615,7 +1691,13 @@ export class Core {
               if (signal.aborted) return;
               try {
                 const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                const extmarkId = await this.setHintExtmark(denops, mapping, targetBufnr, extmarkNamespace, false);
+                const extmarkId = await this.setHintExtmark(
+                  denops,
+                  mapping,
+                  targetBufnr,
+                  extmarkNamespace,
+                  false,
+                );
 
                 // MULTI_BUFFER_EXTMARK_STATE に追跡登録
                 if (extmarkId !== undefined) {
@@ -2905,9 +2987,9 @@ export class Core {
   async showHintsMultiWindowInternal(denops: Denops, mode?: string): Promise<void> {
     // フォーカス復帰直後は処理をスキップ（ちらつき防止）
     // hideHints() より前にチェックすることで、画面クリアによるちらつきを防止
-    const shouldRedraw = await denops.call('hellshake_yano#core#should_redraw') as boolean;
+    const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
     if (!shouldRedraw) {
-      return;  // VimScript側の遅延処理後に再度呼ばれる
+      return; // VimScript側の遅延処理後に再度呼ばれる
     }
 
     const modeString = mode || "normal";
@@ -2948,6 +3030,12 @@ export class Core {
           await this.hideHintsMultiWindow(denops);
           return;
         }
+        if (isConfiguredCancelKey(char, this.config.cancelKeys)) {
+          await this.hideHintsMultiWindow(denops);
+          await denops.cmd(`call feedkeys(${JSON.stringify(char)}, 'm')`);
+          this.resetContinuousModeState();
+          return;
+        }
 
         inputChars.push(char);
         const inputStr = inputChars.join("");
@@ -2964,16 +3052,18 @@ export class Core {
           await this.hideHintsMultiWindow(denops);
 
           // Handle cross-window jump if winid is present
-          if (matchingHint.word.winid && matchingHint.word.winid !== await denops.call("win_getid")) {
+          if (
+            matchingHint.word.winid && matchingHint.word.winid !== await denops.call("win_getid")
+          ) {
             await denops.call("win_gotoid", matchingHint.word.winid);
           }
 
           // Move cursor to target position
           // Use byteCol fallback chain (same as jumpToHintTarget) for correct multi-byte handling
           const col = matchingHint.hintByteCol ??
-                      matchingHint.hintCol ??
-                      matchingHint.word.byteCol ??
-                      matchingHint.word.col;
+            matchingHint.hintCol ??
+            matchingHint.word.byteCol ??
+            matchingHint.word.col;
           await denops.call("cursor", matchingHint.word.line, col);
           // Bug 3 fix: Call postJumpHandler for continuousHintMode check
           await this.postJumpHandler(denops, matchingHint);
@@ -3490,7 +3580,9 @@ export class HellshakeYanoCore {
     try {
       const { shouldUseMultiWindowMode } = await import("./window.ts");
       return await shouldUseMultiWindowMode(denops, this.config);
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
 
   /** Get visible windows information */
@@ -3498,14 +3590,20 @@ export class HellshakeYanoCore {
     try {
       const { getVisibleWindows } = await import("./window.ts");
       return await getVisibleWindows(denops, this.config);
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
 
   /** Enable multi-window mode */
-  enableMultiWindowMode(): void { this.config.multiWindowMode = true; }
+  enableMultiWindowMode(): void {
+    this.config.multiWindowMode = true;
+  }
 
   /** Disable multi-window mode */
-  disableMultiWindowMode(): void { this.config.multiWindowMode = false; }
+  disableMultiWindowMode(): void {
+    this.config.multiWindowMode = false;
+  }
 
   /** Toggle multi-window mode */
   toggleMultiWindowMode(): boolean {
@@ -3514,14 +3612,28 @@ export class HellshakeYanoCore {
   }
 
   /** Check if multi-window mode is enabled in config */
-  isMultiWindowModeEnabled(): boolean { return this.config.multiWindowMode; }
+  isMultiWindowModeEnabled(): boolean {
+    return this.config.multiWindowMode;
+  }
 
   /** Update multi-window configuration */
-  updateMultiWindowConfig(updates: { multiWindowMode?: boolean; multiWindowExcludeTypes?: string[]; multiWindowMaxWindows?: number; }): void {
-    if (updates.multiWindowMode !== undefined) this.config.multiWindowMode = updates.multiWindowMode;
-    if (updates.multiWindowExcludeTypes !== undefined) this.config.multiWindowExcludeTypes = updates.multiWindowExcludeTypes;
+  updateMultiWindowConfig(
+    updates: {
+      multiWindowMode?: boolean;
+      multiWindowExcludeTypes?: string[];
+      multiWindowMaxWindows?: number;
+    },
+  ): void {
+    if (updates.multiWindowMode !== undefined) {
+      this.config.multiWindowMode = updates.multiWindowMode;
+    }
+    if (updates.multiWindowExcludeTypes !== undefined) {
+      this.config.multiWindowExcludeTypes = updates.multiWindowExcludeTypes;
+    }
     if (updates.multiWindowMaxWindows !== undefined) {
-      if (updates.multiWindowMaxWindows < 1) throw new Error("multiWindowMaxWindows must be at least 1");
+      if (updates.multiWindowMaxWindows < 1) {
+        throw new Error("multiWindowMaxWindows must be at least 1");
+      }
       this.config.multiWindowMaxWindows = updates.multiWindowMaxWindows;
     }
   }

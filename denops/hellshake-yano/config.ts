@@ -18,6 +18,7 @@ export interface Config {
   singleCharKeys: string[];
   multiCharKeys: string[];
   maxSingleCharHints?: number;
+  cancelKeys?: string[];
   useHintGroups: boolean;
   continuousHintMode: boolean;
   recenterCommand: string;
@@ -95,6 +96,7 @@ export const DEFAULT_CONFIG: Config = {
   ],
   multiCharKeys: ["B", "C", "E", "I", "O", "P", "Q", "R", "T", "U", "V", "W", "X", "Y", "Z"],
   maxSingleCharHints: 21,
+  cancelKeys: [],
   useHintGroups: true,
   continuousHintMode: false,
   recenterCommand: "normal! zz",
