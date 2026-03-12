@@ -78,39 +78,34 @@ async function getFoldedLines(
   bottomLine: number,
 ): Promise<Set<number>> {
   const foldedLines = new Set<number>();
-  let currentLine = topLine;
+  if (topLine > bottomLine) return foldedLines;
 
-  while (currentLine <= bottomLine) {
-    try {
-      const foldStartResult = await denops.call("foldclosed", currentLine);
-      if (typeof foldStartResult !== "number") {
-        console.error(`foldclosed(${currentLine}) returned non-number: ${typeof foldStartResult}`);
-        currentLine++;
-        continue;
-      }
-      const foldStart = foldStartResult;
+  try {
+    // Single IPC round-trip: get all lines where foldclosed(v:val) == v:val
+    // (i.e., lines that are the first line of a closed fold)
+    const foldStarts = await denops.eval(
+      `filter(range(${topLine}, ${bottomLine}), 'foldclosed(v:val) == v:val')`
+    ) as number[];
 
-      if (foldStart !== -1) {
-        const foldEndResult = await denops.call("foldclosedend", currentLine);
-        if (typeof foldEndResult !== "number") {
-          console.error(`foldclosedend(${currentLine}) returned non-number: ${typeof foldEndResult}`);
-          currentLine++;
-          continue;
+    for (const foldStart of foldStarts) {
+      // Only fetch foldclosedend for actual fold-start lines (avoids redundant calls)
+      if (foldedLines.has(foldStart)) continue; // already covered by a prior fold range
+      try {
+        const foldEnd = await denops.call("foldclosedend", foldStart) as number;
+        if (typeof foldEnd === "number" && foldEnd !== -1) {
+          for (let line = foldStart; line <= foldEnd; line++) {
+            foldedLines.add(line);
+          }
+        } else {
+          foldedLines.add(foldStart);
         }
-        const foldEnd = foldEndResult;
-
-        // foldの範囲内のすべての行を除外対象に追加
-        for (let line = foldStart; line <= foldEnd; line++) {
-          foldedLines.add(line);
-        }
-        currentLine = foldEnd + 1; // foldの次の行へスキップ
-      } else {
-        currentLine++;
+      } catch (error) {
+        console.error(`getFoldedLines foldclosedend error at line ${foldStart}:`, error);
+        foldedLines.add(foldStart);
       }
-    } catch (error) {
-      console.error(`getFoldedLines error at line ${currentLine}:`, error);
-      currentLine++;
     }
+  } catch (error) {
+    console.error(`getFoldedLines error (${topLine}-${bottomLine}):`, error);
   }
 
   return foldedLines;
@@ -248,8 +243,10 @@ export async function detectWordsWithManager(
     }
   }
 
-  // キャッシュクリーンアップ
-  cleanupCache();
+  // キャッシュクリーンアップ（キャッシュが80%以上埋まった時のみ実行）
+  if (detectionCache.size > MAX_CACHE_ENTRIES * 0.8) {
+    cleanupCache();
+  }
 
   // foldされた行を取得
   const foldedLines = await getFoldedLines(denops, topLine, bottomLine);
@@ -257,17 +254,8 @@ export async function detectWordsWithManager(
   try {
     const manager = getWordDetectionManager(config);
     const initialResult = await manager.detectWordsFromBuffer(denops, context);
-    let runtimeConfig: EnhancedWordConfig = { ...config };
-    try {
-      const denopsConfig = await denops.call("get_config") as unknown;
-      if (denopsConfig && typeof denopsConfig === "object") {
-        runtimeConfig = {
-          ...runtimeConfig,
-          ...(denopsConfig as Partial<EnhancedWordConfig>),
-        };
-      }
-    } catch {
-    }
+    const runtimeConfig: EnhancedWordConfig = { ...config };
+    // Note: dead `get_config` RPC call removed — no dispatcher method named `get_config` exists
     if (!context) {
       const derivedContext = deriveContextFromConfig(runtimeConfig);
       if (derivedContext?.minWordLength !== undefined) {
@@ -466,12 +454,15 @@ export async function detectWordsInRange(
     const actualEndLine = Math.min(endLine, await denops.call("line", "$") as number);
     const actualStartLine = Math.max(1, startLine);
 
-    for (let line = actualStartLine; line <= actualEndLine; line++) {
+    // Single IPC round-trip: fetch all lines at once instead of per-line getline calls
+    const allLines = await denops.call("getbufline", "%", actualStartLine, actualEndLine) as string[];
+
+    for (let i = 0; i < allLines.length; i++) {
       if (words.length >= effectiveMaxWords) {
         break;
       }
-      const lineText = await denops.call("getline", line) as string;
-      const lineWords = extractWords(lineText, line, { legacyMode: true });
+      const line = actualStartLine + i;
+      const lineWords = extractWords(allLines[i], line, { legacyMode: true });
 
       const remainingSlots = effectiveMaxWords - words.length;
       words.push(...lineWords.slice(0, remainingSlots));

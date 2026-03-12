@@ -4,6 +4,9 @@ import { assignHintsToWords, calculateHintPosition } from "../core/hint.ts";
 import { generateHintsFromConfig, recordPerformance } from "../../common/utils/performance.ts";
 import { clearDetectionCache } from "../core/word.ts";
 
+/** Module-level singleton to avoid per-line TextEncoder instantiation */
+const TEXT_ENCODER = new TextEncoder();
+
 export const HIGHLIGHT_BATCH_SIZE = 15;
 /** Maximum hint length for small batch synchronous display */
 export const MAX_HINT_LENGTH = 15;
@@ -24,14 +27,22 @@ export function abortCurrentRendering(): void {
   _isRenderingHints = false;
 }
 
-function getTimeoutDelay(): number {
-  const isDeno = typeof Deno !== "undefined";
-  const isTest = isDeno && (Deno.env?.get?.("DENO_TEST") === "1" || Deno.args?.includes?.("test"));
-  const isCI = isDeno && Deno.env?.get?.("CI") === "true";
-  if (isCI) return 30;
-  if (isTest) return 20;
+/** Tracks whether prop_type_add has already been registered (Vim only) */
+let propTypeRegistered = false;
+
+/** Computed once at module load — avoids repeated env checks per keystroke */
+const TIMEOUT_DELAY: number = (() => {
+  try {
+    const isDeno = typeof Deno !== "undefined";
+    const isTest = isDeno && (Deno.env?.get?.("DENO_TEST") === "1" || Deno.args?.includes?.("test"));
+    const isCI = isDeno && Deno.env?.get?.("CI") === "true";
+    if (isCI) return 30;
+    if (isTest) return 20;
+  } catch {
+    // --allow-env not granted; fall through to default
+  }
   return 0;
-}
+})();
 
 export function cleanupPendingTimers(): void {
   if (pendingHighlightTimerId !== undefined) {
@@ -157,7 +168,6 @@ export function highlightCandidateHintsAsync(
     clearTimeout(pendingHighlightTimerId);
     pendingHighlightTimerId = undefined;
   }
-  const delay = getTimeoutDelay();
   pendingHighlightTimerId = setTimeout(() => {
     pendingHighlightTimerId = undefined;
     highlightCandidateHintsOptimized(
@@ -174,7 +184,7 @@ export function highlightCandidateHintsAsync(
       .catch(() => {
         if (onComplete) onComplete();
       });
-  }, delay) as unknown as number;
+  }, TIMEOUT_DELAY) as unknown as number;
 }
 
 export async function highlightCandidateHintsHybrid(
@@ -269,12 +279,15 @@ async function processMatchaddBatched(
     const isSym = !h.hint.match(/^[A-Za-z0-9]+$/);
     if (isSym) {
       try {
-        if (await denops.call("exists", "*prop_type_add") === 1) {
+        if (!propTypeRegistered && await denops.call("exists", "*prop_type_add") === 1) {
           try {
             await denops.call("prop_type_add", "HellshakeYanoSymbol", {
               highlight: highlightGroup,
             });
-          } catch { /* exists */ }
+            propTypeRegistered = true;
+          } catch { propTypeRegistered = true; /* already registered */ }
+        }
+        if (propTypeRegistered) {
           await denops.call("prop_add", p.line, p.col, {
             type: "HellshakeYanoSymbol",
             length: h.hint.length,
@@ -312,10 +325,11 @@ async function processMatchaddBatched(
 // ============================================================================
 
 /**
- * State tracking for multi-buffer extmarks
- * Maps bufnr -> Set of extmark IDs for cleanup
+ * State tracking for multi-buffer extmarks.
+ * Tracks only buffer numbers — nvim_buf_clear_namespace clears the whole
+ * namespace anyway, so storing individual extmark IDs is unnecessary overhead.
  */
-export const MULTI_BUFFER_EXTMARK_STATE = new Map<number, Set<number>>();
+export const MULTI_BUFFER_EXTMARK_STATE = new Set<number>();
 
 /**
  * Display hints across multiple buffers using extmarks
@@ -336,8 +350,8 @@ export async function displayHintsMultiBuffer(
   extmarkNamespace: number,
 ): Promise<Map<number, number[]>> {
   // Clear existing hints before displaying new ones
+  // clearHintsMultiBuffer already clears all tracked buffers — no extra call needed
   await clearHintsMultiBuffer(denops, extmarkNamespace);
-  await denops.call("nvim_buf_clear_namespace", 0, extmarkNamespace, 0, -1);
 
   _isRenderingHints = true;
   const extmarkIdsByBuffer = new Map<number, number[]>();
@@ -360,13 +374,8 @@ export async function displayHintsMultiBuffer(
 
       extmarkIdsByBuffer.set(bufnr, extmarkIds);
 
-      // Track for cleanup
-      if (!MULTI_BUFFER_EXTMARK_STATE.has(bufnr)) {
-        MULTI_BUFFER_EXTMARK_STATE.set(bufnr, new Set());
-      }
-      for (const id of extmarkIds) {
-        MULTI_BUFFER_EXTMARK_STATE.get(bufnr)!.add(id);
-      }
+      // Track buffer for cleanup (IDs not needed — clear_namespace clears all)
+      MULTI_BUFFER_EXTMARK_STATE.add(bufnr);
     }
   } finally {
     _isRenderingHints = false;
@@ -446,7 +455,7 @@ async function processExtmarksForBuffer(
           line + 1,
           false,
         ) as string[];
-        lineLength = lineContent.length > 0 ? new TextEncoder().encode(lineContent[0]).length : 0;
+        lineLength = lineContent.length > 0 ? TEXT_ENCODER.encode(lineContent[0]).length : 0;
         lineLengthCache.set(line, lineLength);
       } catch {
         // Buffer or line doesn't exist, skip this hint
@@ -500,7 +509,7 @@ export async function clearHintsMultiBuffer(
   denops: Denops,
   extmarkNamespace: number,
 ): Promise<void> {
-  for (const [bufnr, _extmarkIds] of MULTI_BUFFER_EXTMARK_STATE) {
+  for (const bufnr of MULTI_BUFFER_EXTMARK_STATE) {
     try {
       // Check if buffer still exists
       const bufExists = await denops.call("bufexists", bufnr) as number;
@@ -677,8 +686,24 @@ export async function displayHintsAutoMultiBuffer(
 /**
  * Get the current multi-buffer extmark state (for debugging)
  *
- * @returns Map of bufnr -> Set of extmark IDs
+ * @returns Set of tracked buffer numbers
  */
-export function getMultiBufferExtmarkState(): Map<number, Set<number>> {
-  return new Map(MULTI_BUFFER_EXTMARK_STATE);
+export function getMultiBufferExtmarkState(): Set<number> {
+  return new Set(MULTI_BUFFER_EXTMARK_STATE);
+}
+
+// Single buffer extmark tracking for LazyGit buffer switch fix
+let singleBufferTrackedBufnr: number | null = null;
+
+export function getSingleBufferExtmarkState(): number | null {
+  return singleBufferTrackedBufnr;
+}
+
+export function clearSingleBufferExtmarkState(): void {
+  singleBufferTrackedBufnr = null;
+}
+
+export function clearHintDisplayTracked(): void {
+  singleBufferTrackedBufnr = null;
+  MULTI_BUFFER_EXTMARK_STATE.clear();
 }

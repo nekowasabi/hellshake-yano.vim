@@ -8,6 +8,9 @@
  */
 import type { Denops } from "@denops/std";
 import { Config, DEFAULT_CONFIG } from "./config.ts";
+
+/** Module-level singleton to avoid per-word TextEncoder instantiation */
+const TEXT_ENCODER = new TextEncoder();
 import type { DebugInfo, HintMapping, WindowInfo, Word } from "./types.ts";
 
 // 統合レイヤーのインポート
@@ -144,8 +147,7 @@ async function initializeDenopsUnified(denops: Denops): Promise<void> {
  * TypeScript Word -> VimScript互換データへの変換
  */
 function toVimWordData(word: Word): Record<string, unknown> {
-  const encoder = new TextEncoder();
-  const byteLen = encoder.encode(word.text).length;
+  const byteLen = TEXT_ENCODER.encode(word.text).length;
   const col = word.byteCol ?? word.col; // byteCol 優先
   const result: Record<string, unknown> = {
     text: word.text,
@@ -963,8 +965,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         try {
           const result = await detectWordsWithManager(denops, config as EnhancedWordConfig);
           return result.words.map((word: Word) => {
-            const encoder = new TextEncoder();
-            const byteLen = encoder.encode(word.text).length;
+            const byteLen = TEXT_ENCODER.encode(word.text).length;
             const col = word.byteCol ?? word.col;
             const resultData: Record<string, unknown> = {
               text: word.text,
@@ -989,8 +990,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         try {
           const words = await detectWordsMultiWindow(denops, config as Config);
           return words.map((word: Word) => {
-            const encoder = new TextEncoder();
-            const byteLen = encoder.encode(word.text).length;
+            const byteLen = TEXT_ENCODER.encode(word.text).length;
             const col = word.byteCol ?? word.col;
             const resultData: Record<string, unknown> = {
               text: word.text,

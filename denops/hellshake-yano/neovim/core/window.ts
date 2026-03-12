@@ -92,17 +92,21 @@ export async function getVisibleWindows(
 
     const currentWin = await denops.call("win_getid") as number;
 
-    for (const info of winInfoList) {
+    // Batch all getbufvar calls into a single IPC round-trip
+    const buftypes = await denops.batch(
+      ...winInfoList.map((info) => ["getbufvar", info.bufnr, "&buftype"] as [string, ...unknown[]])
+    ) as string[];
+
+    for (let i = 0; i < winInfoList.length; i++) {
+      const info = winInfoList[i];
+
       // 最大ウィンドウ数チェック
       if (config.multiWindowMaxWindows && result.length >= config.multiWindowMaxWindows) {
         break;
       }
 
-      // バッファタイプを取得
-      const buftype = await denops.call("getbufvar", info.bufnr, "&buftype") as string;
-
       // 除外対象のバッファタイプはスキップ
-      if (config.multiWindowExcludeTypes?.includes(buftype)) {
+      if (config.multiWindowExcludeTypes?.includes(buftypes[i])) {
         continue;
       }
 
