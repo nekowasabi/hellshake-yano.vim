@@ -30,14 +30,18 @@ function createMockDenops(callResponses: Record<string, unknown>): Denops {
         return callResponses[key];
       }
       // デフォルトレスポンス
-      if (fn === "nvim_list_wins") return [];
-      if (fn === "nvim_get_current_win") return 1000;
       if (fn === "getwininfo") return [];
       if (fn === "win_getid") return 1000;
       if (fn === "bufexists") return 0;  // デフォルトは存在しない
       throw new Error(`Unexpected call: ${fn}(${JSON.stringify(args)})`);
     },
-    batch: async () => [],
+    batch: async (...calls: [string, ...unknown[]][]) => {
+      return calls.map((call) => {
+        const key = `${call[0]}:${JSON.stringify(call.slice(1))}`;
+        if (key in callResponses) return callResponses[key];
+        return "";
+      });
+    },
     cmd: async () => {},
     eval: async () => undefined,
     dispatch: async () => undefined,
@@ -64,14 +68,9 @@ describe("shouldUseMultiWindowMode", () => {
 
   it("should return false when only one window exists", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [{winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24}],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
     });
 
     const result = await shouldUseMultiWindowMode(denops, defaultConfig as Config);
@@ -81,20 +80,13 @@ describe("shouldUseMultiWindowMode", () => {
 
   it("should return true when multiple editable windows exist", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000, 1001],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_win_get_buf:[1001]': 2,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      'nvim_get_option_value:["buftype",{"buf":2}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_width:[1001]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      "nvim_win_get_height:[1001]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
-      'nvim_win_call:[1001,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1001,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [
+        {winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1001, bufnr: 2, topline: 1, botline: 24, width: 80, height: 24},
+      ],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
+      'getbufvar:[2,"&buftype"]': "",
     });
 
     const result = await shouldUseMultiWindowMode(denops, defaultConfig as Config);
@@ -104,16 +96,13 @@ describe("shouldUseMultiWindowMode", () => {
 
   it("should exclude windows with excluded buffer types", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000, 1001],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_win_get_buf:[1001]': 2,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      'nvim_get_option_value:["buftype",{"buf":2}]': "help", // 除外対象
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [
+        {winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1001, bufnr: 2, topline: 1, botline: 24, width: 80, height: 24},
+      ],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
+      'getbufvar:[2,"&buftype"]': "help", // 除外対象
     });
 
     const result = await shouldUseMultiWindowMode(denops, defaultConfig as Config);
@@ -125,8 +114,8 @@ describe("shouldUseMultiWindowMode", () => {
 describe("getVisibleWindows", () => {
   it("should return empty array when no windows", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [],
-      "nvim_get_current_win:[]": 0,
+      "getwininfo:[]": [],
+      "win_getid:[]": 0,
     });
 
     const result = await getVisibleWindows(denops, defaultConfig as Config);
@@ -136,14 +125,9 @@ describe("getVisibleWindows", () => {
 
   it("should return WindowInfo with correct properties", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 50,
+      "getwininfo:[]": [{winid: 1000, bufnr: 1, topline: 1, botline: 50, width: 80, height: 24}],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
     });
 
     const result = await getVisibleWindows(denops, defaultConfig as Config);
@@ -160,22 +144,15 @@ describe("getVisibleWindows", () => {
 
   it("should skip windows with excluded buffer types", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000, 1001, 1002],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_win_get_buf:[1001]': 2,
-      'nvim_win_get_buf:[1002]': 3,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      'nvim_get_option_value:["buftype",{"buf":2}]': "quickfix", // 除外
-      'nvim_get_option_value:["buftype",{"buf":3}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_width:[1002]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      "nvim_win_get_height:[1002]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
-      'nvim_win_call:[1002,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1002,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [
+        {winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1001, bufnr: 2, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1002, bufnr: 3, topline: 1, botline: 24, width: 80, height: 24},
+      ],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
+      'getbufvar:[2,"&buftype"]': "quickfix", // 除外
+      'getbufvar:[3,"&buftype"]': "",
     });
 
     const result = await getVisibleWindows(denops, defaultConfig as Config);
@@ -187,22 +164,15 @@ describe("getVisibleWindows", () => {
 
   it("should respect maxWindows limit", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000, 1001, 1002],
-      "nvim_get_current_win:[]": 1000,
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_win_get_buf:[1001]': 2,
-      'nvim_win_get_buf:[1002]': 3,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      'nvim_get_option_value:["buftype",{"buf":2}]': "",
-      'nvim_get_option_value:["buftype",{"buf":3}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_width:[1001]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      "nvim_win_get_height:[1001]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
-      'nvim_win_call:[1001,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1001,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [
+        {winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1001, bufnr: 2, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1002, bufnr: 3, topline: 1, botline: 24, width: 80, height: 24},
+      ],
+      "win_getid:[]": 1000,
+      'getbufvar:[1,"&buftype"]': "",
+      'getbufvar:[2,"&buftype"]': "",
+      'getbufvar:[3,"&buftype"]': "",
     });
     const config = { ...defaultConfig, multiWindowMaxWindows: 2 };
 
@@ -213,26 +183,20 @@ describe("getVisibleWindows", () => {
 
   it("should set isCurrent correctly for non-current windows", async () => {
     const denops = createMockDenops({
-      "nvim_list_wins:[]": [1000, 1001],
-      "nvim_get_current_win:[]": 1001, // 1001がカレント
-      'nvim_win_get_buf:[1000]': 1,
-      'nvim_win_get_buf:[1001]': 2,
-      'nvim_get_option_value:["buftype",{"buf":1}]': "",
-      'nvim_get_option_value:["buftype",{"buf":2}]': "",
-      "nvim_win_get_width:[1000]": 80,
-      "nvim_win_get_width:[1001]": 80,
-      "nvim_win_get_height:[1000]": 24,
-      "nvim_win_get_height:[1001]": 24,
-      'nvim_win_call:[1000,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1000,"line(\'w$\')"]': 24,
-      'nvim_win_call:[1001,"line(\'w0\')"]': 1,
-      'nvim_win_call:[1001,"line(\'w$\')"]': 24,
+      "getwininfo:[]": [
+        {winid: 1000, bufnr: 1, topline: 1, botline: 24, width: 80, height: 24},
+        {winid: 1001, bufnr: 2, topline: 1, botline: 24, width: 80, height: 24},
+      ],
+      "win_getid:[]": 1001, // 1001がカレント
+      'getbufvar:[1,"&buftype"]': "",
+      'getbufvar:[2,"&buftype"]': "",
     });
 
     const result = await getVisibleWindows(denops, defaultConfig as Config);
 
-    assertEquals(result[0].isCurrent, false);
-    assertEquals(result[1].isCurrent, true);
+    // 実装はisCurrent=trueのウィンドウを先頭にソートする
+    assertEquals(result[0].isCurrent, true);
+    assertEquals(result[1].isCurrent, false);
   });
 });
 
