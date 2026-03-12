@@ -50,7 +50,6 @@ import {
   validateHighlightGroupName,
 } from "../../validation-utils.ts";
 import {
-  clearHintsMultiBuffer,
   MULTI_BUFFER_EXTMARK_STATE,
 } from "../display/extmark-display.ts";
 
@@ -180,6 +179,7 @@ const DEFAULT_MULTI_KEYS = [
   "E",
   "I",
   "O",
+  "P",
   "Q",
   "R",
   "T",
@@ -541,11 +541,6 @@ export class Core {
             "nvim_create_namespace",
             EXTMARK_NAMESPACE,
           ) as number;
-          // Clear extmarks in all tracked multi-buffer buffers
-          if (MULTI_BUFFER_EXTMARK_STATE.size > 0) {
-            await clearHintsMultiBuffer(denops, extmarkNamespace);
-          }
-          // Always clear current buffer for safety
           await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
         } catch (error) {
         }
@@ -1176,8 +1171,6 @@ export class Core {
         timeoutId = setTimeout(() => resolve(-2), inputTimeout) as unknown as number; // -2 = 全体タイムアウト
       });
       const result = await Promise.race([inputPromise, timeoutPromise]);
-      // A: log immediately after getchar
-      console.error(`[HSY-DEBUG] getchar: char=${result}, type=${typeof result}`);
 
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -1187,7 +1180,6 @@ export class Core {
       if (typeof result === "string") {
         await this.hideHintsOptimized(denops);
         await denops.cmd(`call feedkeys(${JSON.stringify(result)}, 'm')`);
-        console.error(`[HSY-DEBUG] feedkeys: char="${result}"`);
         this.resetContinuousModeState();
         return;
       }
@@ -1219,13 +1211,10 @@ export class Core {
       const wasUpperCase = char >= 65 && char <= 90;
       const wasNumber = char >= 48 && char <= 57;
       const wasLowerCase = char >= 97 && char <= 122;
-      // B: log after branch determination
-      console.error(`[HSY-DEBUG] branch: wasLower=${wasLowerCase}, wasUpper=${wasUpperCase}, wasNum=${wasNumber}`);
       if (wasLowerCase) {
         await this.hideHintsOptimized(denops);
         const originalChar = String.fromCharCode(char);
         await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
-        console.error(`[HSY-DEBUG] feedkeys: char="${originalChar}"`);
         this.resetContinuousModeState();
         return;
       }
@@ -1247,20 +1236,15 @@ export class Core {
       }
       const normalizedKeys = allKeys.map((k) => /[a-zA-Z]/.test(k) ? k.toUpperCase() : k);
       const validKeysSet = new Set(normalizedKeys);
-      // C: log validKeysSet check
-      console.error(`[HSY-DEBUG] validKeys: inputChar="${inputChar}", inSet=${validKeysSet.has(inputChar)}`);
       if (!validKeysSet.has(inputChar)) {
         // ヒント以外のキーが入力された場合、ヒントを非表示にしてキーを通常処理に送る
         this.resetContinuousModeState();
         await this.hideHintsOptimized(denops);
         const originalChar = String.fromCharCode(char);
         await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
-        console.error(`[HSY-DEBUG] feedkeys: char="${originalChar}"`);
         return;
       }
       const matchingHints = currentHints.filter((h) => h.hint.startsWith(inputChar));
-      // D: log matching hints result
-      console.error(`[HSY-DEBUG] matching: count=${matchingHints.length}, input="${inputChar}"`);
       // 🔒 必須: 候補ハイライト表示（削除禁止）
       await this.highlightCandidateHintsHybrid(denops, currentHints, inputChar);
 
@@ -1270,7 +1254,6 @@ export class Core {
         await this.hideHintsOptimized(denops);
         const originalChar = String.fromCharCode(char);
         await denops.cmd(`call feedkeys('${originalChar}', 'm')`);
-        console.error(`[HSY-DEBUG] feedkeys: char="${originalChar}"`);
         return;
       }
       const singleCharTarget = matchingHints.find((h) => h.hint === inputChar);

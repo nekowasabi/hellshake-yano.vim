@@ -93,7 +93,7 @@ export const DEFAULT_CONFIG: Config = {
     "8",
     "9",
   ],
-  multiCharKeys: ["B", "C", "E", "I", "O", "Q", "R", "T", "U", "V", "W", "X", "Y", "Z"],
+  multiCharKeys: ["B", "C", "E", "I", "O", "P", "Q", "R", "T", "U", "V", "W", "X", "Y", "Z"],
   maxSingleCharHints: 21,
   useHintGroups: true,
   continuousHintMode: false,

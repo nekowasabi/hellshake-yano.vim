@@ -176,6 +176,7 @@ export const DEFAULT_CONFIG: Config = {
     "E",
     "I",
     "O",
+    "P",
     "Q",
     "R",
     "T",
