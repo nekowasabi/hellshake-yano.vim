@@ -56,10 +56,17 @@ export class ImplementationSelector {
       }`,
     );
 
+    // getImplementationMatrix() で実装タイプを決定（重複ロジック解消）
+    const implementationType = this.getImplementationMatrix(
+      environment.denops.available,
+      environment.denops.running,
+      userPreference,
+    );
+
     // ユーザーがlegacyモードを強制している場合
     if (userPreference === "legacy") {
       const result = this.createResult(
-        "vimscript-pure",
+        implementationType,
         "User preference: legacy mode",
         warnings,
       );
@@ -72,9 +79,9 @@ export class ImplementationSelector {
     }
 
     // Denopsが利用可能で実行中の場合
-    if (environment.denops.available && environment.denops.running) {
+    if (implementationType === "denops-unified") {
       const result = this.createResult(
-        "denops-unified",
+        implementationType,
         "Denops is available and running",
         warnings,
       );
@@ -99,7 +106,7 @@ export class ImplementationSelector {
 
     // Denopsが停止している場合の詳細メッセージ
     const reason = this.getDenopsUnavailableReason(environment.denops);
-    const result = this.createResult("vimscript-pure", reason, warnings);
+    const result = this.createResult(implementationType, reason, warnings);
 
     logMessage(
       "INFO",
@@ -129,7 +136,6 @@ export class ImplementationSelector {
   getImplementationMatrix(
     denopsAvailable: boolean,
     denopsRunning: boolean,
-    _editorType: "vim" | "neovim",
     userPreference?: UserPreference,
   ): ImplementationType {
     // ユーザーがlegacyを指定した場合は常にvimscript-pure

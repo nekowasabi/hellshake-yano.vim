@@ -7,7 +7,7 @@
 
 import type { Denops } from "jsr:@denops/std@7.4.0";
 import { EnvironmentDetector } from "./environment-detector.ts";
-import { ImplementationSelector } from "./implementation-selector.ts";
+import { ImplementationSelector, type UserPreference } from "./implementation-selector.ts";
 import { ConfigMigrator } from "../vim/config/config-migrator.ts";
 import { CommandRegistry } from "./command-registry.ts";
 
@@ -59,7 +59,7 @@ export class Initializer {
    *
    * エラー時は自動的にVimScript版にフォールバック
    */
-  async initialize(): Promise<InitializationResult> {
+  async initialize(userPreference?: UserPreference): Promise<InitializationResult> {
     const warnings: string[] = [];
     const errors: string[] = [];
     let migrated = false;
@@ -95,6 +95,7 @@ export class Initializer {
       try {
         const selectionResult = await this.selector.select({
           environment: envDetails,
+          userPreference,
         });
 
         implementation = selectionResult.implementation as
