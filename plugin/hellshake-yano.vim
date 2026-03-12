@@ -121,6 +121,57 @@ endif
 let g:hellshake_yano.both_min_word_length = g:hellshake_yano.bothMinWordLength
 
 " 設定値の基本検証（TypeScript側でより詳細な検証を実施）
+function! s:normalize_key_collection(value) abort
+  if type(a:value) == v:t_string
+    return split(a:value, '\zs')
+  endif
+  if type(a:value) == v:t_list
+    return filter(copy(a:value), { _, v -> type(v) == v:t_string && !empty(v) })
+  endif
+  return []
+endfunction
+
+function! s:normalize_key_for_collision(key) abort
+  if a:key =~# '^[A-Za-z]$'
+    return toupper(a:key)
+  endif
+  return a:key
+endfunction
+
+function! s:warn_cancel_key_collisions() abort
+  if !has_key(g:hellshake_yano, 'cancelKeys')
+    return
+  endif
+
+  let l:cancel_keys = map(
+        \ s:normalize_key_collection(g:hellshake_yano.cancelKeys),
+        \ { _, v -> s:normalize_key_for_collision(v) }
+        \ )
+  if empty(l:cancel_keys)
+    return
+  endif
+
+  let l:hint_keys = map(
+        \ s:normalize_key_collection(get(g:hellshake_yano, 'singleCharKeys', []))
+        \ + s:normalize_key_collection(get(g:hellshake_yano, 'multiCharKeys', [])),
+        \ { _, v -> s:normalize_key_for_collision(v) }
+        \ )
+
+  let l:collisions = []
+  for l:key in uniq(sort(copy(l:cancel_keys)))
+    if index(l:hint_keys, l:key) >= 0
+      call add(l:collisions, l:key)
+    endif
+  endfor
+
+  if !empty(l:collisions)
+    echohl WarningMsg
+    echom '[hellshake-yano] Warning: cancelKeys overlaps with hint keys: ' . join(l:collisions, ', ')
+    echom '[hellshake-yano] Warning: remove these keys from singleCharKeys/multiCharKeys to avoid ambiguous behavior'
+    echohl None
+  endif
+endfunction
+
 function! s:validate_config() abort
   " key_repeat_threshold が設定されている場合のみ検証
   if has_key(g:hellshake_yano, 'key_repeat_threshold') && g:hellshake_yano.key_repeat_threshold <= 0
@@ -270,6 +321,7 @@ function! s:validate_config() abort
 endfunction
 
 call s:validate_config()
+call s:warn_cancel_key_collisions()
 
 " ハイライトグループの定義（デフォルト値）
 highlight default link HellshakeYanoMarker DiffAdd
