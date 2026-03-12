@@ -100,6 +100,7 @@ lazy.nvim を使用:
 | `enabled` | boolean | v:true | プラグインの有効/無効 |
 | `singleCharKeys` | array | ASDFGHJKLNM0-9 | 単一文字ヒントに使うキー (記号対応) |
 | `multiCharKeys` | array | BCEIOPQRTUVWXYZ | 複数文字ヒントに使うキー |
+| `cancelKeys` | array | [] | ヒント表示中に通常のキー入力へ戻すキャンセルキー (文字は大文字に正規化され、Enter は `"\r"` で指定)。単語ヒントと重複すると警告が出るので避けてください。 |
 | `useHintGroups` | boolean | v:true | ヒントグループ機能を有効化 |
 | `useNumbers` | boolean | v:true | ヒントに数字キーを含めるか |
 | `directionalHintFilter` | boolean | v:false | j/k 操作時に進行方向のヒントのみを表示 |
@@ -121,6 +122,16 @@ lazy.nvim を使用:
 | `continuousHintMode` | boolean | v:false | ヒントの連続ループモードを有効化 |
 | `recenterCommand` | string | "normal! zz" | 連続モード中に再センターするコマンド |
 | `maxContinuousJumps` | number | 50 | 連続ジャンプの安全上限回数 |
+
+### cancelKeys
+
+`cancelKeys` で指定したキーをヒント表示中に押すと、ヒントを閉じて同じキーを `feedkeys()` で送り返し、通常入力として処理できます。たとえば Enter (`"\r"`) と `i` をキャンセルキーにすると、以下のように設定できます:
+
+```vim
+let g:hellshake_yano.cancelKeys = ["\r", "i"]
+```
+
+この設定なら挿入モードへ移る `i` や Enter がヒントレイヤーを抜けてそのまま動作します。`cancelKeys` の文字キーは大文字に正規化され、`singleCharKeys`/`multiCharKeys` と重複すると警告が出るので、衝突するキーは避けてください。
 
 ### 設定例
 

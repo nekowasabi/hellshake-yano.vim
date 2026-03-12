@@ -105,6 +105,7 @@ The plugin can be configured using the `g:hellshake_yano` dictionary variable. A
 | `enabled`                       | boolean     | v:true          | Enable/disable plugin                                          |
 | `singleCharKeys`                | array       | ASDFGHJKLNM0-9  | Keys used for single-character hints (supports symbols)        |
 | `multiCharKeys`                 | array       | BCEIOPQRTUVWXYZ | Keys used for multi-character hints                            |
+| `cancelKeys`                    | array       | []              | Keys that cancel the hint overlay and are replayed to Vim; pressing one hides hints, feeds the key back, and cancels the jump (letters normalize to uppercase and `<CR>` is recognized). Avoid overlaps with hint keys as the plugin warns about collisions. |
 | `useHintGroups`                 | boolean     | v:true          | Enable hint group functionality                                |
 | `useNumbers`                    | boolean     | v:true          | Allow number keys in hints                                     |
 | `directionalHintFilter`         | boolean     | v:false         | Limit hints to the cursor direction when pressing `j` / `k`    |
@@ -130,6 +131,16 @@ The plugin can be configured using the `g:hellshake_yano` dictionary variable. A
 | `multiWindowExcludeTypes`       | array       | ['help', 'quickfix', 'terminal', 'popup'] | Buffer types to exclude from multi-window hints |
 | `multiWindowMaxWindows`         | number      | 4               | Maximum number of windows to show hints in                     |
 
+
+### Cancel Keys
+
+Use `cancelKeys` to keep particular keys from selecting hints. When one of the configured cancel keys is pressed while hints are visible, the plugin hides the hints, replays the key with `feedkeys()`, and skips the jump so the key is processed normally (letters are normalized to uppercase and `<CR>` responds to `"\r"`). Because the plugin emits a warning if a cancel key overlaps with `singleCharKeys` or `multiCharKeys`, avoid reusing hint keys for cancellation.
+
+```vim
+let g:hellshake_yano.cancelKeys = ["\r", "i"]
+```
+
+This example lets Enter and `i` exit the hint layer without selecting a hint, making it easy to switch to insert mode or send Enter even while hints are displayed.
 
 ### Configuration Examples
 
