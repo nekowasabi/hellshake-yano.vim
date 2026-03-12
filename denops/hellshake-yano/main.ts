@@ -102,8 +102,19 @@ export async function main(denops: Denops): Promise<void> {
     await initializeDebugMode(denops);
 
     // Step 1: Initializer経由で初期化（環境判定と設定マイグレーション）
+    // userPreference: g:hellshake_yano.legacyMode が true の場合は "legacy" を渡す
+    const userPreference = await (async () => {
+      try {
+        const legacyMode = await denops.eval(
+          "get(g:hellshake_yano, 'legacyMode', v:false)",
+        );
+        return legacyMode ? "legacy" as const : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
     const initializer = new Initializer(denops);
-    const initResult = await initializer.initialize();
+    const initResult = await initializer.initialize(userPreference);
 
     // Step 2: 初期化結果がdenops-unified実装の場合
     if (initResult.implementation === "denops-unified") {
@@ -530,6 +541,47 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         }
       },
 
+      // Process 54: getHighlightGroup — ヒント表示用ハイライトグループ名を返す
+      // deno-lint-ignore require-await
+      async getHighlightGroup(_type: unknown): Promise<string> {
+        return "HintMarker";
+      },
+
+      // Process 57: showDelayed — 指定遅延後にヒント表示をトリガー (Vim層はVimScript timer委譲)
+      // deno-lint-ignore require-await
+      async showDelayed(_delay: unknown): Promise<void> {
+        // Vim層ではVimScript側の timer_start() に委譲するため、ここではno-op
+        // VimScript側: autoload/hellshake_yano/core.vim#show_delayed が呼び出す
+      },
+
+      // Process 59: getFixedPositions — 固定ヒント位置リストを返す (Vim層スタブ)
+      // deno-lint-ignore require-await
+      async getFixedPositions(): Promise<unknown[]> {
+        return [];
+      },
+
+      // Process 66: getPartialMatches — 部分マッチヒント取得 (Vim層スタブ)
+      // deno-lint-ignore require-await
+      async getPartialMatches(): Promise<string[]> {
+        return [];
+      },
+
+      // Process 64: visualInit / visualGetState — Vim層スタブ
+      // deno-lint-ignore require-await
+      async visualInit(): Promise<void> {},
+
+      // deno-lint-ignore require-await
+      async visualGetState(): Promise<Record<string, unknown>> {
+        return { mode: "none", active: false };
+      },
+
+      // Process 60: shouldRedraw — フォーカス復帰直後かどうかを返す
+      // deno-lint-ignore require-await
+      async shouldRedraw(): Promise<boolean> {
+        // Vim層では FocusGained 検出はVimScript側が担うため常にtrue
+        return true;
+      },
+
       // detectWordsInVisualRange: ビジュアル選択範囲内の単語検出
       async detectWordsInVisualRange(): Promise<Record<string, unknown>[]> {
         const startTime = performance.now();
@@ -730,6 +782,42 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         return core.getStatistics();
       },
 
+      // Process 54: getHighlightGroup — Neovim用ハイライトグループ名を返す
+      // deno-lint-ignore require-await
+      async getHighlightGroup(_type: unknown): Promise<string> {
+        return "HellshakeYanoMarker";
+      },
+
+      // Process 57: showDelayed — 遅延後にヒント表示をトリガー
+      async showDelayed(delay: unknown): Promise<void> {
+        const ms = typeof delay === "number" && delay >= 0 ? delay : 0;
+        if (ms > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, ms));
+        }
+        const core = Core.getInstance(config);
+        await core.showHints(denops);
+      },
+
+      // Process 59: getFixedPositions — 固定ヒント位置リストを返す
+      // deno-lint-ignore require-await
+      async getFixedPositions(): Promise<unknown[]> {
+        const core = Core.getInstance(config);
+        const stats = core.getStatistics() as Record<string, unknown>;
+        // state.fixedPositions が存在すれば返す、なければ空配列
+        const fixedPositions = (stats?.fixedPositions as unknown[]) ?? [];
+        return fixedPositions;
+      },
+
+      // Process 60: shouldRedraw — フォーカス復帰直後かどうかを返す
+      // deno-lint-ignore require-await
+      async shouldRedraw(): Promise<boolean> {
+        const core = Core.getInstance(config);
+        // Core の focusJustRestored フラグを参照
+        const stats = core.getStatistics() as Record<string, unknown>;
+        const focusJustRestored = stats?.focusJustRestored ?? false;
+        return !focusJustRestored;
+      },
+
       async reloadDictionary(): Promise<void> {
         await reloadDictionary(denops);
       },
@@ -762,6 +850,38 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
           return await isInDictionary(denops, word);
         }
         return false;
+      },
+
+      // Process 66: getPartialMatches — 部分マッチヒント取得 (Neovim層)
+      // deno-lint-ignore require-await
+      async getPartialMatches(): Promise<string[]> {
+        // currentHints のうち入力中のプレフィックスにマッチするものを返す
+        // 現状は highlightCandidateHints が担うため空配列を返す
+        return [];
+      },
+
+      // Process 63: detectWordsInVisualRange — Neovim用ビジュアル範囲単語検出
+      // deno-lint-ignore require-await
+      async detectWordsInVisualRange(): Promise<Record<string, unknown>[]> {
+        // TODO: Neovim向けビジュアル範囲単語検出は Phase 2 後半で実装予定 (C-04制約)
+        return [];
+      },
+
+      // Process 64: visualInit / visualGetState — ビジュアルモード初期化・状態取得
+      // deno-lint-ignore require-await
+      async visualInit(): Promise<void> {
+        // Neovim: Core の visual 状態を初期化
+        Core.getInstance(config);
+      },
+
+      // deno-lint-ignore require-await
+      async visualGetState(): Promise<Record<string, unknown>> {
+        const core = Core.getInstance(config);
+        const stats = core.getStatistics() as Record<string, unknown>;
+        return {
+          mode: stats?.visualMode ?? "none",
+          active: stats?.visualActive ?? false,
+        };
       },
 
       async showHintsWithKey(key: unknown, mode?: unknown): Promise<void> {

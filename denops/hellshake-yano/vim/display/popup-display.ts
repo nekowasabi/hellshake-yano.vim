@@ -18,6 +18,10 @@
  */
 
 import type { Denops } from "@denops/std";
+import type {
+  DisplayAdapter,
+  HintItem,
+} from "../../common/interfaces/display-adapter.ts";
 
 /**
  * ヒント情報の型定義
@@ -129,5 +133,59 @@ export class VimPopupDisplay {
    */
   getPopupCount(): number {
     return this.popupIds.length;
+  }
+}
+
+/**
+ * PopupDisplayAdapter — VimPopupDisplayをDisplayAdapterインターフェースでラップする
+ *
+ * C-05: VimPopupDisplayは維持必須。このアダプターは委譲パターンで包む。
+ */
+export class PopupDisplayAdapter implements DisplayAdapter {
+  private inner: VimPopupDisplay;
+
+  constructor(denops: Denops) {
+    this.inner = new VimPopupDisplay(denops);
+  }
+
+  /**
+   * ヒントを表示する
+   *
+   * HintItem → VimPopupDisplay.showHint(lnum, col, hint) に委譲
+   */
+  async showHint(hint: HintItem): Promise<void> {
+    await this.inner.showHint(hint.line, hint.col, hint.hint);
+  }
+
+  /**
+   * 特定ウィンドウにヒントを表示する
+   *
+   * Vim popup はウィンドウ非依存で表示するため、通常の showHint に委譲。
+   */
+  async showHintWithWindow(hint: HintItem, _windowId: number): Promise<void> {
+    await this.showHint(hint);
+  }
+
+  /**
+   * 全ヒントを非表示にする
+   */
+  async hideAll(): Promise<void> {
+    await this.inner.hideAll();
+  }
+
+  /**
+   * 部分マッチするヒントのみ表示を維持する
+   */
+  async highlightPartialMatches(keys: string[]): Promise<void> {
+    await this.inner.highlightPartialMatches(keys);
+  }
+
+  /**
+   * ハイライトグループ名を取得する
+   *
+   * Vim popup は "HintMarker" グループを使用する。
+   */
+  async getHighlightGroup(_type: string): Promise<string> {
+    return "HintMarker";
   }
 }

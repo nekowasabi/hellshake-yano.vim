@@ -6,6 +6,8 @@
  * Vim モーション (h, j, k, l, w, W, b, B等) の検出
  */
 
+import type { MotionState } from "../../common/types/state.ts";
+
 /**
  * モーション タイプ
  */
@@ -79,17 +81,6 @@ export class VimMotion {
   static isValidMotion(motion: MotionInfo): boolean {
     return motion.type !== MotionType.Other;
   }
-}
-
-/**
- * モーション検出状態
- */
-export interface MotionState {
-  lastMotion: string;           // 最後に実行したモーション
-  lastMotionTime: number;        // 最後の実行時刻（ミリ秒）
-  motionCount: number;           // 連打カウント
-  timeoutMs: number;             // タイムアウト時間（デフォルト2000ms）
-  threshold: number;             // ヒント表示閾値（デフォルト2）
 }
 
 /**
