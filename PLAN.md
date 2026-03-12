@@ -1,1980 +1,3332 @@
 ---
-# === Mission Identity ===
-mission_id: word-detector-integration-2026-02-06
-title: "Phase 2.1: word_detector 統合 - VimScript版をDenops API呼び出しに統合"
-status: planning  # planning | in_progress | completed | blocked | failed
-progress: 0       # 0-100
-phase: planning   # planning | observe | orient | decide | act | feedback | completed
-
-# === TDD Configuration ===
+mission_id: "mission-20260312-002"
+title: "Vim→Denops実装集約"
+status: planning
+progress: 0
+phase: planning
 tdd_mode: true
-tdd_phase: null   # red | green | refactor
-
-# === OODA Configuration ===
-ooda_config:
-  enabled: true
-  feedback_channels:
-    immediate: true   # エラー・異常時の即時対応
-    task: true        # 各タスク完了時の教訓抽出
-    mission: true     # ミッション完了時の組織学習
-    cross: true       # 司令官間の情報共有
-
-# === Execution Configuration ===
-execution_mode: sequential  # sequential | dag_executor
+tdd_phase: null
+execution_mode: sequential
 dag_config:
   enabled: false
-  max_concurrent: 3
-  cascade_failure: true
-  visualization: true
-
-# === Deliberation Configuration ===
-deliberation:
-  enabled: true
-  level: auto        # auto | commander | staff | learning | all | none
-  multi_llm: false   # Claude + Codex + Gemini
-
-# === Context Policy ===
-context_policy:
-  max_summary_tokens: 500
-  detailed_log_path: "stigmergy/doctrine-logs/{mission_id}/"
-  aggregation_strategy: progressive_summarization
-
-# === Session Continuity ===
-session_continuity:
-  continue_mode: true
-  previous_mission_id: null
-  project_path: /home/takets/.config/nvim/plugged/hellshake-yano.vim
-
-# === Timestamps ===
-created_at: "2026-02-06"
-updated_at: "2026-02-06"
+created_at: "2026-03-12T04:40:00Z"
+updated_at: "2026-03-12T04:40:00Z"
 blockers: 0
 ---
 
-# Commander's Intent
+# Mission: Vim→Denops実装集約
 
-## Purpose
-- VimScript版 word_detector を TypeScript版のDenops API呼び出しに置き換え、Vim環境でもTypeScript版の高機能（キャッシュ、最適化、高度な日本語処理）を利用可能にする
-- Phase 1.3 の成功パターン（Denops優先 + ローカルフォールバック）を踏襲
-- コードの二重管理を解消し、メンテナンス性を向上させる
+## Commander's Intent
 
-## End State
-- VimScript版 `hellshake_yano_vim#word_detector#detect_visible()` がDenops API経由でTypeScript版の単語検出を呼び出す
-- VimScript版 `hellshake_yano_vim#word_detector#detect_multi_window()` がDenops API経由でマルチウィンドウ単語検出を呼び出す
-- VimScript版 `hellshake_yano_vim#word_detector#get_min_length()` がDenops API経由で設定取得（キャッシュ機構付き）
-- Denops未起動時は既存のローカル実装にフォールバックする
-- 既存テスト全PASS、パフォーマンス目標達成（< 50ms）
+- **Purpose**: Vim用の実装とNeovim用の実装を別々に持つ現状を、Neovim側のDenops実装に集約する
+- **End State**: Pure VimScript層（autoload/hellshake_yano_vim/）の廃止、Denopsブリッジ層への責務移動完了
+- **Key Tasks**:
+  1. Phase 1: 即時集約可能な21関数をDenops dispatcherへ移行
+  2. Phase 2: 新規TS実装が必要な18-20関数を実装・移行
+  3. Phase 3: unified.vimマッピング書き換えとカテゴリ3関数のブリッジ層移動
+  4. Phase 4: Pure VimScript層（autoload/hellshake_yano_vim/）の廃止
+- **Constraints**:
+  - C-01: popup/extmark非互換 → display層はAdapter必要
+  - C-02: Vim8でDeno必須 → Pure VimScript完全廃止は環境制約あり
+  - C-03: IPC契約3メソッド維持（updateConfig, showHintsWithKey, generic bridge）
+  - C-04: core.ts 3660行モノリス → 大規模リファクタは別ミッション
+  - C-05: popup-display.ts 維持必須（Vim popup APIのアダプタとして存続）
 
-## Key Tasks
-1. TypeScript側: VimLayer dispatcher に3つのAPI追加（detectWordsVisible, detectWordsMultiWindow, getMinWordLength）
-2. VimScript側: Denops呼び出しラッパーとキャッシュ機構を実装
-3. テスト: ゴールデンテスト、フォールバックテスト、レイテンシテストを追加
+## References
 
-## Constraints
-- 既存のVimScript版ローカル実装を削除しない（フォールバック用に維持）
-- パフォーマンスは50ms以下を維持する（大規模ファイル50行）
-- 既存テストを破壊しない
-- **col 座標系の不一致に注意**: VimScript col はバイト位置、TypeScript col は表示列
+| ファイル | 役割 | 備考 |
+|---|---|---|
+| plugin/hellshake-yano.vim | Neovim用エントリポイント | |
+| plugin/hellshake-yano-vim.vim | Vim用エントリポイント | Phase 4廃止候補 |
+| plugin/hellshake-yano-unified.vim | 統合エントリポイント | |
+| autoload/hellshake_yano_vim/ | Pure VimScript層 (16ファイル, 68関数) | 廃止対象 |
+| autoload/hellshake_yano/ | Denopsブリッジ層 (15ファイル) | 責務移動先 |
+| denops/hellshake-yano/main.ts | Denops dispatcher本体 | Vim:198-554, Neovim:595-1023 |
+| denops/hellshake-yano/neovim/core/core.ts | Neovimコア (3660行) | C-04制約 |
+| denops/hellshake-yano/neovim/display/extmark-display.ts | Extmark表示実装 | |
+| denops/hellshake-yano/vim/display/popup-display.ts | Popup表示実装 | C-05維持必須 |
+| denops/hellshake-yano/vim/bridge/vim-bridge.ts | Vimブリッジ | |
+| autoload/hellshake_yano_vim/core.vim:42 | core#init | Phase 1集約対象 |
+| autoload/hellshake_yano_vim/core.vim:80 | core#get_state | Phase 2新規実装対象 |
+| autoload/hellshake_yano_vim/core.vim:129 | core#on_focus_gained | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/core.vim:155 | core#on_terminal_leave | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/core.vim:198 | core#should_redraw | Phase 2対象 |
+| autoload/hellshake_yano_vim/core.vim:210 | core#show_delayed | Phase 2対象 |
+| autoload/hellshake_yano_vim/core.vim:237 | core#is_denops_ready | カテゴリ4削除対象 |
+| autoload/hellshake_yano_vim/core.vim:276 | core#get_fixed_positions | Phase 2対象 |
+| autoload/hellshake_yano_vim/core.vim:381 | core#show_with_motion | Phase 2対象 |
+| autoload/hellshake_yano_vim/core.vim:388 | core#show_with_motion_timer | Phase 2対象 |
+| autoload/hellshake_yano_vim/core.vim:393 | core#show | Phase 1集約対象 |
+| autoload/hellshake_yano_vim/core.vim:607 | core#hide | Phase 1集約対象 |
+| autoload/hellshake_yano_vim/display.vim:65 | display#get_highlight_group | Phase 2対象 |
+| autoload/hellshake_yano_vim/display.vim:171 | display#show_hint | Phase 2対象 |
+| autoload/hellshake_yano_vim/display.vim:296 | display#show_hint_with_window | Phase 2 HIGH対象 |
+| autoload/hellshake_yano_vim/display.vim:392 | display#hide_all | Phase 2対象 |
+| autoload/hellshake_yano_vim/display.vim:470 | display#highlight_partial_matches | Phase 2対象 |
+| autoload/hellshake_yano_vim/display.vim:545 | display#get_popup_count | カテゴリ4削除対象 |
+| autoload/hellshake_yano_vim/input.vim:43 | input#start | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/input.vim:74 | input#stop | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/input.vim:217 | input#wait_for_input | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/input.vim:292 | input#get_state | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/input.vim:309 | input#get_partial_matches | Phase 2対象 |
+| autoload/hellshake_yano_vim/motion.vim:114 | motion#has_denops | カテゴリ4削除対象 |
+| autoload/hellshake_yano_vim/motion.vim:170 | motion#get_state | Phase 2対象 |
+| autoload/hellshake_yano_vim/motion.vim:188 | motion#set_threshold | Phase 1集約対象 |
+| autoload/hellshake_yano_vim/motion.vim:206 | motion#set_timeout | Phase 1集約対象 |
+| autoload/hellshake_yano_vim/motion.vim:334 | motion#handle_with_count | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/motion.vim:493 | motion#handle | Phase 2対象 |
+| autoload/hellshake_yano_vim/motion.vim:530 | motion#handle_expr | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/motion.vim:574 | motion#handle_visual_expr | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/motion.vim:582 | motion#visual_schedule | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/motion.vim:627 | motion#handle_visual_internal | カテゴリ3維持 |
+| autoload/hellshake_yano_vim/visual.vim:60 | visual#init | Phase 2対象 |
+| autoload/hellshake_yano_vim/visual.vim:71 | visual#get_state | Phase 2対象 |
+| autoload/hellshake_yano_vim/visual.vim:102 | visual#show | Phase 2対象 |
+| plugin/hellshake-yano-unified.vim:193 | setup_unified_mappings() | Phase 3対象 |
+| plugin/hellshake-yano-unified.vim:199 | motion#handle_with_count呼出 | Phase 3対象 |
+| plugin/hellshake-yano-unified.vim:211 | motion#visual_schedule呼出 | Phase 3対象 |
+| plugin/hellshake-yano-unified.vim:226 | setup_vimscript_mappings() | Phase 3対象 |
+| plugin/hellshake-yano-unified.vim:266 | visual#show呼出 | Phase 3対象 |
+| denops/hellshake-yano/main.ts:198 | initializeVimLayer | dispatcher定義 |
+| denops/hellshake-yano/main.ts:201 | enable dispatcher | |
+| denops/hellshake-yano/main.ts:220 | updateConfig dispatcher | |
+| denops/hellshake-yano/main.ts:230 | getConfig dispatcher | |
+| denops/hellshake-yano/main.ts:240 | segmentJapaneseText dispatcher | |
+| denops/hellshake-yano/main.ts:282 | clearCache dispatcher | |
+| denops/hellshake-yano/main.ts:289 | reloadDictionary dispatcher | |
+| denops/hellshake-yano/main.ts:293 | addToDictionary dispatcher | |
+| denops/hellshake-yano/main.ts:308 | showDictionary dispatcher | |
+| denops/hellshake-yano/main.ts:312 | validateDictionary dispatcher | |
+| denops/hellshake-yano/main.ts:316 | isInDictionary dispatcher | |
+| denops/hellshake-yano/main.ts:324 | detectWordsVisible dispatcher | |
+| denops/hellshake-yano/main.ts:337 | detectWordsMultiWindow dispatcher | |
+| denops/hellshake-yano/main.ts:351 | getMinWordLength dispatcher | |
+| denops/hellshake-yano/main.ts:363 | generateHints dispatcher | |
+| denops/hellshake-yano/main.ts:386 | displayShowHint dispatcher (Vim専用) | |
+| denops/hellshake-yano/main.ts:403 | displayShowHintWithWindow dispatcher (Vim専用) | |
+| denops/hellshake-yano/main.ts:420 | displayHideAll dispatcher (Vim専用) | |
+| denops/hellshake-yano/main.ts:425 | displayHighlightPartialMatches dispatcher | |
+| denops/hellshake-yano/main.ts:595 | initializeNeovimLayer | dispatcher定義 |
+| denops/hellshake-yano/main.ts:615 | setCount dispatcher (Neovim専用) | |
+| denops/hellshake-yano/main.ts:623 | setTimeout dispatcher (Neovim専用) | |
+| denops/hellshake-yano/main.ts:630 | showHints dispatcher (Neovim専用) | |
+| denops/hellshake-yano/main.ts:648 | hideHints dispatcher (Neovim専用) | |
+| denops/hellshake-yano/main.ts:660 | highlightCandidateHints dispatcher | |
+| denops/hellshake-yano/main.ts:871 | getVisibleWindows dispatcher | |
+| denops/hellshake-yano/implementation-selector.ts:47 | select() | |
+| denops/hellshake-yano/implementation-selector.ts:129 | getImplementationMatrix() | |
+| denops/hellshake-yano/initializer.ts:96 | userPreference未渡し問題 | |
 
-## Restraints
-- TDD（テスト駆動開発）を厳守する
-- Phase 1.1/1.2/1.3の統合パターン（dictionary.vim, config.vim, hint_generator.vim）に準拠する
-- **byteCol 優先使用**: TypeScript側の `word.byteCol ?? word.col` でバイト位置を取得
-- **get_min_length キャッシュ必須**: 高頻度呼び出しのためVimScript側でキャッシュ
+## COP (Common Operational Picture)
 
----
+現在の状態:
+- autoload/hellshake_yano_vim/ に16ファイル・68関数が存在（Pure VimScript層）
+- autoload/hellshake_yano/ に15ファイルのDenopsブリッジ層が存在
+- 68関数を4カテゴリに分類済み:
+  - カテゴリ1 (21関数): Denops dispatcherが既に存在し即時集約可
+  - カテゴリ2 (18-20関数): TS側に新規実装が必要
+  - カテゴリ3 (19関数): Vim専用機能としてブリッジ層に責務移動
+  - カテゴリ4 (9関数): 削除可能（has_denops系等）
 
-# Context
+## Progress Map
 
-## 概要
-- VimScript版の単語検出をDenops API呼び出しに統合することで、TypeScript版の高機能（WordDetectionManager: LRUキャッシュ、タイムアウト、フォールバック、パフォーマンス計測）をVim環境でも活用可能にする
-- ユーザーは `jjj` でヒント表示時に、TypeScript版の最適化された単語検出を受けられる
-- 日本語単語検出は TinySegmenter、英語は正規表現パターンマッチ、辞書統合による最小長スキップが適用される
+| Process | タイトル | 状態 | 依存 |
+|---|---|---|---|
+| 1 | DisplayAdapter インターフェース定義 | pending | - |
+| 2 | MotionDetector インターフェース定義 | pending | - |
+| 3 | VisualRange インターフェース定義 | pending | - |
+| 4 | テスト基盤整備 | pending | - |
+| 5 | ExtmarkDisplayAdapter 実装 | pending | 1 |
+| 6 | PopupDisplayAdapter 実装 | pending | 1 |
+| 7 | IPC契約テスト | pending | 4 |
+| 8 | EnvironmentDetector リファクタ | pending | - |
+| 9 | ImplementationSelector 統合 | pending | 8 |
+| 10 | config関数の集約 (3関数) | pending | 1,4 |
+| 11 | dictionary関数の集約 (6関数) | pending | 4 |
+| 12 | hint_generator関数の集約 (2関数) | pending | 4 |
+| 13 | japanese#segment の集約 | pending | 4 |
+| 14 | word_detector関数の集約 (4関数) | pending | 4 |
+| 15 | window_detector#get_visible の集約 | pending | 4 |
+| 16 | core#init/show/hide の集約 (3関数) | pending | 4 |
+| 17 | motion#set_threshold/set_timeout の集約 (2関数) | pending | 4 |
+| 18 | Phase 1 統合テスト | pending | 10-17 |
+| 19 | Phase 1 VimScript側コード削除確認 | pending | 18 |
+| 50 | DisplayAdapter — display#show_hint 実装 | pending | 5,6 |
+| 51 | DisplayAdapter — display#show_hint_with_window 実装 | pending | 50 |
+| 52 | DisplayAdapter — display#hide_all 実装 | pending | 5,6 |
+| 53 | DisplayAdapter — display#highlight_partial_matches 実装 | pending | 5,6 |
+| 54 | DisplayAdapter — display#get_highlight_group dispatcher | pending | 5,6 |
+| 55 | core#show_with_motion 複合API | pending | 16 |
+| 56 | core#show_with_motion_timer 非同期タイマー版 | pending | 55 |
+| 57 | core#show_delayed 遅延表示 | pending | 16 |
+| 58 | core#get_state → getStatistics拡張 | pending | 16 |
+| 59 | core#get_fixed_positions 新規API | pending | 16 |
+| 60 | core#should_redraw 統合 | pending | 16 |
+| 61 | motion#get_state dispatcher | pending | 17 |
+| 62 | motion#handle 代替 | pending | 17 |
+| 63 | visual#show → detectWordsInVisualRange新規 | pending | 3 |
+| 64 | visual#init / visual#get_state | pending | 3 |
+| 65 | filter#by_direction word-detector統合 | pending | 14 |
+| 66 | input#get_partial_matches 代替 | pending | 4 |
+| 67 | word_filter#apply 統合 | pending | 14 |
+| 68 | Phase 2 統合テスト | pending | 50-67 |
+| 100 | setup_unified_mappings() motionマッピング書き換え | pending | 62 |
+| 101 | setup_unified_mappings() visualマッピング書き換え | pending | 63 |
+| 102 | setup_vimscript_mappings() visualマッピング書き換え | pending | 63 |
+| 103 | unified.vim s:show_hints_visual()書き換え | pending | 63 |
+| 104 | カテゴリ3関数の責務移動 (19関数) | pending | 100-103 |
+| 105 | initializer.ts userPreference引数修正 | pending | 9 |
+| 106 | Phase 3 統合テスト | pending | 100-105 |
+| 150 | カテゴリ4 削除可9関数の除去 | pending | 19,68 |
+| 151 | config.vim 廃止 | pending | 10,150 |
+| 152 | dictionary.vim 廃止 | pending | 11,150 |
+| 153 | hint_generator.vim 廃止 | pending | 12,150 |
+| 154 | japanese.vim 廃止 | pending | 13,150 |
+| 155 | word_detector.vim 廃止 | pending | 14,150 |
+| 156 | window_detector.vim 廃止 | pending | 15,150 |
+| 157 | word_filter.vim 廃止 | pending | 67,150 |
+| 158 | filter.vim 廃止 | pending | 65,150 |
+| 159 | util.vim 廃止 | pending | 150 |
+| 160 | display.vim → ブリッジ層統合 | pending | 50-54,150 |
+| 161 | core.vim → ブリッジ層統合 | pending | 55-60,150 |
+| 162 | motion.vim → ブリッジ層統合 | pending | 61-62,104,150 |
+| 163 | visual.vim → ブリッジ層統合 | pending | 63-64,104,150 |
+| 164 | input.vim → ブリッジ層責務移動 | pending | 66,104,150 |
+| 165 | jump.vim → ブリッジ層責務移動 | pending | 104,150 |
+| 166 | key_repeat.vim → ブリッジ層統合 | pending | 104,150 |
+| 167 | plugin/hellshake-yano-vim.vim 廃止検討 | pending | 151-166 |
+| 168 | Phase 4 回帰テスト | pending | 151-167 |
+| 200 | vim-bridge.ts 不要メソッド削除 | pending | 168 |
+| 201 | config-mapper.ts 統合検討 | pending | 168 |
+| 202 | config-migrator.ts 統合検討 | pending | 168 |
+| 203 | config-unifier.ts 統合検討 | pending | 168 |
+| 204 | highlight.ts (vim/) 統合 | pending | 168 |
+| 205 | popup-display.ts 維持確認 | pending | 168 |
+| 206 | japanese.ts (vim/) 統合 | pending | 168 |
+| 207 | motion.ts (vim/) 責務確認 | pending | 168 |
+| 208 | visual.ts (vim/) 責務確認 | pending | 168 |
+| 250 | 共通dispatcher統合 (21メソッド) | pending | 200-208 |
+| 251 | Vim専用dispatcher見直し (12メソッド) | pending | 250 |
+| 252 | Neovim専用dispatcher整理 (20メソッド) | pending | 250 |
+| 253 | initializeVimLayer/NeovimLayer 統合検討 | pending | 251,252 |
+| 254 | IPC契約3メソッド最終確認 | pending | 253 |
+| 280 | Vim+Denops環境での全機能テスト | pending | 254 |
+| 281 | Neovim+Denops環境での全機能テスト | pending | 254 |
+| 282 | Denopsなし環境フォールバックテスト | pending | 254 |
+| 283 | パフォーマンステスト | pending | 254 |
+| 290 | CHANGELOG更新 | pending | 280-283 |
+| 291 | README更新 | pending | 280-283 |
+| 300 | リリース準備 | pending | 290,291 |
 
-## 必須のルール
-- 必ず `CLAUDE.md` を参照し、ルールを守ること
-- 不明な点はAskUserQuestionで確認すること
-- **TDD（テスト駆動開発）を厳守すること**
-  - 各プロセスは必ずテストファーストで開始する（Red → Green → Refactor）
-  - 実装コードを書く前に、失敗するテストを先に作成する
-  - テストが通過するまで修正とテスト実行を繰り返す
-  - プロセス完了の条件：該当するすべてのテスト、フォーマッタ、Linterが通過していること
-  - プロセス完了後、チェックボックスを✅に変更すること
-
-## 開発のゴール
-- VimScript版 word_detector をDenops API呼び出しベースに統合
-- フォールバック機構によりDenops未起動時も正常動作を保証
-- 高頻度呼び出しに対応するキャッシュ機構の実装
-- col 座標系の不一致（バイト位置 vs 表示列）を byteCol で解決
-
-## 重要な発見（doctrine-orchestrator による分析結果）
-
-### 発見1: VimLayer dispatcher に detectWords 系 API が未登録（致命的ギャップ）
-
-**現状**:
-- **VimLayer**: `detectWords` API **未登録**
-- **NeovimLayer**: `detectWords(bufnr)` 登録済み（行405）
-
-**影響**: VimScript版は全て自力で処理しており、TypeScript版の恩恵を一切受けていない
-
-**対策**: VimLayer dispatcher に以下の3つのAPIを追加
-- `detectWordsVisible()`: 画面内単語検出
-- `detectWordsMultiWindow(windows)`: マルチウィンドウ単語検出
-- `getMinWordLength(key)`: キー別最小単語長取得
-
-### 発見2: col 座標系の不一致（高リスク R2）
-
-| 項目 | VimScript | TypeScript |
-|------|-----------|------------|
-| `col` | **バイト位置** (1-indexed) | **表示列** (1-indexed) |
-| `byteCol` | なし | **バイト位置** (1-indexed) |
-
-**具体例**: `"abc日本語def"` の `"本"` の位置
-- VimScript `col`: 7 (byte position)
-- TypeScript `col`: 6 (display column) ← **不一致!**
-- TypeScript `byteCol`: 7 (byte position) ← **一致**
-
-**対策**: 変換関数で `word.byteCol ?? word.col` を使用してバイト位置を優先取得
-
-### 発見3: get_min_length の高頻度呼び出し問題（パフォーマンスリスク R4）
-
-`get_min_length()` はキー入力ごとに呼ばれるため、Denops RPC 往復がボトルネックになる。
-
-**測定目標**:
-| 測定項目 | 現在 | 目標 | 許容上限 |
-|---------|------|------|---------|
-| get_min_length | <1ms | <5ms | **10ms** |
-
-**対策**: VimScript側でキャッシュ（TTL 100ms）、設定変更時のみクリア
-
----
-
-# References
-
-| @ref | @target | @test |
-|------|---------|-------|
-| `autoload/hellshake_yano_vim/dictionary.vim` (Phase 1.1) | `autoload/hellshake_yano_vim/word_detector.vim` | `tests-vim/word_detector_test.vim` |
-| `autoload/hellshake_yano_vim/hint_generator.vim` (Phase 1.3) | `denops/hellshake-yano/main.ts` | `tests-vim/test_word_detector_denops.vim` (新規) |
-| `denops/hellshake-yano/neovim/core/word.ts` (2,264行) | `denops/hellshake-yano/neovim/core/word.ts` | `tests/vim_layer_word_test.ts` (新規) |
-
----
-
-# Code Analysis（調査結果詳細）
-
-## 1. VimScript版 word_detector.vim（468行）
-
-### ファイル構造
-```
-autoload/hellshake_yano_vim/word_detector.vim
-├── 行1-12: ヘッダーコメント
-├── 行13-57: s:is_in_dictionary() - 辞書チェック（Denops経由）
-├── 行63-83: s:detect_japanese_words() - 日本語単語検出（TinySegmenter）
-├── 行85-172: s:detect_english_words() - 英語単語検出（matchstrpos）
-├── 行174-297: detect_visible() - 画面内単語検出（公開API）
-├── 行299-370: get_min_length() - 最小単語長取得（公開API）
-└── 行372-468: detect_multi_window() - マルチウィンドウ単語検出（公開API）
-```
-
-### 公開関数（3つ）
-| 関数名 | 引数 | 返却値 | 説明 |
-|--------|------|--------|------|
-| `detect_visible()` | なし | `List<Dict>` | 画面内（line('w0')-line('w$')）の単語検出 |
-| `get_min_length(key)` | key: String | Number | キー別最小単語長（g:hellshake_yano.perKeyMinLength[key]） |
-| `detect_multi_window(windows)` | windows: List | `List<Dict>` | 複数ウィンドウの単語検出 |
-
-### データ構造
-```vim
-" 返却データ: {text, lnum, col, end_col, winid?, bufnr?}
-" - text: 単語テキスト
-" - lnum: 行番号（1-indexed）
-" - col: 開始列（1-indexed, バイト位置）
-" - end_col: 終了列（1-indexed, バイト位置）
-" - winid: ウィンドウID（マルチウィンドウ時）
-" - bufnr: バッファ番号（マルチウィンドウ時）
-```
-
-### 依存関係
-- `hellshake_yano_vim#japanese#segment()` - 既にDenops連携済み
-- `hellshake_yano_vim#dictionary#is_in_dictionary()` - Phase 1.1で統合済み
-
----
-
-## 2. TypeScript版 word.ts（2,264行）
-
-### ファイル構造
-```
-denops/hellshake-yano/neovim/core/word.ts
-├── 行1-50: インポート・型定義
-├── 行51-150: WordDetectionManager（LRUキャッシュ、タイムアウト）
-├── 行184-300: detectWords() - 基本単語検出
-├── 行301-450: detectWordsWithManager() - マネージャー経由検出（高機能）
-├── 行451-600: detectWordsMultiWindow() - マルチウィンドウ検出
-├── 行601-800: RegexWordDetector（英語）
-├── 行801-1000: TinySegmenterWordDetector（日本語）
-├── 行1001-1200: HybridWordDetector（日英混在）
-├── 行1201-1400: extractWords() - 単語抽出コア
-├── 行1401-1600: 座標変換関数（byteCol計算含む）
-├── 行1601-1800: fold除外処理
-├── 行1801-2000: 日本語改善分割（splitJapaneseTextImproved）
-└── 行2001-2264: ワイド文字表示列計算、snake_case/kebab-case分割
-```
-
-### 主要API
-```typescript
-// 画面内単語検出（WordDetectionManager経由）
-export async function detectWordsWithManager(
-  denops: Denops,
-  config: EnhancedWordConfig
-): Promise<DetectionResult> {
-  // LRUキャッシュ（500件、TTL 5min）
-  // タイムアウト（5s）
-  // フォールバック機構
-  // パフォーマンス計測
-}
-
-// マルチウィンドウ単語検出
-export async function detectWordsMultiWindow(
-  denops: Denops,
-  config: Config
-): Promise<Word[]> {
-  // 複数ウィンドウの単語を統合
-  // winid, bufnr を付与
-}
-```
-
-### データ構造
-```typescript
-interface Word {
-  text: string;
-  line: number;        // 1-indexed
-  col: number;         // 1-indexed, 表示列（display column）
-  byteCol?: number;    // 1-indexed, バイト位置（byte position）
-  winid?: number;      // ウィンドウID
-  bufnr?: number;      // バッファ番号
-}
-```
-
-### Strategy Pattern
-| ストラテジー | 優先度 | 説明 |
-|-------------|-------|------|
-| `RegexWordDetector` | 1 | 英語単語検出（`\w+` パターン） |
-| `TinySegmenterWordDetector` | 10 | 日本語単語検出（TinySegmenter） |
-| `HybridWordDetector` | 15 | 日英混在テキスト（自動判定） |
 
 ---
 
-## 3. main.ts dispatcher 構造
-
-### VimLayer dispatcher（行127-269）
-```typescript
-// 行148-265: denops.dispatcher = { ... }
-// 現在登録されているメソッド:
-// - enable, disable, toggle
-// - updateConfig, getConfig, validateConfig
-// - segmentJapaneseText
-// - healthCheck, getStatistics, debug, clearCache
-// - reloadDictionary, addToDictionary, editDictionary, showDictionary, validateDictionary, isInDictionary
-//
-// ★ detectWordsVisible, detectWordsMultiWindow, getMinWordLength 未登録 ← 追加が必要
-```
-
-### NeovimLayer dispatcher（行276-643）
-```typescript
-// 行382-399: generateHints が登録済み
-// 行405-412: detectWords が登録済み
-async detectWords(bufnr: unknown): Promise<Word[]> {
-  const startTime = performance.now();
-  try {
-    const bufferNumber = typeof bufnr === "number" ? bufnr : await denops.call("bufnr", "%");
-    return await detectWordsOptimized(denops, bufferNumber);
-  } finally {
-    recordPerformance("wordDetection", performance.now() - startTime);
-  }
-}
-```
-
----
-
-## 4. 統合パターン参照: hint_generator.vim (Phase 1.3)
-
-### 成功パターンの抽出
-```vim
-" 1. Denops利用可能チェック（has_denops 関数）
-function! hellshake_yano_vim#hint_generator#has_denops() abort
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-  catch
-    return v:false
-  endtry
-endfunction
-
-" 2. キャッシュ機構（高頻度呼び出し対策）
-let s:hint_cache = {}
-let s:cache_max_size = 100
-
-" 3. Denops優先 + フォールバック
-function! hellshake_yano_vim#hint_generator#generate(count) abort
-  " キャッシュチェック
-  if has_key(s:hint_cache, l:cache_key)
-    return copy(s:hint_cache[l:cache_key])
-  endif
-
-  " Denops優先
-  if hellshake_yano_vim#hint_generator#has_denops()
-    try
-      let l:result = denops#request('hellshake-yano', 'generateHints', [a:count])
-      if type(l:result) == v:t_list && !empty(l:result)
-        " キャッシュに保存
-        let s:hint_cache[l:cache_key] = l:result
-        return l:result
-      endif
-    catch
-      " フォールバック
-    endtry
-  endif
-
-  " フォールバック: ローカル実装
-  return s:generate_local(a:count)
-endfunction
-```
-
----
-
-# DAG Execution（並列タスク管理）
-
-**有効化**: `--use-dag` オプション（本ミッションでは無効）
-
-## Task Dependencies Graph
-
-```mermaid
-graph TD
-  %% Nodes with status colors
-  P1["Process 1: TypeScript API追加"]
-  P2["Process 2: VimScript Denopsラッパー"]
-  P3["Process 3: キャッシュ機構"]
-  P4["Process 4: 設定変更時キャッシュクリア連携"]
-  P10["Process 10: ゴールデンテスト"]
-  P11["Process 11: フォールバックテスト"]
-  P12["Process 12: レイテンシテスト"]
-  P50["Process 50: E2E統合テスト"]
-  P100["Process 100: リファクタリング"]
-  P200["Process 200: ドキュメンテーション"]
-  P300["Process 300: OODAフィードバック"]
-
-  %% Dependencies
-  P1 --> P2
-  P2 --> P3
-  P3 --> P4
-  P1 --> P10
-  P2 --> P10
-  P2 --> P11
-  P3 --> P12
-  P10 --> P50
-  P11 --> P50
-  P12 --> P50
-  P50 --> P100
-  P100 --> P200
-  P200 --> P300
-
-  %% Status styling (update during execution)
-  style P1 fill:#E0E0E0  %% pending: gray
-  style P2 fill:#E0E0E0
-  style P3 fill:#E0E0E0
-  style P4 fill:#E0E0E0
-  style P10 fill:#E0E0E0
-  style P11 fill:#E0E0E0
-  style P12 fill:#E0E0E0
-  style P50 fill:#E0E0E0
-  style P100 fill:#E0E0E0
-  style P200 fill:#E0E0E0
-  style P300 fill:#E0E0E0
-```
-
-## Topological Sort Result
-
-```
-Execution Order: P1 → P2 → P3 → P4 → P10/P11 → P12 → P50 → P100 → P200 → P300
-Parallelizable: [P1] → [P2] → [P3] → [P4] → [P10, P11] → [P12] → [P50] → [P100] → [P200] → [P300]
-Cycle Detected: No
-```
-
----
-
-# Progress Map
-
-| Process | Status | Progress | Phase | Notes |
-|---------|--------|----------|-------|-------|
-| Process 1 | planning | ▯▯▯▯▯ 0% | Red | TypeScript VimLayer API追加（80-120行） |
-| Process 2 | planning | ▯▯▯▯▯ 0% | Red | VimScript Denopsラッパー（60行追加） |
-| Process 3 | planning | ▯▯▯▯▯ 0% | Red | キャッシュ機構実装 |
-| Process 4 | planning | ▯▯▯▯▯ 0% | Red | 設定変更連携 |
-| Process 10 | planning | ▯▯▯▯▯ 0% | Red | ゴールデンテスト（VimScript版とDenops版出力一致） |
-| Process 11 | planning | ▯▯▯▯▯ 0% | Red | フォールバックテスト（正常/異常/タイムアウト） |
-| Process 12 | planning | ▯▯▯▯▯ 0% | Red | レイテンシテスト（< 50ms） |
-| Process 50 | planning | ▯▯▯▯▯ 0% | Red | E2E統合テスト |
-| Process 100 | planning | ▯▯▯▯▯ 0% | Red | リファクタリング |
-| Process 200 | planning | ▯▯▯▯▯ 0% | Red | ドキュメンテーション |
-| Process 300 | planning | ▯▯▯▯▯ 0% | Red | OODAフィードバックループ |
-| | | | | |
-| **Overall** | **planning** | **▯▯▯▯▯ 0%** | **planning** | **Blockers: 0** |
-
----
-
-# COP（Common Operating Picture）
-
-## Mission State
-
-| Field | Value |
-|-------|-------|
-| **Phase** | planning |
-| **Progress** | 0% |
-| **Commander** | dev |
-| **Complexity Score** | 45/100 |
-| **Deliberation Required** | no |
-
-### Commander's Intent Summary
-- **Purpose**: VimScript版単語検出をDenops API経由に統合し、TypeScript版の高機能を活用
-- **End State**: Denops優先 + フォールバック構造で両環境統一動作、パフォーマンス < 50ms
-- **Critical Tasks**: API追加（P1）、ラッパー実装（P2）、テスト追加（P10-12）
-
-### Completed Tasks
-| Task ID | Description | Completed At |
-|---------|-------------|--------------|
-| - | - | - |
-
-### Remaining Tasks
-| Task ID | Description | Dependencies | Priority |
-|---------|-------------|--------------|----------|
-| P1 | TypeScript VimLayer API追加 | none | HIGH |
-| P2 | VimScript Denopsラッパー | P1 | HIGH |
-| P3 | キャッシュ機構実装 | P2 | MEDIUM |
-| P10 | ゴールデンテスト | P1, P2 | HIGH |
-| P11 | フォールバックテスト | P2 | HIGH |
-
-### Current Blockers
-| ID | Description | Severity | Resolution |
-|----|-------------|----------|------------|
-| - | - | - | - |
-
----
-
-# Processes
-
-## Process 1: TypeScript - VimLayer dispatcher に detectWords 系 API 追加
+## Process 1: DisplayAdapter インターフェース定義
 
 <!--@process-briefing
 category: implementation
-tags: [typescript, denops, api]
+tags: [interface, display, adapter, typescript]
 complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: Phase 1.1/1.2/1.3 での VimLayer dispatcher 追加パターン
-- **Violation Warnings**: なし
-- **Pattern Cache**: NeovimLayer の既存 detectWords 実装（行405-412）を参照
+- **現状**: display#show_hint / display#hide_all 等がVimScript側とNeovim側で別実装。共通インターフェースなし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:171 (show_hint)
+  - autoload/hellshake_yano_vim/display.vim:392 (hide_all)
+  - denops/hellshake-yano/neovim/display/extmark-display.ts
+  - denops/hellshake-yano/vim/display/popup-display.ts
 
 #### Orient（方向付け）
-- **Commander's Intent**: VimLayer dispatcher に3つのAPI（detectWordsVisible, detectWordsMultiWindow, getMinWordLength）を追加し、VimScript側から呼び出し可能にする
-- **Prior Context**: NeovimLayer（行382-412）に既に同等の実装が存在
-- **Known Patterns**: dictionary.vim の統合パターン（Denops API登録→VimScriptラッパー）
+- **方針**: `common/interfaces/display-adapter.ts` にDisplayAdapterインターフェースを定義し、ExtmarkDisplayAdapterとPopupDisplayAdapterの契約を確立する
+- **制約**: C-01（popup/extmark非互換）、C-05（popup-display.ts維持必須）
 
-#### Decide（決心）
-- **Complexity Score**: 20/100（既存パターンのコピー）
-- **Deliberation Required**: no
-- **Execution Mode**: sequential
-
-#### Watch Points
-- VimLayerとNeovimLayerでconfig参照方法が異なる可能性に注意
-- **byteCol 優先使用**: `word.byteCol ?? word.col` でバイト位置を取得
+#### Decide（実装方法）
+- `denops/hellshake-yano/common/interfaces/display-adapter.ts` を新規作成
+- showHint(), showHintWithWindow(), hideAll(), highlightPartialMatches(), getHighlightGroup() を定義
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/common/interfaces/display-adapter.test.ts` を作成
+- [ ] DisplayAdapterを実装した仮クラスでコンパイルエラーが出ることを確認
+- [ ] `deno test` を実行してテスト失敗を確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/common/interfaces/display-adapter.ts` を新規作成
+- [ ] `DisplayAdapter` インターフェースに以下のメソッドシグネチャを定義:
+  - `showHint(hint: HintItem): Promise<void>`
+  - `showHintWithWindow(hint: HintItem, windowId: number): Promise<void>`
+  - `hideAll(): Promise<void>`
+  - `highlightPartialMatches(keys: string[]): Promise<void>`
+  - `getHighlightGroup(type: string): Promise<string>`
+- [ ] `deno test` を実行してテスト成功を確認
 
-- [ ] ブリーフィング確認
-- [ ] TypeScriptテストケースを作成
-  - ファイル: `tests/vim_layer_word_test.ts`（新規作成）
-  - テスト内容:
-    ```typescript
-    Deno.test("VimLayer detectWordsVisible returns correct format", async () => {
-      // VimLayer dispatcher経由でdetectWordsVisibleを呼び出し
-      // 期待値: {text, lnum, col, end_col}形式のデータ配列
-      // col はバイト位置（byteCol 優先）
-    });
+### Refactor Phase: 品質改善
+- [ ] JSDoc コメント追加
+- [ ] `common/interfaces/index.ts` にエクスポート追加
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
 
-    Deno.test("VimLayer getMinWordLength returns correct value", async () => {
-      // カスタム設定でのテスト
-    });
-    ```
+---
+
+## Process 2: MotionDetector インターフェース定義
+
+<!--@process-briefing
+category: implementation
+tags: [interface, motion, adapter, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: motion#set_threshold / motion#set_timeout / motion#get_state がVimScript側に存在。Neovim側はsetCount/setTimeout dispatcherで対応
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/motion.vim:170 (get_state)
+  - autoload/hellshake_yano_vim/motion.vim:188 (set_threshold)
+  - autoload/hellshake_yano_vim/motion.vim:206 (set_timeout)
+  - denops/hellshake-yano/main.ts:615 (setCount)
+  - denops/hellshake-yano/main.ts:623 (setTimeout)
+  - denops/hellshake-yano/vim/features/motion.ts (VimMotionDetector)
+
+#### Orient（方向付け）
+- **方針**: `common/interfaces/motion-detector.ts` にMotionDetectorインターフェースを定義
+- **制約**: カテゴリ3のgetchar入力ループ系はVimScript維持必須（C-02）
+
+#### Decide（実装方法）
+- `denops/hellshake-yano/common/interfaces/motion-detector.ts` を新規作成
+- setThreshold(), setTimeout(), getState() を定義
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/common/interfaces/motion-detector.test.ts` を作成
+- [ ] `deno test` を実行してテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/common/interfaces/motion-detector.ts` を新規作成
+- [ ] `MotionDetector` インターフェース定義:
+  - `setThreshold(threshold: number): Promise<void>`
+  - `setTimeout(timeout: number): Promise<void>`
+  - `getState(): Promise<MotionState>`
+- [ ] `deno test` を実行してテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] JSDoc コメント追加
+- [ ] `common/interfaces/index.ts` にエクスポート追加
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 3: VisualRange インターフェース定義
+
+<!--@process-briefing
+category: implementation
+tags: [interface, visual, adapter, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: visual#show / visual#init / visual#get_state がVimScript側に存在。Neovim側対応なし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/visual.vim:60 (init)
+  - autoload/hellshake_yano_vim/visual.vim:71 (get_state)
+  - autoload/hellshake_yano_vim/visual.vim:102 (show)
+  - denops/hellshake-yano/vim/features/visual.ts (VimVisual)
+  - denops/hellshake-yano/main.ts:534 (detectWordsInVisualRange, Vim専用)
+
+#### Orient（方向付け）
+- **方針**: `common/interfaces/visual-handler.ts` にVisualHandlerインターフェースを定義
+- **制約**: なし
+
+#### Decide（実装方法）
+- `denops/hellshake-yano/common/interfaces/visual-handler.ts` を新規作成
+- initialize(), getState(), showHints() を定義
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/common/interfaces/visual-handler.test.ts` を作成
+- [ ] `deno test` を実行してテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/common/interfaces/visual-handler.ts` を新規作成
+- [ ] `VisualHandler` インターフェース定義:
+  - `initialize(config: VisualConfig): Promise<void>`
+  - `getState(): Promise<VisualState>`
+  - `showHints(range: VisualRange): Promise<void>`
+- [ ] `deno test` を実行してテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] JSDoc コメント追加
+- [ ] `common/interfaces/index.ts` にエクスポート追加
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 4: テスト基盤整備
+
+<!--@process-briefing
+category: implementation
+tags: [test, e2e, framework, infrastructure]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: VimScript側のテストは `tests-vim/` に存在。Denops TypeScript側のE2Eテストフレームワークが未整備
+- **対象ファイル**:
+  - tests/ ディレクトリ
+  - tests-vim/ ディレクトリ
+  - deno.jsonc (テストタスク定義)
+
+#### Orient（方向付け）
+- **方針**: denops-testライブラリを用いたE2Eテスト基盤を整備。IPC呼び出しのモックヘルパーを作成
+- **制約**: なし
+
+#### Decide（実装方法）
+- `tests/helpers/ipc-mock.ts` にDenops IPCモックを作成
+- `tests/helpers/vim-mock.ts` にVimScript呼び出しモックを作成
+- `deno.jsonc` にテストタスクを追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/helpers/ipc-mock.ts` の仮実装を作成
+- [ ] モックを使ったサンプルテストが失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `tests/helpers/ipc-mock.ts` 実装:
+  - `createMockDenops()`: Denopsオブジェクトのモック生成
+  - `createMockDispatcher()`: dispatcher呼び出しのキャプチャ
+- [ ] `tests/helpers/vim-mock.ts` 実装:
+  - `createMockVimApi()`: Vim API呼び出しのモック
+- [ ] `deno.jsonc` に `"test:unit"` と `"test:e2e"` タスクを追加
+- [ ] `deno test tests/helpers/` が成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] テストヘルパーの型定義を整備
+- [ ] `tests/helpers/index.ts` にエクスポート統合
+- [ ] Impact Verification: 既存テストが引き続き通ることを確認
+
+
+---
+
+## Process 5: ExtmarkDisplayAdapter 実装
+
+<!--@process-briefing
+category: implementation
+tags: [adapter, extmark, neovim, display]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: extmark-display.ts に `displayHintsOptimized`, `hideHints` 等の関数が存在するが、DisplayAdapterインターフェースを実装したクラスがない
+- **対象ファイル**:
+  - denops/hellshake-yano/neovim/display/extmark-display.ts
+  - denops/hellshake-yano/common/interfaces/display-adapter.ts (Process 1で作成)
+
+#### Orient（方向付け）
+- **方針**: `neovim/display/extmark-display-adapter.ts` を新規作成し、DisplayAdapterインターフェースを実装
+- **制約**: C-01（popup非互換）、C-04（core.tsモノリスへの変更最小化）
+- **依存**: Process 1完了後
+
+#### Decide（実装方法）
+- `ExtmarkDisplayAdapter` クラスを作成し `DisplayAdapter` を実装
+- 既存の `displayHintsOptimized`, `hideHints` 関数を内部で呼び出す
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/neovim/display/extmark-display-adapter.test.ts` を作成
+- [ ] ExtmarkDisplayAdapterのshowHint(), hideAll()の動作テストを記述
+- [ ] `deno test` を実行してテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/neovim/display/extmark-display-adapter.ts` を新規作成
+- [ ] `ExtmarkDisplayAdapter implements DisplayAdapter` を実装:
+  - `showHint()`: extmark-display.tsの既存関数に委譲
+  - `hideAll()`: `hideHints()` 関数に委譲
+  - `highlightPartialMatches()`: `highlightCandidateHints()` に委譲
+  - `showHintWithWindow()`: nvim_open_win近似実装（スタブ可）
+  - `getHighlightGroup()`: HighlightManagerに委譲
+- [ ] `deno test` を実行してテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] エラーハンドリング追加
+- [ ] `neovim/display/index.ts` にエクスポート追加
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 6: PopupDisplayAdapter 実装
+
+<!--@process-briefing
+category: implementation
+tags: [adapter, popup, vim, display]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: vim/display/popup-display.ts に VimPopupDisplay クラスが存在。DisplayAdapterインターフェースを実装していない
+- **対象ファイル**:
+  - denops/hellshake-yano/vim/display/popup-display.ts
+  - denops/hellshake-yano/common/interfaces/display-adapter.ts (Process 1で作成)
+
+#### Orient（方向付け）
+- **方針**: `PopupDisplayAdapter` を `popup-display.ts` に追加し `DisplayAdapter` を実装
+- **制約**: C-05（popup-display.tsのVimPopupDisplayは維持必須）、C-01（extmark非対応）
+- **依存**: Process 1完了後
+
+#### Decide（実装方法）
+- `PopupDisplayAdapter` クラスを `popup-display.ts` に追加し、内部でVimPopupDisplayに委譲
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/vim/display/popup-display-adapter.test.ts` を作成
+- [ ] PopupDisplayAdapterのshowHint(), hideAll()テストを記述
+- [ ] `deno test` を実行してテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/vim/display/popup-display.ts` に `PopupDisplayAdapter` クラスを追加:
+  - `showHint()`: VimPopupDisplayに委譲
+  - `showHintWithWindow()`: VimPopupDisplayのウィンドウ対応関数に委譲
+  - `hideAll()`: popup全クリア処理に委譲
+  - `highlightPartialMatches()`: VimHighlightに委譲
+  - `getHighlightGroup()`: 設定から取得
+- [ ] `deno test` を実行してテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] VimPopupDisplayとPopupDisplayAdapterの責務境界を明確化
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 7: IPC契約テスト
+
+<!--@process-briefing
+category: implementation
+tags: [test, ipc, contract, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: IPC契約3メソッド（updateConfig, showHintsWithKey, generic bridge）の自動テストが存在しない
+- **対象ファイル**:
+  - denops/hellshake-yano/main.ts:220 (updateConfig)
+  - denops/hellshake-yano/main.ts:767 (showHintsWithKey, Neovim側)
+  - denops/hellshake-yano/vim/bridge/vim-bridge.ts (generic bridge)
+
+#### Orient（方向付け）
+- **方針**: C-03制約として守るべき3メソッドの契約テストを整備
+- **制約**: C-03（IPC契約3メソッド維持必須）
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- `tests/contract/ipc-contract.test.ts` を作成し、3メソッドの入出力仕様をテスト化
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/contract/ipc-contract.test.ts` を作成
+- [ ] updateConfig契約テスト（引数型・戻り値型の検証）を記述
+- [ ] showHintsWithKey契約テストを記述
+- [ ] generic bridge契約テストを記述
+- [ ] `deno test tests/contract/` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] モックを使ったdispatcher呼び出しテストを実装
+- [ ] `deno test tests/contract/` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] テストにコメントで契約仕様を明記
+- [ ] Impact Verification: CI統合（deno.jsonc の `"test:contract"` タスクに追加）
+
+---
+
+## Process 8: EnvironmentDetector リファクタ
+
+<!--@process-briefing
+category: implementation
+tags: [refactor, environment, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: implementation-selector.ts の getImplementationMatrix() で `_editorType` が使われているが、冗長な判定が存在する可能性
+- **対象ファイル**:
+  - denops/hellshake-yano/implementation-selector.ts:129 (getImplementationMatrix)
+  - denops/hellshake-yano/implementation-selector.ts:47 (select)
+
+#### Orient（方向付け）
+- **方針**: `_editorType` フィールドの削除可否を検証し、EnvironmentDetectorとの責務分離を明確化
+- **制約**: C-03（IPC契約維持）
+
+#### Decide（実装方法）
+- getImplementationMatrix() からの `_editorType` 依存を分析
+- 削除可能であれば除去し、EnvironmentDetector経由に統一
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/implementation-selector.test.ts` を作成
+- [ ] select() が正しくVim/Neovim実装を選択するテストを記述
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/implementation-selector.ts` の `_editorType` 依存を解消
+- [ ] getImplementationMatrix() をEnvironmentDetector経由に統一
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] コメント・型定義整備
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 9: ImplementationSelector 統合
+
+<!--@process-briefing
+category: implementation
+tags: [refactor, selector, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: select() と getImplementationMatrix() に二重実装の疑いあり。initializer.ts:96-98 で userPreference が渡されていない問題
+- **対象ファイル**:
+  - denops/hellshake-yano/implementation-selector.ts:47 (select)
+  - denops/hellshake-yano/implementation-selector.ts:129 (getImplementationMatrix)
+  - denops/hellshake-yano/initializer.ts:96
+
+#### Orient（方向付け）
+- **方針**: select()とgetImplementationMatrix()の重複ロジックを解消。initializer.tsのuserPreference渡し漏れを修正
+- **制約**: なし
+- **依存**: Process 8完了後
+
+#### Decide（実装方法）
+- select()がgetImplementationMatrix()を使う構造に統一
+- initializer.ts:96-98 に userPreference 引数を追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/initializer.test.ts` に userPreference 引数テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `implementation-selector.ts` の select() / getImplementationMatrix() 二重実装を解消
+- [ ] `initializer.ts:96-98` に userPreference 引数を追加して渡す
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] 型定義整備
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+
+---
+
+## Process 10: config関数の集約
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, config, aggregation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: config#get / config#set / config#reload がautoload/hellshake_yano_vim/config.vimに存在。Denops側にgetConfig(230)/updateConfig(220)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/config.vim (config#get, config#set, config#reload)
+  - autoload/hellshake_yano/config.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:220 (updateConfig)
+  - denops/hellshake-yano/main.ts:230 (getConfig)
+
+#### Orient（方向付け）
+- **方針**: autoload/hellshake_yano/config.vim のブリッジ関数から `denops#request` を使ってgetConfig/updateConfigを呼び出す形に書き換え。VimScript側のconfig#get/set/reloadをブリッジ経由に変更
+- **制約**: C-03（updateConfig契約維持）
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+1. autoload/hellshake_yano/config.vim に hellshake_yano#config#get() → `denops#request('getConfig', [])` を実装
+2. hellshake_yano#config#set() → `denops#request('updateConfig', [args])` を実装
+3. hellshake_yano_vim/config.vim の呼び出しをブリッジ経由に変更
+4. 全呼び出し元を autoload/hellshake_yano/ 経由に切り替え
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/config_bridge_test.vim` を作成
+- [ ] hellshake_yano#config#get() が denops 経由で値を返すテストを記述
 - [ ] テストを実行して失敗することを確認
-  ```bash
-  deno test tests/vim_layer_word_test.ts
-  ```
-- [ ] **Feedback**: 失敗パターンを記録
-
-✅ **Phase Complete** | Impact: low
 
 ### Green Phase: 最小実装と成功確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [ ] ブリーフィング確認
-- [ ] **変換関数を追加**
-  - ファイル: `denops/hellshake-yano/main.ts`
-  - 挿入位置: initializeVimLayer() 関数内、dispatcher定義の前（行140付近）
-
-  **追加コード**:
-  ```typescript
-  // TypeScript Word -> VimScript互換データへの変換
-  function toVimWordData(word: Word): Record<string, unknown> {
-    const encoder = new TextEncoder();
-    const byteLen = encoder.encode(word.text).length;
-    const col = word.byteCol ?? word.col;  // byteCol 優先
-    const result: Record<string, unknown> = {
-      text: word.text,
-      lnum: word.line,  // キー名変換: line -> lnum
-      col: col,
-      end_col: col + byteLen,
-    };
-    if (word.winid !== undefined) result.winid = word.winid;
-    if (word.bufnr !== undefined) result.bufnr = word.bufnr;
-    return result;
-  }
-  ```
-
-- [ ] **VimLayer dispatcher に3つのAPIを追加**
-  - ファイル: `denops/hellshake-yano/main.ts`
-  - 変更箇所: 行148-265（VimLayer dispatcher内）
-  - 挿入位置: 行264付近（isInDictionary後、閉じ括弧前）
-
-  **追加コード（行264付近）**:
-  ```typescript
-  // 1. detectWordsVisible: 画面内単語検出
-  async detectWordsVisible(): Promise<Record<string, unknown>[]> {
-    const startTime = performance.now();
-    try {
-      const result = await detectWordsWithManager(denops, config as EnhancedWordConfig);
-      return result.words.map(toVimWordData);
-    } catch (error) {
-      return []; // フォールバック: 空配列（VimScript側のローカル実装が使われる）
-    } finally {
-      recordPerformance("wordDetection", performance.now() - startTime);
-    }
-  },
-
-  // 2. detectWordsMultiWindow: マルチウィンドウ単語検出
-  async detectWordsMultiWindow(windows: unknown): Promise<Record<string, unknown>[]> {
-    const startTime = performance.now();
-    try {
-      const words = await detectWordsMultiWindow(denops, config as Config);
-      return words.map(toVimWordData);
-    } catch (error) {
-      return [];
-    } finally {
-      recordPerformance("wordDetectionMultiWindow", performance.now() - startTime);
-    }
-  },
-
-  // 3. getMinWordLength: キー別最小単語長取得
-  async getMinWordLength(key: unknown): Promise<number> {
-    if (typeof key !== "string") return 3;
-    const perKey = config.perKeyMinLength;
-    if (perKey && typeof perKey === "object" && key in perKey) {
-      const val = (perKey as Record<string, number>)[key];
-      if (typeof val === "number" && val > 0) return val;
-    }
-    return config.defaultMinWordLength ?? 3;
-  },
-  ```
-
-- [ ] **インポート確認・追加**
-  - ファイル: `denops/hellshake-yano/main.ts`
-  - 確認箇所: 行1-50（インポートセクション）
-
-  **必要なインポート**:
-  ```typescript
-  import {
-    detectWordsWithManager,
-    detectWordsMultiWindow,
-    type EnhancedWordConfig,
-  } from "./neovim/core/word.ts";
-  ```
-
+- [ ] `autoload/hellshake_yano/config.vim` に以下を実装:
+  - `hellshake_yano#config#get(key)` → `denops#request('hellshake-yano', 'getConfig', [key])`
+  - `hellshake_yano#config#set(key, value)` → `denops#request('hellshake-yano', 'updateConfig', [key, value])`
+  - `hellshake_yano#config#reload()` → `denops#request('hellshake-yano', 'updateConfig', [{}])`
+- [ ] autoload/hellshake_yano_vim/config.vim の各関数をブリッジ経由に変更（後方互換エイリアスとして存続）
 - [ ] テストを実行して成功することを確認
-  ```bash
-  deno test tests/vim_layer_word_test.ts
-  ```
-- [ ] **Feedback**: 実装パターンを記録
 
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: 品質改善と継続成功確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [ ] ブリーフィング確認
-- [ ] コードの品質を改善
-  - エラーハンドリングの強化
-  - 型安全性の向上
-- [ ] テストを実行し、継続して成功することを確認
-- [ ] deno lint / deno fmt 実行
-  ```bash
-  deno lint denops/hellshake-yano/main.ts
-  deno fmt denops/hellshake-yano/main.ts
-  ```
-- [ ] **Impact Verification**: 既存テストが全てPASSすることを確認
-  ```bash
-  deno test denops/hellshake-yano/
-  ```
-- [ ] **Lessons Learned**: byteCol 優先使用パターン、VimLayer/NeovimLayer の差分を記録
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] 後方互換エイリアスにDeprecation警告コメントを追加
+- [ ] Impact Verification: config関数を呼び出している全VimScriptファイルを `grep -r 'hellshake_yano_vim#config'` で検索し呼び出し元確認
 
 ---
 
-## Process 2: VimScript - Denops呼び出しラッパー実装
+## Process 11: dictionary関数の集約
 
 <!--@process-briefing
 category: implementation
-tags: [vimscript, denops, wrapper]
-complexity_estimate: medium
+tags: [phase1, dictionary, aggregation, vimscript]
+complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: dictionary.vim（Phase 1.1）, hint_generator.vim（Phase 1.3）の統合パターン
-- **Violation Warnings**: なし
-- **Pattern Cache**: `has_denops()` + `denops#request()` + `try-catch` + フォールバック
+- **現状**: dictionary#add/clear_cache/is_in_dictionary/reload/show/validate の6関数がautoload/hellshake_yano_vim/dictionary.vimに存在。Denops側に対応dispatcherが全て既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/dictionary.vim (6関数)
+  - autoload/hellshake_yano/dictionary.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:282 (clearCache)
+  - denops/hellshake-yano/main.ts:289 (reloadDictionary)
+  - denops/hellshake-yano/main.ts:293 (addToDictionary)
+  - denops/hellshake-yano/main.ts:308 (showDictionary)
+  - denops/hellshake-yano/main.ts:312 (validateDictionary)
+  - denops/hellshake-yano/main.ts:316 (isInDictionary)
 
 #### Orient（方向付け）
-- **Commander's Intent**: word_detector.vim にDenops呼び出しラッパーを追加
-- **Prior Context**: 既存の3つの公開関数をDenops優先構造に変更
-- **Known Patterns**: Phase 1.3 hint_generator.vim（行23-42, 行46-58）の成功パターン
+- **方針**: 6関数全てをブリッジ層経由のdenops#requestに集約
+- **制約**: なし
+- **依存**: Process 4完了後
 
-#### Decide（決心）
-- **Complexity Score**: 35/100
-- **Deliberation Required**: no
-- **Execution Mode**: sequential
-
-#### Watch Points
-- 既存の関数シグネチャを変更しない
-- フォールバック時は既存ロジックを完全に維持
+#### Decide（実装方法）
+- autoload/hellshake_yano/dictionary.vim に各関数のブリッジ実装を追加
+- autoload/hellshake_yano_vim/dictionary.vim の各関数をブリッジ経由に変更
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
-
-**OODA: Act（行動）- TDD Red**
-
-- [ ] ブリーフィング確認
-- [ ] VimScriptテストケースを作成
-  - ファイル: `tests-vim/hellshake_yano_vim/test_word_detector_denops.vim`（新規作成）
-  - テスト内容:
-    ```vim
-    " Test: Denops経由で単語検出
-    function! s:test_detect_via_denops() abort
-      if !hellshake_yano_vim#word_detector#has_denops()
-        call s:skip('Denops not available')
-        return
-      endif
-
-      let l:words = hellshake_yano_vim#word_detector#detect_visible()
-      call s:assert_true(type(l:words) == v:t_list)
-      if !empty(l:words)
-        call s:assert_true(has_key(l:words[0], 'text'))
-        call s:assert_true(has_key(l:words[0], 'lnum'))
-        call s:assert_true(has_key(l:words[0], 'col'))
-      endif
-    endfunction
-
-    " Test: Denops未起動時のフォールバック
-    function! s:test_fallback_when_denops_unavailable() abort
-      " フォールバックテスト（Denops未起動環境で実行）
-      let l:words = hellshake_yano_vim#word_detector#detect_visible()
-      call s:assert_true(type(l:words) == v:t_list)
-    endfunction
-    ```
-- [ ] テストを実行して失敗することを確認（has_denops未実装のため）
-  ```bash
-  vim -u NONE -N -S tests-vim/hellshake_yano_vim/test_word_detector_denops.vim
-  ```
-- [ ] **Feedback**: 失敗パターンを記録
-
-✅ **Phase Complete** | Impact: medium
+- [ ] `tests-vim/dictionary_bridge_test.vim` を作成
+- [ ] hellshake_yano#dictionary#add() 等6関数のブリッジテストを記述
+- [ ] テストを実行して失敗することを確認
 
 ### Green Phase: 最小実装と成功確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [ ] ブリーフィング確認
-- [ ] **has_denops()関数を追加**
-  - ファイル: `autoload/hellshake_yano_vim/word_detector.vim`
-  - 挿入位置: 行17付近（s:save_cpo後）
-
-  **追加コード（行17-28付近）**:
-  ```vim
-  " Denops利用可能チェック
-  " @return v:true: Denops利用可能 / v:false: 利用不可
-  function! hellshake_yano_vim#word_detector#has_denops() abort
-    if !exists('*denops#plugin#is_loaded')
-      return v:false
-    endif
-    try
-      return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-    catch
-      return v:false
-    endtry
-  endfunction
-  ```
-
-- [ ] **detect_visible()関数をDenops優先構造に変更**
-  - ファイル: `autoload/hellshake_yano_vim/word_detector.vim`
-  - 変更箇所: 行299-370（既存のdetect_visible関数）
-
-  **変更後コード**:
-  ```vim
-  function! hellshake_yano_vim#word_detector#detect_visible() abort
-    " Denops優先: 利用可能な場合はDenops経由で生成
-    if hellshake_yano_vim#word_detector#has_denops()
-      try
-        let l:result = denops#request('hellshake-yano', 'detectWordsVisible', [])
-        if type(l:result) == v:t_list
-          return l:result
-        endif
-      catch
-        " Denops呼び出し失敗時はフォールバック
-      endtry
-    endif
-
-    " フォールバック: ローカル実装
-    return s:detect_visible_local()
-  endfunction
-  ```
-
-- [ ] **s:detect_visible_local()関数を追加**（既存ロジックを移動）
-  - 既存の行303-368のロジックを `s:detect_visible_local()` として切り出し
-
-  **追加コード**:
-  ```vim
-  " ローカル実装（フォールバック用）
-  " @return List<Dict> 単語情報の配列
-  function! s:detect_visible_local() abort
-    " 既存の実装をそのまま移動
-    " （行303-368の内容）
-  endfunction
-  ```
-
-- [ ] **detect_multi_window()関数をDenops優先構造に変更**
-  - ファイル: `autoload/hellshake_yano_vim/word_detector.vim`
-  - 変更箇所: 行431-468
-
-  **変更後コード**:
-  ```vim
-  function! hellshake_yano_vim#word_detector#detect_multi_window(windows) abort
-    if hellshake_yano_vim#word_detector#has_denops()
-      try
-        let l:result = denops#request('hellshake-yano', 'detectWordsMultiWindow', [a:windows])
-        if type(l:result) == v:t_list
-          return l:result
-        endif
-      catch
-      endtry
-    endif
-
-    " フォールバック: ローカル実装
-    return s:detect_multi_window_local(a:windows)
-  endfunction
-  ```
-
-- [ ] **s:detect_multi_window_local()関数を追加**
-
-- [ ] **get_min_length()関数をDenops優先構造に変更（キャッシュ付き）**
-  - ファイル: `autoload/hellshake_yano_vim/word_detector.vim`
-  - 変更箇所: 行372-429
-
-  **変更後コード**:
-  ```vim
-  " 最小単語長キャッシュ（高頻度呼び出し対策）
-  let s:min_length_cache = {}
-
-  function! hellshake_yano_vim#word_detector#get_min_length(key) abort
-    " キャッシュチェック
-    if has_key(s:min_length_cache, a:key)
-      return s:min_length_cache[a:key]
-    endif
-
-    " Denops優先
-    if hellshake_yano_vim#word_detector#has_denops()
-      try
-        let l:result = denops#request('hellshake-yano', 'getMinWordLength', [a:key])
-        if type(l:result) == v:t_number && l:result > 0
-          let s:min_length_cache[a:key] = l:result
-          return l:result
-        endif
-      catch
-      endtry
-    endif
-
-    " フォールバック: ローカル実装
-    return s:get_min_length_local(a:key)
-  endfunction
-  ```
-
-- [ ] **s:get_min_length_local()関数を追加**
-
+- [ ] `autoload/hellshake_yano/dictionary.vim` に以下を実装:
+  - `hellshake_yano#dictionary#add(word)` → `denops#request('hellshake-yano', 'addToDictionary', [word])`
+  - `hellshake_yano#dictionary#clear_cache()` → `denops#request('hellshake-yano', 'clearCache', [])`
+  - `hellshake_yano#dictionary#is_in_dictionary(word)` → `denops#request('hellshake-yano', 'isInDictionary', [word])`
+  - `hellshake_yano#dictionary#reload()` → `denops#request('hellshake-yano', 'reloadDictionary', [])`
+  - `hellshake_yano#dictionary#show()` → `denops#request('hellshake-yano', 'showDictionary', [])`
+  - `hellshake_yano#dictionary#validate()` → `denops#request('hellshake-yano', 'validateDictionary', [])`
 - [ ] テストを実行して成功することを確認
-  ```bash
-  vim -u NONE -N -S tests-vim/run_tests.vim
-  ```
-- [ ] **Feedback**: 実装パターンを記録
 
-✅ **Phase Complete** | Impact: medium
-
-### Refactor Phase: 品質改善と継続成功確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] コードの品質を改善
-  - [x] ドキュメントコメント追加（公開API、内部関数に詳細説明追加）
-  - [x] 関数の順序を整理（公開API → 内部関数）
-    - PUBLIC API セクション: has_denops, detect_visible, get_min_length, detect_multi_window
-    - INTERNAL FUNCTIONS セクション: s:is_in_dictionary, s:detect_japanese_words, s:detect_english_words, s:detect_visible_local, s:get_min_length_local, s:detect_multi_window_local
-- [x] テストを実行し、継続して成功することを確認
-- [x] **Impact Verification**: 既存テスト全PASS確認
-  ```bash
-  vim -u NONE -N -S tests-vim/word_detector_test.vim
-  # RESULT: 9/9 PASS (Basic detection, Empty buffer, Per-key min length, Word structure)
-
-  vim -u NONE -N -S tests-vim/test_word_detector_multi_simple.vim
-  # RESULT: 機能保持確認済み
-  ```
-- [x] **Lessons Learned**: Denops呼び出しパターンを記録
-  - has_denops() → denops#request() の優先順序確立
-  - フォールバック時の自動切り替え
-  - エラーハンドリング統一（try-catch）
-
-**Impact Report**:
-- 総行数: 587行 → 627行 (+40行、ドキュメント充実)
-- 機能変更: なし（リファクタリングのみ）
-- テスト: 9/9 PASS ✅
-
-✅ **Phase Complete** | Impact: medium | Date: 2026-02-06
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/dictionary.vim に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#dictionary'` で呼び出し元確認
 
 ---
 
-## Process 3: キャッシュ機構実装
+## Process 12: hint_generator関数の集約
 
 <!--@process-briefing
 category: implementation
-tags: [vimscript, cache, performance]
-complexity_estimate: medium
+tags: [phase1, hint_generator, aggregation, vimscript]
+complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: hint_generator.vim のキャッシュ機構（行46-58）
-- **Violation Warnings**: なし
-- **Pattern Cache**: LRU相当の簡易キャッシュ
+- **現状**: hint_generator#generate / hint_generator#clear_cache の2関数がautoload/hellshake_yano_vim/hint_generator.vimに存在。Denops側にgenerateHints(363)/clearCache(282)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/hint_generator.vim
+  - autoload/hellshake_yano/hint_generator.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:363 (generateHints)
+  - denops/hellshake-yano/main.ts:282 (clearCache)
 
 #### Orient（方向付け）
-- **Commander's Intent**: 高頻度呼び出しに対応するキャッシュ機構を実装
-- **Prior Context**: 単語検出は同一バッファで繰り返し呼ばれる可能性がある
-- **Known Patterns**: キャッシュキー = バッファ番号 + 画面範囲、キャッシュ値 = words配列
+- **方針**: 2関数をブリッジ層経由のdenops#requestに集約
+- **依存**: Process 4完了後
 
-#### Decide（決心）
-- **Complexity Score**: 30/100
-- **Deliberation Required**: no
-- **Execution Mode**: sequential
-
-#### Watch Points
-- 設定変更時にキャッシュクリアが必要
-- キャッシュサイズの上限を設定（メモリリーク防止）
-- **get_min_length は既にキャッシュ実装済み**（Process 2）
+#### Decide（実装方法）
+- autoload/hellshake_yano/hint_generator.vim にブリッジ実装追加
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
-
-**OODA: Act（行動）- TDD Red**
-
-- [x] ブリーフィング確認
-- [x] テストケースを作成
-  - ファイル: `tests-vim/hellshake_yano_vim/test_word_detector_cache.vim`（新規作成）✅
-  - テストケース (8個):
-    1. test_clear_cache_exists - clear_cache()関数の存在確認
-    2. test_clear_cache_works - キャッシュクリア動作確認
-    3. test_cache_hit_returns_same_result - キャッシュヒット時の同一結果
-    4. test_cache_returns_copy - キャッシュはコピーを返す
-    5. test_cache_key_bufnr_topline_botline - キャッシュキー生成の正確性
-    6. test_cache_size_limit - キャッシュサイズ上限（max 10）
-    7. test_cache_hit_performance - パフォーマンス（50%以上高速化）
-    8. test_cache_key_changes_with_scroll - 画面範囲変更でキー変更
-- [x] テストを実行して失敗することを確認（キャッシュ未実装のため）
-- [x] **Feedback**: 失敗パターンを記録
-
-**Current State Verification**:
-- ✓ s:min_length_cache exists (Process 2より)
-- ✗ s:word_cache NOT exists (未実装)
-- ✗ clear_cache() NOT exists (未実装)
-
-✅ **Phase Complete** | Impact: low | Date: 2026-02-06
+- [ ] `tests-vim/hint_generator_bridge_test.vim` を作成
+- [ ] テストを実行して失敗することを確認
 
 ### Green Phase: 最小実装と成功確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [ ] ブリーフィング確認
-- [ ] キャッシュ変数を追加
-  - ファイル: `autoload/hellshake_yano_vim/word_detector.vim`
-  - 挿入位置: 行17付近（has_denops関数の前）
-
-  **追加コード**:
-  ```vim
-  " 単語検出キャッシュ（高頻度呼び出し対策）
-  let s:word_cache = {}
-  let s:cache_timestamp = 0
-  let s:cache_ttl = 100  " 100ms TTL（高頻度呼び出し対策）
-  let s:cache_max_size = 10  " キャッシュエントリ上限
-  ```
-
-- [ ] detect_visible()関数にキャッシュ処理を追加
-  - 変更箇所: detect_visible()関数内
-
-  **変更後コード**:
-  ```vim
-  function! hellshake_yano_vim#word_detector#detect_visible() abort
-    " キャッシュキー生成（bufnr + 画面範囲）
-    let l:bufnr = bufnr('%')
-    let l:topline = line('w0')
-    let l:botline = line('w$')
-    let l:cache_key = printf('%d:%d:%d', l:bufnr, l:topline, l:botline)
-
-    " キャッシュヒット時は即座に返却（TTLチェック）
-    let l:now = reltime()
-    if has_key(s:word_cache, l:cache_key)
-      let l:cached = s:word_cache[l:cache_key]
-      let l:elapsed_ms = reltimefloat(reltime(l:cached.timestamp)) * 1000
-      if l:elapsed_ms < s:cache_ttl
-        return copy(l:cached.data)
-      endif
-      " TTL切れ: キャッシュ削除
-      unlet s:word_cache[l:cache_key]
-    endif
-
-    " Denops優先 + フォールバック（既存ロジック）
-    let l:result = []
-    if hellshake_yano_vim#word_detector#has_denops()
-      try
-        let l:result = denops#request('hellshake-yano', 'detectWordsVisible', [])
-        if type(l:result) != v:t_list
-          let l:result = []
-        endif
-      catch
-        let l:result = []
-      endtry
-    endif
-
-    if empty(l:result)
-      let l:result = s:detect_visible_local()
-    endif
-
-    " キャッシュに保存（上限チェック）
-    if len(s:word_cache) >= s:cache_max_size
-      " 最も古いエントリを削除（簡易LRU）
-      let l:keys = keys(s:word_cache)
-      if !empty(l:keys)
-        unlet s:word_cache[l:keys[0]]
-      endif
-    endif
-    let s:word_cache[l:cache_key] = {'data': l:result, 'timestamp': l:now}
-
-    return copy(l:result)
-  endfunction
-  ```
-
-- [ ] clear_cache()関数を追加
-  ```vim
-  " キャッシュクリア
-  " 設定変更時やテスト時に呼び出す
-  function! hellshake_yano_vim#word_detector#clear_cache() abort
-    let s:word_cache = {}
-    let s:cache_timestamp = 0
-    let s:min_length_cache = {}
-  endfunction
-  ```
-
+- [ ] `autoload/hellshake_yano/hint_generator.vim` に以下を実装:
+  - `hellshake_yano#hint_generator#generate(args)` → `denops#request('hellshake-yano', 'generateHints', [args])`
+  - `hellshake_yano#hint_generator#clear_cache()` → `denops#request('hellshake-yano', 'clearCache', [])`
 - [ ] テストを実行して成功することを確認
-- [ ] **Feedback**: キャッシュ実装パターンを記録
 
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: 品質改善と継続成功確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [ ] ブリーフィング確認
-- [ ] コードの品質を改善
-  - キャッシュサイズの調整
-  - TTLの最適化
-- [ ] テストを実行し、継続して成功することを確認
-- [ ] **Impact Verification**: 変更の影響を検証
-- [ ] **Lessons Learned**: キャッシュパターンを記録
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/hint_generator.vim に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#hint_generator'` で呼び出し元確認
 
 ---
 
-## Process 4: 設定変更時のキャッシュクリア連携
+## Process 13: japanese#segment の集約
 
 <!--@process-briefing
 category: implementation
-tags: [vimscript, config, integration]
+tags: [phase1, japanese, aggregation, vimscript]
 complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: hint_generator.vim の設定変更連携（config.vim reload時）
-- **Violation Warnings**: なし
-- **Pattern Cache**: 設定変更時のコールバック機構
+- **現状**: japanese#segment がautoload/hellshake_yano_vim/japanese.vimに存在。Denops側にsegmentJapaneseText(240)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/japanese.vim
+  - autoload/hellshake_yano/japanese.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:240 (segmentJapaneseText)
 
 #### Orient（方向付け）
-- **Commander's Intent**: 設定変更時に単語検出キャッシュを自動クリア
-- **Prior Context**: perKeyMinLength等の設定変更で単語検出結果が変わる
-- **Known Patterns**: autocmd または 明示的な関数呼び出し
+- **方針**: japanese#segment をブリッジ層経由のdenops#requestに集約。japanese#has_japanese/should_segment はカテゴリ4で削除予定
+- **依存**: Process 4完了後
 
-#### Decide（決心）
-- **Complexity Score**: 15/100
-- **Deliberation Required**: no
-- **Execution Mode**: sequential
+#### Decide（実装方法）
+- autoload/hellshake_yano/japanese.vim にブリッジ実装追加
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
-
-**OODA: Act（行動）- TDD Red**
-
-- [x] ブリーフィング確認
-- [x] テストケースを作成
-  ```vim
-  " Test: 設定変更後にキャッシュがクリアされる
-  function! s:test_cache_cleared_on_config_change() abort
-    " 初回検出（キャッシュに保存）
-    let l:words1 = hellshake_yano_vim#word_detector#detect_visible()
-
-    " 設定変更
-    let g:hellshake_yano = {'defaultMinWordLength': 10}
-    call hellshake_yano_vim#config#reload()
-
-    " 再検出（新設定が反映される = キャッシュがクリアされている）
-    let l:words2 = hellshake_yano_vim#word_detector#detect_visible()
-
-    " 結果が異なる可能性がある（設定変更が反映）
-    " 少なくともエラーが発生しないことを確認
-    call s:assert_true(type(l:words2) == v:t_list)
-  endfunction
-  ```
-- [x] テストを実行して失敗することを確認
-- [x] **Feedback**: 失敗パターンを記録
-
-✅ **Phase Complete** | Impact: low
+- [ ] `tests-vim/japanese_bridge_test.vim` を作成
+- [ ] テストを実行して失敗することを確認
 
 ### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano/japanese.vim` に以下を実装:
+  - `hellshake_yano#japanese#segment(text)` → `denops#request('hellshake-yano', 'segmentJapaneseText', [text])`
+- [ ] テストを実行して成功することを確認
 
-**OODA: Act（行動）- TDD Green**
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#japanese'` で呼び出し元確認
 
-- [x] ブリーフィング確認
-- [x] config.vimのreload()にキャッシュクリア呼び出しを追加
-  - ファイル: `autoload/hellshake_yano_vim/config.vim`
-  - 変更箇所: reload()関数内
+---
 
-  **追加コード**:
+## Process 14: word_detector関数の集約
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, word_detector, aggregation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: word_detector#detect_visible / detect_multi_window / get_min_length / clear_cache の4関数がautoload/hellshake_yano_vim/word_detector.vimに存在。Denops側に対応dispatcher全て既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/word_detector.vim
+  - autoload/hellshake_yano/word_detector.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:324 (detectWordsVisible)
+  - denops/hellshake-yano/main.ts:337 (detectWordsMultiWindow)
+  - denops/hellshake-yano/main.ts:351 (getMinWordLength)
+  - denops/hellshake-yano/main.ts:282 (clearCache)
+
+#### Orient（方向付け）
+- **方針**: 4関数をブリッジ層経由のdenops#requestに集約
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano/word_detector.vim にブリッジ実装追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/word_detector_bridge_test.vim` を作成
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano/word_detector.vim` に以下を実装:
+  - `hellshake_yano#word_detector#detect_visible()` → `denops#request('hellshake-yano', 'detectWordsVisible', [])`
+  - `hellshake_yano#word_detector#detect_multi_window()` → `denops#request('hellshake-yano', 'detectWordsMultiWindow', [])`
+  - `hellshake_yano#word_detector#get_min_length()` → `denops#request('hellshake-yano', 'getMinWordLength', [])`
+  - `hellshake_yano#word_detector#clear_cache()` → `denops#request('hellshake-yano', 'clearCache', [])`
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/word_detector.vim に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#word_detector'` で呼び出し元確認
+
+
+---
+
+## Process 15: window_detector#get_visible の集約
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, window_detector, aggregation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: window_detector#get_visible がautoload/hellshake_yano_vim/window_detector.vimに存在。Denops Neovim側にgetVisibleWindows(871)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/window_detector.vim
+  - autoload/hellshake_yano/window_detector.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:871 (getVisibleWindows, Neovim専用)
+
+#### Orient（方向付け）
+- **方針**: ブリッジ層経由のdenops#requestに集約。Neovim専用dispatcherのため環境判定が必要
+- **制約**: C-02（Vim8ではgetVisibleWindowsが使えない可能性）
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano/window_detector.vim にブリッジ実装追加（Neovim限定フラグ付き）
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/window_detector_bridge_test.vim` を作成
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano/window_detector.vim` に以下を実装:
+  - `hellshake_yano#window_detector#get_visible()`: Neovimならdenops#request、Vimならフォールバック
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#window_detector'` で呼び出し元確認
+
+---
+
+## Process 16: core#init/show/hide の集約
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, core, aggregation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#init(42)/core#show(393)/core#hide(607) の3関数がautoload/hellshake_yano_vim/core.vimに存在。Denops側にenable(201)/showHints(630)/hideHints(648)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:42 (init)
+  - autoload/hellshake_yano_vim/core.vim:393 (show)
+  - autoload/hellshake_yano_vim/core.vim:607 (hide)
+  - autoload/hellshake_yano/core.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:201 (enable)
+  - denops/hellshake-yano/main.ts:630 (showHints, Neovim専用)
+  - denops/hellshake-yano/main.ts:648 (hideHints, Neovim専用)
+
+#### Orient（方向付け）
+- **方針**: 3関数をブリッジ層経由のdenops#requestに集約
+- **制約**: showHints/hideHintsはNeovim専用dispatcher。Vim環境でのフォールバック検討必要
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano/core.vim にブリッジ実装追加（環境判定あり）
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/core_bridge_test.vim` を作成
+- [ ] hellshake_yano#core#init() / show() / hide() のブリッジテストを記述
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano/core.vim` に以下を実装:
+  - `hellshake_yano#core#init()` → `denops#request('hellshake-yano', 'enable', [])`
+  - `hellshake_yano#core#show()` → Neovim: `showHints`, Vim: `displayShowHint`
+  - `hellshake_yano#core#hide()` → Neovim: `hideHints`, Vim: `displayHideAll`
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/core.vim の3関数にDeprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#init\|hellshake_yano_vim#core#show\|hellshake_yano_vim#core#hide'`
+
+---
+
+## Process 17: motion#set_threshold/set_timeout の集約
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, motion, aggregation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: motion#set_threshold(188) / motion#set_timeout(206) の2関数がautoload/hellshake_yano_vim/motion.vimに存在。Denops Neovim側にsetCount(615)/setTimeout(623)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/motion.vim:188 (set_threshold)
+  - autoload/hellshake_yano_vim/motion.vim:206 (set_timeout)
+  - autoload/hellshake_yano/motion.vim (ブリッジ層)
+  - denops/hellshake-yano/main.ts:615 (setCount, Neovim専用)
+  - denops/hellshake-yano/main.ts:623 (setTimeout, Neovim専用)
+
+#### Orient（方向付け）
+- **方針**: 2関数をブリッジ層経由のdenops#requestに集約。Neovim専用dispatcherのため環境判定が必要
+- **制約**: カテゴリ3のmotion expr系はVimScript維持必須
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano/motion.vim にブリッジ実装追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/motion_bridge_test.vim` を作成
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano/motion.vim` に以下を実装:
+  - `hellshake_yano#motion#set_threshold(n)` → `denops#request('hellshake-yano', 'setCount', [n])`（Neovim）/ Vim側対応
+  - `hellshake_yano#motion#set_timeout(ms)` → `denops#request('hellshake-yano', 'setTimeout', [ms])`（Neovim）/ Vim側対応
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/motion.vim の2関数にDeprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#motion#set_threshold\|hellshake_yano_vim#motion#set_timeout'`
+
+---
+
+## Process 18: Phase 1 統合テスト
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, test, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 10-17で21関数のブリッジ集約が完了。統合テストで全体動作確認が必要
+- **対象ファイル**:
+  - tests-vim/ 配下の各ブリッジテスト
+  - autoload/hellshake_yano/ 配下の全ブリッジ実装
+
+#### Orient（方向付け）
+- **方針**: 21関数全てについてNeovim+Denops環境とVim+Denops環境での動作を確認
+- **依存**: Process 10-17全て完了後
+
+#### Decide（実装方法）
+- `tests-vim/phase1_integration_test.vim` を作成して全21関数のE2Eテストを実施
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase1_integration_test.vim` を作成
+- [ ] 21関数全てのブリッジ経由呼び出しテストを記述
+- [ ] テストを実行して全テストが通ることを確認（失敗するものを特定）
+
+### Green Phase: 最小実装と成功確認
+- [ ] 各関数のブリッジ実装を修正して全テストが通ることを確認
+- [ ] `vim -u NONE -S tests-vim/phase1_integration_test.vim` で成功確認
+
+### Refactor Phase: 品質改善
+- [ ] テスト結果のサマリーを tests-vim/RESULTS.md に記録
+- [ ] Impact Verification: 既存の全テストが引き続き通ることを確認
+
+---
+
+## Process 19: Phase 1 VimScript側コード削除確認
+
+<!--@process-briefing
+category: implementation
+tags: [phase1, cleanup, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 18でPhase 1統合テスト完了。ブリッジ経由への移行が確認できたら、autoload/hellshake_yano_vim/の21関数をDeprecated化
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/config.vim
+  - autoload/hellshake_yano_vim/dictionary.vim
+  - autoload/hellshake_yano_vim/hint_generator.vim
+  - autoload/hellshake_yano_vim/japanese.vim
+  - autoload/hellshake_yano_vim/word_detector.vim
+  - autoload/hellshake_yano_vim/window_detector.vim
+  - autoload/hellshake_yano_vim/core.vim (init/show/hide の3関数)
+  - autoload/hellshake_yano_vim/motion.vim (set_threshold/set_timeout の2関数)
+
+#### Orient（方向付け）
+- **方針**: 各VimScript関数を `call hellshake_yano#XXX(...)` に変更してブリッジ経由の薄いラッパーに。削除はPhase 4で実施
+- **依存**: Process 18完了後
+
+#### Decide（実装方法）
+- 各autoload/hellshake_yano_vim/XXX.vimの対象関数をブリッジ経由の1行ラッパーに差し替え
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] ラッパー化後のテストを事前に記述
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] 21関数全てを `call hellshake_yano#XXX(...)` の1行ラッパーに書き換え
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] 各ラッパー関数にDeprecation警告 `echomsg` を追加
+- [ ] Impact Verification: Phase 1統合テストが引き続き通ることを確認
+
+
+---
+
+## Process 50: DisplayAdapter — display#show_hint 実装
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, display, adapter, extmark]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: display#show_hint(display.vim:171) がVimScript側に存在。Denops Vim側にdisplayShowHint(386)が既存。ExtmarkDisplayAdapterには未実装
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:171
+  - denops/hellshake-yano/main.ts:386 (displayShowHint, Vim専用)
+  - denops/hellshake-yano/neovim/display/extmark-display-adapter.ts (Process 5で作成)
+
+#### Orient（方向付け）
+- **方針**: ExtmarkDisplayAdapter.showHint() の完全実装。既存extmark-display.tsの関数を活用
+- **制約**: C-01（Neovim extmark API使用）
+- **依存**: Process 5完了後
+
+#### Decide（実装方法）
+- ExtmarkDisplayAdapter.showHint() を extmark-display.ts の displayHintsOptimized に委譲する形で実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/neovim/display/extmark-display-adapter.test.ts` に showHint() テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `ExtmarkDisplayAdapter.showHint()` を実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] エラーハンドリング追加
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 51: DisplayAdapter — display#show_hint_with_window 実装
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, display, adapter, extmark, high-cost]
+complexity_estimate: high
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: display#show_hint_with_window(display.vim:296) がVimScript側に存在。Denops Vim側にdisplayShowHintWithWindow(403)が既存。C-01の最大障壁
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:296
+  - denops/hellshake-yano/main.ts:403 (displayShowHintWithWindow, Vim専用)
+  - denops/hellshake-yano/neovim/display/extmark-display-adapter.ts
+
+#### Orient（方向付け）
+- **方針**: Neovim側は `nvim_open_win()` 近似実装。PopupとExtmarkでウィンドウ表示の挙動が異なる問題に対処
+- **制約**: C-01（popup/extmark非互換が最も顕著に現れる箇所）
+- **依存**: Process 50完了後
+
+#### Decide（実装方法）
+1. Neovim側: nvim_open_win を使ったフローティングウィンドウ表示
+2. Vim側: 既存のPopupDisplayAdapterに委譲
+3. 両者の動作差異をドキュメント化
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/neovim/display/extmark-display-adapter.test.ts` に showHintWithWindow() テストを追加
+- [ ] Vim側とNeovim側の動作差異テストを記述
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `ExtmarkDisplayAdapter.showHintWithWindow()` を nvim_open_win を使って実装
+- [ ] `PopupDisplayAdapter.showHintWithWindow()` を既存のVimPopupDisplay APIに委譲
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] 動作差異をコメントでドキュメント化
+- [ ] Impact Verification: Neovim + Vim 両環境での手動確認手順を tests/MANUAL.md に記載
+
+---
+
+## Process 52: DisplayAdapter — display#hide_all 実装
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, display, adapter]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: display#hide_all(display.vim:392) がVimScript側に存在。Denops Vim側にdisplayHideAll(420)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:392
+  - denops/hellshake-yano/main.ts:420 (displayHideAll, Vim専用)
+  - denops/hellshake-yano/neovim/display/extmark-display-adapter.ts
+
+#### Orient（方向付け）
+- **方針**: ExtmarkDisplayAdapter.hideAll() と PopupDisplayAdapter.hideAll() を実装
+- **依存**: Process 5, 6完了後
+
+#### Decide（実装方法）
+- hideAll() を extmark-display.ts の hideHints / VimPopupDisplay のクリア処理に委譲
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] hideAll() テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `ExtmarkDisplayAdapter.hideAll()` 実装
+- [ ] `PopupDisplayAdapter.hideAll()` 実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 53: DisplayAdapter — display#highlight_partial_matches 実装
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, display, highlight, adapter]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: display#highlight_partial_matches(display.vim:470) がVimScript側に存在。Denops側にdisplayHighlightPartialMatches(425)が既存
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:470
+  - denops/hellshake-yano/main.ts:425
+  - denops/hellshake-yano/neovim/display/extmark-display-adapter.ts
+
+#### Orient（方向付け）
+- **方針**: ExtmarkDisplayAdapter.highlightPartialMatches() を HighlightManager に委譲
+- **依存**: Process 5完了後
+
+#### Decide（実装方法）
+- highlightPartialMatches() を neovim/display/highlight.ts の HighlightManager に委譲
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] highlightPartialMatches() テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `ExtmarkDisplayAdapter.highlightPartialMatches()` 実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 54: DisplayAdapter — display#get_highlight_group dispatcher
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, display, highlight, dispatcher]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: display#get_highlight_group(display.vim:65) がVimScript側に存在。Denops側にdispatcherなし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim:65
+  - denops/hellshake-yano/main.ts (getHighlightGroup dispatcher追加が必要)
+  - denops/hellshake-yano/neovim/display/extmark-display-adapter.ts
+
+#### Orient（方向付け）
+- **方針**: main.ts に getHighlightGroup dispatcher を追加し、ExtmarkDisplayAdapter.getHighlightGroup() を実装
+- **依存**: Process 5完了後
+
+#### Decide（実装方法）
+- main.ts に `getHighlightGroup` dispatcher を追加
+- ExtmarkDisplayAdapter.getHighlightGroup() を設定/HighlightManagerから取得
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] getHighlightGroup() テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に getHighlightGroup dispatcher を追加
+- [ ] `ExtmarkDisplayAdapter.getHighlightGroup()` 実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+
+---
+
+## Process 55: core#show_with_motion 複合API
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, motion, composite-api]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#show_with_motion(core.vim:381) がVimScript側に存在。motionDetect + showHintsの複合操作。Denops側に直接対応するdispatcherなし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:381
+  - denops/hellshake-yano/main.ts:441 (motionDetect, Vim専用)
+  - denops/hellshake-yano/main.ts:630 (showHints, Neovim専用)
+
+#### Orient（方向付け）
+- **方針**: main.ts に `showHintsWithMotion` 複合dispatcher を追加。内部でmotionDetect + showHints を呼び出す
+- **依存**: Process 16完了後
+
+#### Decide（実装方法）
+- main.ts に `showHintsWithMotion(args)` dispatcher を追加
+- motionDetect → showHints の連鎖呼び出しをTypeScript側で実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/main-dispatcher.test.ts` に showHintsWithMotion テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `showHintsWithMotion` dispatcher を追加
+- [ ] autoload/hellshake_yano/core.vim に `hellshake_yano#core#show_with_motion()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/core.vim:381 に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#show_with_motion'` で呼び出し元確認
+
+---
+
+## Process 56: core#show_with_motion_timer 非同期タイマー版
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, motion, async, timer]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#show_with_motion_timer(core.vim:388) がVimScript側に存在。非同期タイマー版
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:388
+  - denops/hellshake-yano/main.ts (showHintsWithMotionTimer dispatcher追加が必要)
+
+#### Orient（方向付け）
+- **方針**: main.ts に `showHintsWithMotionTimer` dispatcher を追加。TypeScript側でsetTimeout/非同期処理を実装
+- **依存**: Process 55完了後
+
+#### Decide（実装方法）
+- `showHintsWithMotionTimer(delay: number)` dispatcher をmain.tsに追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] showHintsWithMotionTimer テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `showHintsWithMotionTimer` dispatcher を追加
+- [ ] autoload/hellshake_yano/core.vim に `hellshake_yano#core#show_with_motion_timer()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#show_with_motion_timer'` で呼び出し元確認
+
+---
+
+## Process 57: core#show_delayed 遅延表示
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, delay, dispatcher]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#show_delayed(core.vim:210) がVimScript側に存在
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:210
+  - denops/hellshake-yano/main.ts (showDelayed dispatcher追加が必要)
+
+#### Orient（方向付け）
+- **方針**: main.ts に `showDelayed` dispatcher を追加
+- **依存**: Process 16完了後
+
+#### Decide（実装方法）
+- `showDelayed(delay: number)` dispatcher をmain.tsに追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] showDelayed テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `showDelayed` dispatcher を追加
+- [ ] autoload/hellshake_yano/core.vim に `hellshake_yano#core#show_delayed()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#show_delayed'` で呼び出し元確認
+
+---
+
+## Process 58: core#get_state → getStatistics拡張
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, state, statistics]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#get_state(core.vim:80) がVimScript側に存在。Denops側にgetStatistics dispatcherが存在するが、返す情報が異なる可能性
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:80
+  - denops/hellshake-yano/main.ts (getStatistics dispatcher)
+
+#### Orient（方向付け）
+- **方針**: getStatistics dispatcherを拡張してcore#get_stateが返す全フィールドをカバー
+- **依存**: Process 16完了後
+
+#### Decide（実装方法）
+- getStatistics の戻り値に state フィールドを追加
+- autoload/hellshake_yano/core.vim に hellshake_yano#core#get_state() ブリッジを実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] getStatisticsの拡張フィールドテストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] getStatistics の戻り値を拡張
+- [ ] autoload/hellshake_yano/core.vim に hellshake_yano#core#get_state() を実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 59: core#get_fixed_positions 新規API
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, positions, new-api]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#get_fixed_positions(core.vim:276) がVimScript側に存在。Denops側に対応APIなし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:276
+  - denops/hellshake-yano/main.ts (getFixedPositions dispatcher追加が必要)
+  - denops/hellshake-yano/neovim/core/core.ts (3660行モノリス)
+
+#### Orient（方向付け）
+- **方針**: main.ts に `getFixedPositions` dispatcher を新規追加。C-04制約によりcore.tsへの変更は最小限
+- **制約**: C-04（core.ts 3660行モノリスへの変更最小化）
+- **依存**: Process 16完了後
+
+#### Decide（実装方法）
+- main.ts に `getFixedPositions()` dispatcher を追加
+- core.ts からの固定位置データ取得ロジックをmain.ts側に実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] getFixedPositions テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `getFixedPositions` dispatcher を追加
+- [ ] autoload/hellshake_yano/core.vim に `hellshake_yano#core#get_fixed_positions()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#get_fixed_positions'` で呼び出し元確認
+
+---
+
+## Process 60: core#should_redraw 統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, core, redraw, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: core#should_redraw(core.vim:198) がVimScript側に存在。内部判定ロジックをDenops側に移動
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:198
+  - denops/hellshake-yano/main.ts
+
+#### Orient（方向付け）
+- **方針**: should_redraw の判定ロジックをDenops側に移動し、ブリッジ経由で呼び出す
+- **依存**: Process 16完了後
+
+#### Decide（実装方法）
+- main.ts に `shouldRedraw()` dispatcher を追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] shouldRedraw テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `shouldRedraw` dispatcher を追加
+- [ ] autoload/hellshake_yano/core.vim に `hellshake_yano#core#should_redraw()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core#should_redraw'` で呼び出し元確認
+
+
+---
+
+## Process 61: motion#get_state dispatcher
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, motion, state, dispatcher]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: motion#get_state(motion.vim:170) がVimScript側に存在。Denops側にdispatcherなし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/motion.vim:170
+  - denops/hellshake-yano/main.ts (motionGetState dispatcher追加が必要)
+  - denops/hellshake-yano/vim/features/motion.ts (VimMotionDetector)
+
+#### Orient（方向付け）
+- **方針**: main.ts に `motionGetState` dispatcher を追加
+- **依存**: Process 17完了後
+
+#### Decide（実装方法）
+- main.ts に `motionGetState()` dispatcher を追加
+- VimMotionDetector / NeovimMotionDetector から状態取得
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] motionGetState テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `motionGetState` dispatcher を追加
+- [ ] autoload/hellshake_yano/motion.vim に `hellshake_yano#motion#get_state()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#motion#get_state'` で呼び出し元確認
+
+---
+
+## Process 62: motion#handle 代替
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, motion, handle, dispatcher]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: motion#handle(motion.vim:493) がVimScript側に存在。showHints + setCount の代替として実装
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/motion.vim:493
+  - denops/hellshake-yano/main.ts:615 (setCount)
+  - denops/hellshake-yano/main.ts:630 (showHints)
+
+#### Orient（方向付け）
+- **方針**: setCount + showHints の連鎖呼び出しで代替。Process 55で作成したshowHintsWithMotion複合APIを活用
+- **依存**: Process 55, 17完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano/motion.vim に `hellshake_yano#motion#handle(key)` をブリッジ実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] motion#handle ブリッジテストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] autoload/hellshake_yano/motion.vim に `hellshake_yano#motion#handle(key)` を実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#motion#handle[^_]'` で呼び出し元確認
+
+---
+
+## Process 63: visual#show → detectWordsInVisualRange新規
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, visual, word-detection, new-api]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: visual#show(visual.vim:102) がVimScript側に存在。Denops Vim側にdetectWordsInVisualRange(534)が既存（Vim専用）。Neovim側に対応なし
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/visual.vim:102
+  - denops/hellshake-yano/main.ts:534 (detectWordsInVisualRange, Vim専用)
+  - denops/hellshake-yano/vim/features/visual.ts (VimVisual)
+
+#### Orient（方向付け）
+- **方針**: Neovim側にもdetectWordsInVisualRange相当のdispatcherを追加。VimVisualとNeovim共通APIで抽象化
+- **制約**: C-01（実装が異なる）
+- **依存**: Process 3（VisualHandler IF）完了後
+
+#### Decide（実装方法）
+- Neovim側のdetectWordsInVisualRange dispatcher を main.ts に追加
+- autoload/hellshake_yano/visual.vim に `hellshake_yano#visual#show()` ブリッジを実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/visual-handler.test.ts` に detectWordsInVisualRange テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] Neovim側 `detectWordsInVisualRange` dispatcher を main.ts に追加
+- [ ] autoload/hellshake_yano/visual.vim に `hellshake_yano#visual#show()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/visual.vim:102 に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#visual#show'` で呼び出し元確認
+
+---
+
+## Process 64: visual#init / visual#get_state
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, visual, init, state]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: visual#init(visual.vim:60) / visual#get_state(visual.vim:71) がVimScript側に存在
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/visual.vim:60 (init)
+  - autoload/hellshake_yano_vim/visual.vim:71 (get_state)
+  - denops/hellshake-yano/main.ts (dispatcher追加が必要)
+
+#### Orient（方向付け）
+- **方針**: enable dispatcher（Process 16で使用）の再利用またはvisualInit/visualGetState dispatcherを追加
+- **依存**: Process 3, 63完了後
+
+#### Decide（実装方法）
+- main.ts に `visualInit` / `visualGetState` dispatcher を追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] visualInit / visualGetState テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `visualInit` / `visualGetState` dispatcher を追加
+- [ ] autoload/hellshake_yano/visual.vim に対応ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#visual#init\|hellshake_yano_vim#visual#get_state'` で呼び出し元確認
+
+---
+
+## Process 65: filter#by_direction word-detector統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, filter, word-detector, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: filter#by_direction が autoload/hellshake_yano_vim/filter.vim に存在。word-detector内に統合予定
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/filter.vim
+  - denops/hellshake-yano/ (word-detector実装)
+
+#### Orient（方向付け）
+- **方針**: filter#by_direction のロジックをDenops word-detector内に統合し、VimScript側から呼び出し不要にする
+- **依存**: Process 14完了後
+
+#### Decide（実装方法）
+- detectWordsVisible/detectWordsMultiWindow のオプション引数として方向フィルタを実装
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] 方向フィルタつきword-detectionテストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] Denops word-detector に方向フィルタオプションを追加
+- [ ] autoload/hellshake_yano/filter.vim に `hellshake_yano#filter#by_direction()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/filter.vim に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#filter'` で呼び出し元確認
+
+---
+
+## Process 66: input#get_partial_matches 代替
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, input, partial-matches, dispatcher]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: input#get_partial_matches(input.vim:309) がVimScript側に存在。highlightCandidateHints(660)で代替可能
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/input.vim:309
+  - denops/hellshake-yano/main.ts:660 (highlightCandidateHints)
+
+#### Orient（方向付け）
+- **方針**: highlightCandidateHints dispatcherの戻り値でpartial matchesを返す形に拡張
+- **依存**: Process 4完了後
+
+#### Decide（実装方法）
+- highlightCandidateHints の戻り値にpartialMatchesフィールドを追加
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] highlightCandidateHints拡張テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts:660` の戻り値を拡張
+- [ ] autoload/hellshake_yano/input.vim に `hellshake_yano#input#get_partial_matches()` ブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/input.vim:309 に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#input#get_partial_matches'` で呼び出し元確認
+
+---
+
+## Process 67: word_filter#apply 統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, word_filter, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: word_filter#apply が autoload/hellshake_yano_vim/word_filter.vim に存在。内部統合予定
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/word_filter.vim
+  - denops/hellshake-yano/ (word-detector実装)
+
+#### Orient（方向付け）
+- **方針**: word_filter#apply のロジックをDenops word-detector内に統合
+- **依存**: Process 14完了後
+
+#### Decide（実装方法）
+- detectWordsVisible のフィルタオプションとしてword_filterを統合
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] word_filterオプションつきword-detectionテストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] Denops word-detector にword_filterオプションを統合
+- [ ] autoload/hellshake_yano/word_filter.vim に薄いブリッジを実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/word_filter.vim に Deprecation警告コメントを追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#word_filter'` で呼び出し元確認
+
+---
+
+## Process 68: Phase 2 統合テスト
+
+<!--@process-briefing
+category: implementation
+tags: [phase2, test, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 50-67でPhase 2の18-20関数の新規実装が完了。統合テストで全体動作確認が必要
+- **対象ファイル**: tests/ および tests-vim/ 配下の全テスト
+
+#### Orient（方向付け）
+- **方針**: Phase 2の全関数についてNeovim+Denops環境での動作を確認
+- **依存**: Process 50-67全て完了後
+
+#### Decide（実装方法）
+- `tests-vim/phase2_integration_test.vim` を作成して全Phase 2関数のE2Eテストを実施
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase2_integration_test.vim` を作成
+- [ ] Phase 2の18-20関数全てのブリッジ経由呼び出しテストを記述
+- [ ] テストを実行して失敗するものを特定
+
+### Green Phase: 最小実装と成功確認
+- [ ] 各関数の実装を修正して全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] Phase 1 + Phase 2合算の回帰テストを実施
+- [ ] Impact Verification: 既存の全テストが引き続き通ることを確認
+
+
+---
+
+## Process 100: setup_unified_mappings() motionマッピング書き換え
+
+<!--@process-briefing
+category: implementation
+tags: [phase3, unified, mapping, motion, vimscript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: plugin/hellshake-yano-unified.vim:199 で `hellshake_yano_vim#motion#handle_with_count` を直接呼出。Denops dispatcher経由に変更が必要
+- **対象ファイル**:
+  - plugin/hellshake-yano-unified.vim:193 (setup_unified_mappings())
+  - plugin/hellshake-yano-unified.vim:199 (nnoremap行)
+  - autoload/hellshake_yano_vim/motion.vim:334 (handle_with_count, カテゴリ3維持)
+
+#### Orient（方向付け）
+- **方針**: nnoremap マッピングを `denops#request('hellshake-yano', 'motionDetect', [...])` 経由に書き換え。またはhellshake_yano#motion#handle_with_count() ブリッジ経由
+- **制約**: カテゴリ3のhandle_with_countはgetchar入力ループのためVimScript維持必須
+- **依存**: Process 62完了後
+
+#### Decide（実装方法）
+- unified.vim:199 の nnoremap を `call hellshake_yano#motion#handle_with_count(v:count)` に変更（autoload/hellshake_yano/ ブリッジ経由）
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase3_mapping_test.vim` を作成
+- [ ] motionマッピングがブリッジ経由で動作するテストを記述
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `plugin/hellshake-yano-unified.vim:199` のnnoremap を以下に変更:
   ```vim
-  " 設定リロード時に単語検出キャッシュをクリア
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
+  nnoremap <silent> <expr> ... '<Cmd>call hellshake_yano#motion#handle_with_count(' . v:count . ')<CR>'
   ```
+- [ ] autoload/hellshake_yano/motion.vim に `hellshake_yano#motion#handle_with_count()` を実装
+- [ ] テストを実行して成功することを確認
 
-- [x] テストを実行して成功することを確認
-- [x] **Feedback**: 連携パターンを記録
-
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: 品質改善と継続成功確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] コードの品質を改善
-- [x] テストを実行し、継続して成功することを確認
-- [x] **Impact Verification**: 既存テスト全PASSを確認
-- [x] **Lessons Learned**: 設定連携パターンを記録
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] マッピング変更箇所にコメントを追加
+- [ ] Impact Verification: Neovim + Vim 両環境でのキーマッピング動作を手動確認
 
 ---
 
-## Process 10: ゴールデンテスト追加（VimScript版とDenops版の出力一致）
+## Process 101: setup_unified_mappings() visualマッピング書き換え
 
 <!--@process-briefing
-category: testing
-tags: [golden-test, integration]
+category: implementation
+tags: [phase3, unified, mapping, visual, vimscript]
 complexity_estimate: medium
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: Phase 1.3 hint_generator のゴールデンテスト
-- **Violation Warnings**: なし
-- **Pattern Cache**: スナップショットテスト、期待値ファイル比較
+- **現状**: plugin/hellshake-yano-unified.vim:211 で `hellshake_yano_vim#motion#visual_schedule` を直接呼出
+- **対象ファイル**:
+  - plugin/hellshake-yano-unified.vim:211 (xnoremap行)
+  - autoload/hellshake_yano_vim/motion.vim:582 (visual_schedule, カテゴリ3維持)
 
 #### Orient（方向付け）
-- **Commander's Intent**: VimScript版とDenops版で同一入力に対して同一出力を保証
-- **Prior Context**: 単語検出の互換性を担保
-- **Known Patterns**: 期待値配列との比較テスト
+- **方針**: xnoremap マッピングを hellshake_yano#motion#visual_schedule() ブリッジ経由に変更
+- **制約**: visual_scheduleはVimScript維持必須（カテゴリ3）
+- **依存**: Process 63完了後
 
-#### Decide（決心）
-- **Complexity Score**: 40/100
-- **Deliberation Required**: no
-- **Execution Mode**: sequential
+#### Decide（実装方法）
+- unified.vim:211 の xnoremap を autoload/hellshake_yano/ ブリッジ経由に変更
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
+- [ ] visualマッピングのブリッジ動作テストを追加
+- [ ] テストを実行して失敗することを確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] `plugin/hellshake-yano-unified.vim:211` の xnoremap を変更
+- [ ] autoload/hellshake_yano/motion.vim に `hellshake_yano#motion#visual_schedule()` を実装
+- [ ] テストを実行して成功することを確認
 
-- [x] ブリーフィング確認
-- [x] ゴールデンテストケースを作成
-  - ファイル: `tests-vim/hellshake_yano_vim/test_word_detector_golden.vim`（新規作成）✅
-  - フレームワーク: themis (既存パターンに統一)
-  - テストケース:
-    - `test_golden_structure` - 返される辞書の構造検証
-    - `test_golden_local_english` - 英語テキストの検出
-    - `test_golden_local_multiline` - 複数行テキストの検出
-    - `test_golden_local_empty` - 空バッファの処理
-    - `test_golden_denops_basic` - Denops基本動作（Denops available時）
-    - `test_golden_denops_english` - Denops英語テキスト検出
-    - `test_golden_unified_*` - ローカル実装とDenops版の出力一致検証
-    - `test_get_min_length_*` - 最小単語長取得機能テスト
-  - **実装注**: PLAN.mdのコード例は理想版。実装はthemis統一でより包括的なテストスイートに拡張
-
-- [x] テストを実行可能な状態に設定
-- [x] **Feedback**: テスト設計を記録
-  - ローカル実装（Denops利用不可時のフォールバック）の動作確認
-  - Denops版の動作確認（利用可能な場合）
-  - 両者の出力一致検証（複数テストケース）
-  - キャッシュ機能の検証（clear_cache()使用）
-
-✅ **Phase Complete** | Impact: medium
-
-### Green Phase: テストPASS確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] テスト実行環境の検証
-  - themis フレームワーク統合 ✅
-  - word_detector.vim 実装確認 ✅
-    - `has_denops()` - Denops可用性チェック（実装済み）
-    - `detect_visible()` - メイン検出機能（実装済み、キャッシュ付き）
-    - `clear_cache()` - キャッシュクリア（実装済み）
-    - `get_min_length()` - 最小単語長取得（実装済み）
-
-- [x] 期待される動作確認
-  - ローカル実装でのテキスト検出：対応済み
-  - Denops経由での検出：対応済み
-  - キャッシュメカニズム：対応済み
-  - フォールバック機能：対応済み
-
-- [x] **Feedback**: 実装状態を記録
-  - Process 1-4 の実装が完了しており、テストはすべて成功する状態を確認
-  - VimScript版とDenops版の両方の出力検証が可能な設計
-
-✅ **Phase Complete** | Impact: medium
-
-### Refactor Phase: テスト品質改善
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] テストケースを追加（包括的なカバレッジ）
-  - [x] 基本構造テスト - 返却辞書のフィールド検証
-  - [x] 空バッファ - 空結果の確認
-  - [x] 日本語のみ - TinySegmenter分割検証
-  - [x] 英語のみ - 正規表現パターン検証
-  - [x] 混合コンテンツ - 両言語の統合検証
-  - [x] 単一単語 - 最小ケース検証
-  - [x] マルチバイト文字の col/end_col 検証
-  - [x] キャッシュ一貫性テスト - 複数呼び出しで出力が安定するか
-  - [x] 位置情報検証 - lnum, col, end_col の正確性
-
-- [x] **Impact Verification**: テストスイートが完成
-  - 構造テスト: 1件
-  - ローカル実装テスト: 3件
-  - Denops実装テスト: 2件
-  - 統合テスト（ローカル↔Denops）: 3件
-  - 設定連動テスト: 4件
-  - 計: 13件のテストケース
-
-- [x] **Lessons Learned**: ゴールデンテストパターンを記録
-  - VimScript↔Denops の透過的な置き換え検証の重要性
-  - キャッシュクリア後の再実行で一貫性を確認するテスト設計
-  - 返却データ構造の完全性検証（必須フィールド確認）
-  - 境界値テスト（空、1行、複数行、混合言語）の網羅
-
-✅ **Phase Complete** | Impact: medium
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: ビジュアルモードでのマッピング動作を手動確認
 
 ---
 
-## Process 11: フォールバックテスト（正常系・異常系・タイムアウト）
+## Process 102: setup_vimscript_mappings() visualマッピング書き換え
 
 <!--@process-briefing
-category: testing
-tags: [fallback-test, robustness]
+category: implementation
+tags: [phase3, unified, mapping, visual, vimscript]
 complexity_estimate: medium
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: dictionary.vim のフォールバックテスト
-- **Violation Warnings**: なし
-- **Pattern Cache**: try-catchパターン
+- **現状**: plugin/hellshake-yano-unified.vim:266 で `hellshake_yano_vim#visual#show()` を直接呼出
+- **対象ファイル**:
+  - plugin/hellshake-yano-unified.vim:226 (setup_vimscript_mappings())
+  - plugin/hellshake-yano-unified.vim:266 (visual#show呼出行)
 
 #### Orient（方向付け）
-- **Commander's Intent**: 正常系・異常系・タイムアウトの3ケースをテスト
-- **Prior Context**: Denops未起動時やエラー時のフォールバック動作を保証
-- **Known Patterns**: モック、例外注入
+- **方針**: unified.vim:266 の呼び出しを `denops#request('hellshake-yano', 'detectWordsInVisualRange', [...])` 経由に変更
+- **依存**: Process 63完了後
+
+#### Decide（実装方法）
+- unified.vim:266 を `call hellshake_yano#visual#show()` に変更
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
+- [ ] setup_vimscript_mappings visualマッピングのテストを追加
+- [ ] テストを実行して失敗することを確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] `plugin/hellshake-yano-unified.vim:266` の呼び出しを変更
+- [ ] テストを実行して成功することを確認
 
-- [x] ブリーフィング確認
-- [x] フォールバックテストケースを作成
-  - ファイル: `tests-vim/hellshake_yano_vim/test_word_detector_fallback.vim`（新規作成）
-  - 10個のテストケースを実装
-    - Case 1: 正常系 - Denops利用可能時
-    - Case 2: 異常系 - Denops未起動時
-    - Case 3: エラー系 - Denopsエラー時
-    - Case 4-10: エッジケース（空バッファ、長い行、特殊文字、キャッシュ、has_denops精度、最小長フィルタ）
-- [x] テストを実行確認（構文・機能検証）
-- [x] **Feedback**: テスト設計完了 - themis フレームワークで実装、既存パターンに準拠
-
-✅ **Phase Complete** | Impact: medium
-
-### Green Phase: テストPASS確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] テストを実行して成功することを確認
-  - 実装側は既に完成（word_detector.vim にフォールバック処理済み）
-  - has_denops() 関数実装済み
-  - detect_visible() の try-catch フォールバック実装済み
-  - detect_multi_window() のフォールバック実装済み
-  - キャッシュ機能実装済み
-- [x] **Feedback**: フォールバック処理が完全実装済み - テストは既存実装に対応
-
-✅ **Phase Complete** | Impact: medium
-
-### Refactor Phase: テスト品質改善
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] テストカバレッジを確認
-  - 正常系: has_denops()、detect_visible() の動作確認
-  - 異常系: 複数行、特殊文字、キャッシュ動作
-  - エッジケース: 空バッファ、長い行、min_length フィルタ
-- [x] **Impact Verification**: 全テストが既存実装をカバー
-- [x] **Lessons Learned**:
-  - フォールバックパターン: try-catch で Denops エラー時にローカル実装へ
-  - キャッシュ機能: TTL ベースの自動クリア
-  - has_denops() 関数: Denops 利用可否を確実に判定
-  - エッジケース対応: 空バッファ、無効なデータへの安全性確保
-
-✅ **Phase Complete** | Impact: medium
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: Vim環境でのvisualマッピング動作を手動確認
 
 ---
 
-## Process 12: レイテンシテスト（< 50ms）
+## Process 103: unified.vim s:show_hints_visual() 関数書き換え
 
 <!--@process-briefing
-category: testing
-tags: [performance-test, latency]
-complexity_estimate: low
--->
-
-### Briefing (auto-generated)
-
-#### Observe（観察）
-- **Related Lessons**: パフォーマンス計測パターン
-- **Violation Warnings**: なし
-- **Pattern Cache**: reltime()による計測
-
-#### Orient（方向付け）
-- **Commander's Intent**: Denops呼び出しのレイテンシが50ms以下であることを保証
-- **Prior Context**: 大規模ファイル（50行）でのパフォーマンス測定
-- **Known Patterns**: reltime(), reltimefloat()
-
----
-
-### Red Phase: テスト作成と失敗確認
-
-**OODA: Act（行動）- TDD Red**
-
-- [x] ブリーフィング確認
-- [x] レイテンシテストケースを作成
-  - ファイル: `tests-vim/hellshake_yano_vim/test_word_detector_latency.vim`（✅作成完了）
-  - テストケース:
-    1. `test_latency_detect_visible_50_lines()` - 大規模ファイル(50行)での計測 <50ms
-    2. `test_latency_cache_hit()` - キャッシュヒット時 <1ms
-    3. `test_latency_get_min_length()` - 辞書処理 <10ms
-    4. `test_latency_after_clear_cache()` - クリア後の再計測
-    5. `test_latency_multi_window()` - マルチウィンドウ処理 <100ms
-  - テスト形式: themis suite + reltime()/reltimefloat() 計測
-- [x] テストを実行
-  - ✅ テストファイル構文確認（nvim構文チェック）
-  - ✅ 必要な関数が実装済み確認:
-    - has_denops() @line 48
-    - detect_visible() @line 96
-    - clear_cache() @line 155
-    - get_min_length() @line 185
-    - detect_multi_window() @line 238
-- [x] **Feedback**: 実装確認完了
-  - **計測結果**: テスト実装済み、機能モジュール検証完了
-  - **パフォーマンス見通し**: Denops+キャッシュ機構により50ms基準達成可能と判断
-
-✅ **Phase Complete** | Impact: low
-
-### Green Phase: テストPASS確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] テストを実行して成功することを確認
-  - ✅ test_word_detector_latency.vim - 5つのテストケース定義完了
-  - ✅ 全テストケースの論理構造検証完了
-  - ✅ Denops可用性チェック機構あり
-- [x] レイテンシが50msを超える場合の対応戦略
-  - 現状: キャッシュTTL=100ms、キャッシュサイズ=10エントリで設定済み
-  - assess: Denops側での最適化（TypeScriptネイティブ処理）で高速化を確認予定
-  - 50ms超過時の対応: キャッシュサイズ拡張 or TTL短縮検討
-- [x] **Feedback**: 計測準備完了
-  - **テスト階層**: 関数検出(detect_visible), キャッシュ動作(cache_hit), 辞書処理(get_min_length), マルチウィンドウ
-  - **期待値**: すべて閾値以下で PASS
-
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: パフォーマンス最適化
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] パフォーマンス最適化検討完了
-  - 現状分析: word_detector.vim L20-28でキャッシュ機構が既に実装済み
-    - TTL: 100ms (s:cache_ttl)
-    - サイズ上限: 10エントリ (s:cache_max_size)
-  - 優化不要判定理由: Denops版(TypeScript)の方が高速化済み
-  - キャッシュ戦略: バッファ+ウィンドウ範囲でキャッシュキー生成済み
-- [x] **Impact Verification**: 全テスト関数が実装条件を満たす確認
-  - detect_visible: キャッシュ機構あり ✓
-  - get_min_length: 辞書キャッシュあり ✓
-  - clear_cache: 明示的キャッシュクリア ✓
-  - detect_multi_window: マルチウィンドウ対応 ✓
-- [x] **Lessons Learned**: レイテンシ基準設定完了
-  - detect_visible(50行): <50ms ← 大規模ファイル基準
-  - キャッシュヒット: <1ms ← 連続呼び出し最適化
-  - get_min_length: <10ms ← 辞書統合処理
-  - 複数ウィンドウ: <100ms ← マルチウィンドウモード
-
-✅ **Phase Complete** | Impact: low
-
----
-
-## Process 50: E2E統合テスト
-
-<!--@process-briefing
-category: testing
-tags: [e2e, integration]
+category: implementation
+tags: [phase3, unified, visual, vimscript]
 complexity_estimate: medium
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: Phase 1.1/1.2/1.3 のE2Eテストパターン
-- **Violation Warnings**: なし
-- **Pattern Cache**: tests-vim/test_phase1_X_integration.vim
+- **現状**: plugin/hellshake-yano-unified.vim に s:show_hints_visual() 関数が存在し、VimScript直接呼び出しが含まれる可能性
+- **対象ファイル**:
+  - plugin/hellshake-yano-unified.vim
 
 #### Orient（方向付け）
-- **Commander's Intent**: Vim/Neovim両環境での実際の動作を検証
-- **Prior Context**: 全Processの統合テスト
-- **Known Patterns**: HellshakeYanoToggle → jjj → ヒント表示
+- **方針**: s:show_hints_visual() をブリッジ層経由の実装に書き換え
+- **依存**: Process 63, 102完了後
+
+#### Decide（実装方法）
+- s:show_hints_visual() を `call hellshake_yano#visual#show()` に置き換え
 
 ---
 
 ### Red Phase: テスト作成と失敗確認
+- [ ] s:show_hints_visual()の動作テストを追加
+- [ ] テストを実行して失敗することを確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] s:show_hints_visual() をブリッジ経由に書き換え
+- [ ] テストを実行して成功することを確認
 
-- [x] ブリーフィング確認
-- [x] E2Eテストケースを作成
-  - ファイル: `tests-vim/test_phase2_1_integration.vim`（新規作成）
-  ```vim
-  " Phase 2.1 E2E統合テスト
-  " Vim/Neovim両環境での単語検出統合を検証
-
-  function! s:test_e2e_word_detection() abort
-    " 1. プラグイン有効化
-    HellshakeYanoToggle
-
-    " 2. テストバッファ作成
-    new
-    call setline(1, 'function test_func() { return 42; }')
-    call setline(2, '東京タワーは日本の観光名所です')
-    call setline(3, 'Hello World')
-
-    " 3. 単語検出（内部API）
-    let l:words = hellshake_yano_vim#word_detector#detect_visible()
-
-    " 4. 検証
-    call s:assert_true(type(l:words) == v:t_list)
-    call s:assert_true(len(l:words) > 0)
-
-    " 英語単語が含まれるか
-    let l:found_function = 0
-    for l:word in l:words
-      if l:word.text ==# 'function'
-        let l:found_function = 1
-        break
-      endif
-    endfor
-    call s:assert_true(l:found_function, 'Expected "function" in detected words')
-
-    " 5. クリーンアップ
-    bwipeout!
-    HellshakeYanoToggle
-  endfunction
-
-  function! s:test_e2e_denops_integration() abort
-    if !hellshake_yano_vim#word_detector#has_denops()
-      call s:skip('Denops not available')
-      return
-    endif
-
-    " Denops経由で単語検出が行われることを確認
-    new
-    call setline(1, 'test word')
-    call hellshake_yano_vim#word_detector#clear_cache()
-    let l:words = hellshake_yano_vim#word_detector#detect_visible()
-
-    " TypeScript版の出力形式を確認
-    call s:assert_true(type(l:words) == v:t_list)
-    if !empty(l:words)
-      call s:assert_true(has_key(l:words[0], 'text'))
-      call s:assert_true(has_key(l:words[0], 'lnum'))
-      call s:assert_true(has_key(l:words[0], 'col'))
-    endif
-
-    bwipeout!
-  endfunction
-
-  function! s:test_e2e_multi_window() abort
-    " マルチウィンドウモードでの統合テスト
-    new
-    call setline(1, 'window1 test')
-    vsplit
-    call setline(1, 'window2 test')
-
-    " マルチウィンドウ単語検出
-    let l:windows = [
-      \ {'winid': win_getid(1), 'bufnr': winbufnr(1)},
-      \ {'winid': win_getid(2), 'bufnr': winbufnr(2)}
-      \ ]
-    let l:words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
-
-    call s:assert_true(type(l:words) == v:t_list)
-    call s:assert_true(len(l:words) >= 4, 'Expected at least 4 words from 2 windows')
-
-    " クリーンアップ
-    only
-    bwipeout!
-  endfunction
-  ```
-- [x] テストを実行
-- [x] **Feedback**: テスト結果を記録
-
-✅ **Phase Complete** | Impact: medium
-
-### Green Phase: テストPASS確認
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] Vim環境でテスト実行
-  ```bash
-  vim -u NONE -N -S tests-vim/test_phase2_1_integration.vim
-  ```
-- [x] Neovim環境でテスト実行
-  ```bash
-  nvim -u NONE -N -S tests-vim/test_phase2_1_integration.vim
-  ```
-- [x] **Feedback**: 両環境での結果を記録
-
-✅ **Phase Complete** | Impact: medium
-
-### Refactor Phase: テスト品質改善
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] 追加テストケースの検討
-  - ヒント表示との統合
-  - 実際のジャンプ動作
-- [x] **Impact Verification**: 全テストPASSを確認
-- [x] **Lessons Learned**: E2Eテストパターンを記録
-
-✅ **Phase Complete** | Impact: medium
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: unified.vim の全マッピングを手動確認
 
 ---
 
-## Process 100: リファクタリング・品質向上
+## Process 104: カテゴリ3関数の責務移動 (19関数)
 
 <!--@process-briefing
-category: quality
-tags: [refactoring, cleanup]
+category: implementation
+tags: [phase3, category3, bridge, responsibility-move]
+complexity_estimate: high
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: カテゴリ3の19関数がautoload/hellshake_yano_vim/に存在。autoload/hellshake_yano/（ブリッジ層）に責務移動が必要
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/input.vim:43,74,217,292 (input系4関数)
+  - autoload/hellshake_yano_vim/jump.vim (jump系2関数)
+  - autoload/hellshake_yano_vim/key_repeat.vim (key_repeat系6関数)
+  - autoload/hellshake_yano_vim/motion.vim:530,574,582,627 (expr系4関数) + motion.vim:334
+  - autoload/hellshake_yano_vim/core.vim:129,155 (autocmd系2関数)
+  - autoload/hellshake_yano/ 配下の対応ブリッジファイル
+
+#### Orient（方向付け）
+- **方針**: 各関数のロジックをそのままautoload/hellshake_yano/配下のブリッジ層ファイルに移動。autoload/hellshake_yano_vim/側はブリッジ呼び出しのエイリアスに変更
+- **制約**: これらの関数はVimScript必須（getchar, reltime, <expr>マッピング, autocmd）
+- **依存**: Process 100-103完了後
+
+#### Decide（実装方法）
+1. autoload/hellshake_yano/input.vim に input系4関数を移動
+2. autoload/hellshake_yano/jump.vim に jump系2関数を移動
+3. autoload/hellshake_yano/key_repeat.vim に key_repeat系6関数を移動
+4. autoload/hellshake_yano/motion.vim に expr系5関数を移動
+5. autoload/hellshake_yano/core.vim に autocmd系2関数を移動
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase3_category3_test.vim` を作成
+- [ ] 19関数全ての動作テストを記述
+- [ ] テストを実行して失敗することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] autoload/hellshake_yano/input.vim に input#start / stop / wait_for_input / get_state を移動
+- [ ] autoload/hellshake_yano/jump.vim に jump#to / to_window を移動
+- [ ] autoload/hellshake_yano/key_repeat.vim に key_repeat系6関数を移動
+- [ ] autoload/hellshake_yano/motion.vim に expr系5関数を移動
+- [ ] autoload/hellshake_yano/core.vim に on_focus_gained / on_terminal_leave を移動
+- [ ] autoload/hellshake_yano_vim/ 側を1行エイリアスに変更
+- [ ] テストを実行して成功することを確認
+
+### Refactor Phase: 品質改善
+- [ ] autoload/hellshake_yano_vim/ 側のエイリアスにDeprecation警告を追加
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#input\|hellshake_yano_vim#jump\|hellshake_yano_vim#key_repeat'` で呼び出し元確認
+
+---
+
+## Process 105: initializer.ts の userPreference 引数修正
+
+<!--@process-briefing
+category: implementation
+tags: [phase3, initializer, typescript, bugfix]
 complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: コードレビューフィードバック
-- **Violation Warnings**: なし
-- **Pattern Cache**: なし
+- **現状**: denops/hellshake-yano/initializer.ts:96-98 で userPreference が渡されていない問題
+- **対象ファイル**:
+  - denops/hellshake-yano/initializer.ts:96
+
+#### Orient（方向付け）
+- **方針**: initializer.ts:96-98 に userPreference 引数を追加
+- **依存**: Process 9完了後
+
+#### Decide（実装方法）
+- `initializer.ts:96` の呼び出しに `userPreference` を追加
 
 ---
 
-### Red Phase: 品質基準テスト
+### Red Phase: テスト作成と失敗確認
+- [ ] initializer.ts の userPreference 引数テストを追加
+- [ ] `deno test` でテスト失敗を確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/initializer.ts:96-98` に userPreference を渡すよう修正
+- [ ] `deno test` でテスト成功を確認
 
-- [x] ブリーフィング確認
-- [x] コード品質チェック
-  ```bash
-  # TypeScript
-  deno lint denops/hellshake-yano/
-  deno fmt --check denops/hellshake-yano/
-
-  # VimScript
-  # vint等のリンター使用（あれば）
-  ```
-- [x] **Feedback**: 品質問題を記録
-
-✅ **Phase Complete** | Impact: low
-
-### Green Phase: リファクタリング実施
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] コード重複の除去
-  - toVimWordData 変換ロジックの共通化
-  - エラーハンドリングの統一
-- [x] ドキュメントコメントの充実
-  - byteCol 優先使用の説明
-  - キャッシュ機構の説明
-- [x] **Feedback**: 改善内容を記録
-
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: 最終品質確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] 全テスト実行
-  ```bash
-  # VimScript
-  vim -u NONE -N -S tests-vim/run_tests.vim
-
-  # TypeScript
-  deno test denops/hellshake-yano/
-  ```
-- [x] **Impact Verification**: 全テストPASSを確認
-- [x] **Lessons Learned**: リファクタリングパターンを記録
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
 
 ---
 
-## Process 200: ドキュメンテーション
+## Process 106: Phase 3 統合テスト
 
 <!--@process-briefing
-category: documentation
-tags: [docs, readme]
+category: implementation
+tags: [phase3, test, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 100-105でPhase 3の実装が完了。マッピングとカテゴリ3の責務移動を統合テストで確認
+- **対象ファイル**: tests-vim/ および tests/ 配下の全テスト
+
+#### Orient（方向付け）
+- **方針**: unified.vimの全マッピングとカテゴリ3の19関数についてNeovim+Vim両環境での動作確認
+- **依存**: Process 100-105全て完了後
+
+#### Decide（実装方法）
+- `tests-vim/phase3_integration_test.vim` を作成してE2Eテストを実施
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase3_integration_test.vim` を作成
+- [ ] 全マッピングと責務移動後の19関数テストを記述
+
+### Green Phase: 最小実装と成功確認
+- [ ] 各実装を修正して全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] Phase 1 + 2 + 3 合算の回帰テストを実施
+- [ ] Impact Verification: 既存の全テストが引き続き通ることを確認
+
+
+---
+
+## Process 150: カテゴリ4 削除可9関数の除去
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, cleanup, delete, vimscript]
 complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: Phase 1.1/1.2/1.3 のドキュメント更新
-- **Violation Warnings**: なし
-- **Pattern Cache**: PLAN_TOTAL.md 更新パターン
+- **現状**: カテゴリ4の9関数が削除可能な状態。has_denops系、is_denops_ready、get_popup_count、japanese#has_japanese/should_segment
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim:237 (is_denops_ready)
+  - autoload/hellshake_yano_vim/dictionary.vim (has_denops)
+  - autoload/hellshake_yano_vim/display.vim (has_denops, get_popup_count:545)
+  - autoload/hellshake_yano_vim/hint_generator.vim (has_denops)
+  - autoload/hellshake_yano_vim/japanese.vim (has_denops, has_japanese, should_segment)
+  - autoload/hellshake_yano_vim/motion.vim:114 (has_denops)
+  - autoload/hellshake_yano_vim/word_detector.vim (has_denops)
+
+#### Orient（方向付け）
+- **方針**: 9関数を全て削除。削除前に全呼び出し元がないことを確認
+- **依存**: Process 19, 68完了後（Phase 1+2の集約完了後）
+
+#### Decide（実装方法）
+1. grep で呼び出し元が0件であることを確認
+2. 各関数を削除
 
 ---
 
-### Red Phase: ドキュメント設計
+### Red Phase: テスト作成と失敗確認
+- [ ] 削除対象9関数の呼び出し元がないことを確認するテストを記述
+- [ ] `grep -r 'has_denops\|is_denops_ready\|get_popup_count\|has_japanese\|should_segment'` で呼び出し元0件を確認
 
-**OODA: Act（行動）- TDD Red**
+### Green Phase: 最小実装と成功確認
+- [ ] autoload/hellshake_yano_vim/core.vim から `core#is_denops_ready` を削除
+- [ ] autoload/hellshake_yano_vim/dictionary.vim から `dictionary#has_denops` を削除
+- [ ] autoload/hellshake_yano_vim/display.vim から `display#has_denops` / `display#get_popup_count` を削除
+- [ ] autoload/hellshake_yano_vim/hint_generator.vim から `hint_generator#has_denops` を削除
+- [ ] autoload/hellshake_yano_vim/japanese.vim から `japanese#has_denops` / `japanese#has_japanese` / `japanese#should_segment` を削除
+- [ ] autoload/hellshake_yano_vim/motion.vim から `motion#has_denops` を削除
+- [ ] autoload/hellshake_yano_vim/word_detector.vim から `word_detector#has_denops` を削除
+- [ ] 全テストが通ることを確認
 
-- [x] ブリーフィング確認
-- [x] 更新対象ドキュメントを特定
-  - PLAN_TOTAL.md: Phase 2.1 のタスク状態更新
-  - RESEARCH.md: byteCol 座標系の文書化
-- [x] **Feedback**: ドキュメント構成を記録
-
-✅ **Phase Complete** | Impact: low
-
-### Green Phase: ドキュメント記述
-
-**OODA: Act（行動）- TDD Green**
-
-- [x] ブリーフィング確認
-- [x] PLAN_TOTAL.md 更新
-  - Phase 2.1 のタスク状態を✅に更新
-  ```markdown
-  | # | タスク | 状態 |
-  |---|--------|------|
-  | 2.1.1 | VimScript版の単語検出ロジックを分析 | ✅ |
-  | 2.1.2 | TypeScript版のAPIをVimScriptから呼び出せるようにする | ✅ |
-  | 2.1.3 | 日本語単語検出の動作確認 | ✅ |
-  | 2.1.4 | パフォーマンス測定（大規模ファイル） | ✅ |
-  | 2.1.5 | VimScript版をDenops API呼び出しに置き換え | ✅ |
-  | 2.1.6 | Vim で動作確認 | ✅ |
-  | 2.1.7 | Neovim で動作確認 | ✅ |
-  | 2.1.8 | 回帰テスト実行 | ✅ |
-  ```
-
-- [x] RESEARCH.md 更新（座標系の文書化）
-  ```markdown
-  ## 座標系の注意点（Phase 2.1 で発見）
-
-  ### col の不一致問題
-
-  | 項目 | VimScript | TypeScript |
-  |------|-----------|------------|
-  | `col` | バイト位置 (1-indexed) | 表示列 (1-indexed) |
-  | `byteCol` | なし | バイト位置 (1-indexed) |
-
-  **対策**: TypeScript側の `word.byteCol ?? word.col` でバイト位置を優先取得
-
-  **例**: `"abc日本語def"` の `"本"` の位置
-  - VimScript `col`: 7 (byte)
-  - TypeScript `col`: 6 (display) ← 不一致!
-  - TypeScript `byteCol`: 7 (byte) ← 一致
-
-  ### 実装パターン
-
-  ```typescript
-  function toVimWordData(word: Word): Record<string, unknown> {
-    const encoder = new TextEncoder();
-    const byteLen = encoder.encode(word.text).length;
-    const col = word.byteCol ?? word.col;  // byteCol 優先
-    return {
-      text: word.text,
-      lnum: word.line,
-      col: col,
-      end_col: col + byteLen,
-    };
-  }
-  ```
-  ```
-- [x] **Feedback**: 文書化内容を記録
-
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: 品質確認
-
-**OODA: Act（行動）- TDD Refactor + Feedback**
-
-- [x] ブリーフィング確認
-- [x] リンク検証
-- [x] **Impact Verification**: ドキュメント整合性を確認
-- [x] **Lessons Learned**: ドキュメントパターンを記録
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: 削除後に全テストが引き続き通ることを確認
 
 ---
 
-## Process 300: OODAフィードバックループ（教訓・知見の保存）
+## Process 151: autoload/hellshake_yano_vim/config.vim 廃止
 
 <!--@process-briefing
-category: ooda_feedback
-tags: [lessons, knowledge]
+category: implementation
+tags: [phase4, config, deprecation, vimscript]
 complexity_estimate: low
 -->
 
 ### Briefing (auto-generated)
 
 #### Observe（観察）
-- **Related Lessons**: Phase 1.1/1.2/1.3 のフィードバック
-- **Violation Warnings**: なし
-- **Pattern Cache**: stigmergy/lessons/ 形式
+- **現状**: autoload/hellshake_yano_vim/config.vim がProcess 10でブリッジ経由の薄いラッパーに変更済み。削除可能
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/config.vim
+
+#### Orient（方向付け）
+- **方針**: ファイルを削除。削除前に呼び出し元が全てブリッジ経由に切り替わっていることを確認
+- **依存**: Process 10, 150完了後
+
+#### Decide（実装方法）
+- 呼び出し元0件確認後にファイル削除
 
 ---
 
-### Red Phase: フィードバック収集設計
+### Red Phase: テスト作成と失敗確認
+- [ ] `grep -r 'hellshake_yano_vim#config'` で呼び出し元0件を確認
 
-**Observe（観察）**
-- [ ] ブリーフィング確認
-- [ ] 実装過程で発生した問題・課題を収集
-  - col 座標系の不一致問題
-  - get_min_length のキャッシュ必須性
-  - byteCol 優先使用パターン
-- [ ] テスト結果から得られた知見を記録
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano_vim/config.vim` を削除
+- [ ] 全テストが通ることを確認
 
-**Orient（方向付け）**
-- [ ] ブリーフィング確認
-- [ ] 収集した情報をカテゴリ別に分類
-  - Technical: byteCol 変換パターン、キャッシュ機構
-  - Process: Phase 1.3 成功パターンの踏襲
-  - Antipattern: col 直接使用の危険性
-  - Best Practice: has_denops() + try-catch + フォールバック
-
-✅ **Phase Complete** | Impact: low
-
-### Green Phase: 教訓・知見の永続化
-
-**Decide（決心）**
-- [ ] ブリーフィング確認
-- [ ] 保存すべき教訓・知見を選定
-  - byteCol 優先使用の重要性（High）
-  - キャッシュ機構の実装パターン（Medium）
-  - Denops優先+フォールバックパターン（High）
-
-**Act（行動）**
-- [ ] ブリーフィング確認
-- [ ] stigmergy/lessons/に教訓を保存
-  - ファイル: `stigmergy/lessons/phase2-1-word-detector.md`
-  ```markdown
-  # Phase 2.1: word_detector 統合の教訓
-
-  ## 重要な発見
-
-  ### L1: col 座標系の不一致（High）
-  - VimScript `col` はバイト位置、TypeScript `col` は表示列
-  - **対策**: `word.byteCol ?? word.col` でバイト位置を優先取得
-  - **影響**: マルチバイト文字（日本語等）で位置ズレが発生
-
-  ### L2: get_min_length の高頻度呼び出し（Medium）
-  - キー入力ごとに呼ばれるため、Denops RPC がボトルネック
-  - **対策**: VimScript側でキャッシュ（TTL 100ms）
-  - **計測結果**: キャッシュなし 5ms → キャッシュあり 0.1ms
-
-  ### L3: Phase 1.3 成功パターンの有効性（High）
-  - has_denops() + try-catch + フォールバック
-  - キャッシュ機構（hint_generator.vim と同パターン）
-  - **再利用性**: Phase 2.2/2.3 でも同じパターンを適用可能
-
-  ## Antipattern
-
-  - TypeScript `col` を直接 VimScript に渡すのは危険
-  - キャッシュなしの高頻度 Denops 呼び出しはNG
-
-  ## Best Practice
-
-  - byteCol 優先使用
-  - VimScript 側キャッシュ（高頻度呼び出し関数）
-  - Denops優先 + ローカルフォールバック
-  ```
-- [ ] コードコメントを追加（必要に応じて）
-
-✅ **Phase Complete** | Impact: low
-
-### Refactor Phase: フィードバック品質改善
-
-**Feedback Loop**
-- [ ] ブリーフィング確認
-- [ ] 保存した教訓の品質を検証
-- [ ] 重複・矛盾する教訓を統合・整理
-
-**Cross-Feedback**
-- [ ] ブリーフィング確認
-- [ ] 他のProcess（100, 200）との連携を確認
-- [ ] 将来のPhase（2.2, 2.3以降）への引き継ぎ事項を整理
-  - 同じパターンを display.vim, visual.vim に適用
-  - col 座標系問題の周知
-
-✅ **Phase Complete** | Impact: low
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'autoload/hellshake_yano_vim/config'` でファイル参照がないことを確認
 
 ---
 
-# Management
+## Process 152: autoload/hellshake_yano_vim/dictionary.vim 廃止
 
-## Blockers
-
-| ID | Description | Status | Resolution |
-|----|-------------|--------|-----------|
-| - | - | - | - |
-
-## Lessons
-
-| ID | Insight | Severity | Applied |
-|----|---------|----------|---------|
-| L1 | byteCol 優先使用で座標系不一致を解決 | high | ☐ |
-| L2 | get_min_length にキャッシュ機構が必須 | medium | ☐ |
-| L3 | Phase 1.3 成功パターンを踏襲 | high | ☐ |
-
-## Feedback Log
-
-| Date | Type | Content | Status |
-|------|------|---------|--------|
-| 2026-02-06 | doctrine-orchestrator | OODA Cycle 完了、詳細計画作成 | closed |
-
-## Completion Checklist
-- [ ] すべてのProcess完了
-- [ ] すべてのテスト合格（VimScript + TypeScript）
-- [ ] ゴールデンテストPASS（VimScript版 == Denops版）
-- [ ] フォールバックテストPASS（正常/異常/タイムアウト）
-- [ ] レイテンシ < 50ms
-- [ ] コードレビュー完了
-- [ ] ドキュメント更新完了
-- [ ] PLAN_TOTAL.md更新完了
-- [ ] マージ可能な状態
-
----
-
-# Impact Verification
-
-## Configuration
-
-| Setting | Value | Description |
-|---------|-------|-------------|
-| Enabled | true | 影響検証の有効化 |
-| Level | normal | 検証深度 |
-| Timeout | 60 | タイムアウト秒数 |
-| Auto Remediation | false | 自動修正の有効化 |
-
-## Verification Results
-
-### Changes Analyzed
-
-| File | Change Type | Lines Changed | Symbols |
-|------|-------------|---------------|---------|
-| `denops/hellshake-yano/main.ts` | modified | +80 / -0 | toVimWordData, detectWordsVisible, detectWordsMultiWindow, getMinWordLength |
-| `autoload/hellshake_yano_vim/word_detector.vim` | modified | +60 / -40 | has_denops, clear_cache, detect_visible, detect_multi_window, get_min_length |
-| `autoload/hellshake_yano_vim/config.vim` | modified | +3 / -0 | reload (キャッシュクリア連携) |
-
-### Test Impact
-
-| Test File | Status | Recommendation |
-|-----------|--------|----------------|
-| `tests-vim/word_detector_test.vim` | affected | Run required |
-| `tests-vim/test_word_detector_multi_simple.vim` | affected | Run required |
-| `tests/vim_layer_word_test.ts` | new | Run required |
-| `tests-vim/hellshake_yano_vim/test_word_detector_denops.vim` | new | Run required |
-| `tests-vim/hellshake_yano_vim/test_word_detector_golden.vim` | new | Run required |
-
-**Recommended Test Command**:
-```bash
-# VimScriptテスト
-vim -u NONE -N -S tests-vim/run_tests.vim
-
-# TypeScriptテスト
-deno test denops/hellshake-yano/
-
-# E2Eテスト
-vim -u NONE -N -S tests-vim/test_phase2_1_integration.vim
-nvim -u NONE -N -S tests-vim/test_phase2_1_integration.vim
-```
-
----
-
-# Session Memory
-
-## Current Session
-
-| Field | Value |
-|-------|-------|
-| Project Path | /home/takets/.config/nvim/plugged/hellshake-yano.vim |
-| Previous Mission | Phase 1.3 hint_generator統合（完了） |
-| Continue Mode | true |
-| Entry Count | 4/20 (global max) |
-
-## Session History（このプロジェクト）
-
-| Mission ID | Objective | Status | Timestamp |
-|------------|-----------|--------|-----------|
-| - | Phase 1.1 dictionary統合 | completed | 2026-01-25 |
-| - | Phase 1.2 config統合 | completed | 2026-01-25 |
-| - | Phase 1.3 hint_generator統合 | completed | 2026-01-26 |
-| word-detector-integration-2026-02-06 | Phase 2.1 word_detector統合 | planning | 2026-02-06 |
-
----
-
-# Module Reference
-
-## 関連ファイル一覧
-
-| ファイル | 行数 | 役割 |
-|---------|------|------|
-| `autoload/hellshake_yano_vim/word_detector.vim` | 468 | VimScript版単語検出（変更対象） |
-| `denops/hellshake-yano/neovim/core/word.ts` | 2,264 | TypeScript版単語検出 |
-| `denops/hellshake-yano/main.ts` | 722 | Denops dispatcher（変更対象） |
-| `autoload/hellshake_yano_vim/dictionary.vim` | 187 | 統合パターン参照（Phase 1.1） |
-| `autoload/hellshake_yano_vim/hint_generator.vim` | 230 | 統合パターン参照（Phase 1.3） |
-
-## テストファイル一覧
-
-| ファイル | 種別 | 状態 |
-|---------|------|------|
-| `tests-vim/word_detector_test.vim` | 既存 | 維持 |
-| `tests-vim/test_word_detector_multi_simple.vim` | 既存 | 維持 |
-| `tests/vim_layer_word_test.ts` | 新規 | 作成予定 |
-| `tests-vim/hellshake_yano_vim/test_word_detector_denops.vim` | 新規 | 作成予定 |
-| `tests-vim/hellshake_yano_vim/test_word_detector_golden.vim` | 新規 | 作成予定 |
-| `tests-vim/hellshake_yano_vim/test_word_detector_fallback.vim` | 新規 | 作成予定 |
-| `tests-vim/hellshake_yano_vim/test_word_detector_latency.vim` | 新規 | 作成予定 |
-| `tests-vim/hellshake_yano_vim/test_word_detector_cache.vim` | 新規 | 作成予定 |
-| `tests-vim/test_phase2_1_integration.vim` | 新規 | 作成予定 |
-
----
-
-<!--
-## Changelog
-
-### v1.0.0 (2026-02-06)
-- 初版作成
-- Phase 2.1 word_detector 統合の詳細実装計画
-- Code Analysis セクション追加（調査結果詳細）
-- Process 1-4, 10-12, 50, 100, 200, 300 定義
-- doctrine-orchestrator による OODA Cycle 実行結果を統合
-
-Process番号規則
-- 1-9: 機能実装
-- 10-49: テスト拡充
-- 50-99: フォローアップ
-- 100-199: 品質向上（リファクタリング）
-- 200-299: ドキュメンテーション
-- 300+: OODAフィードバックループ（教訓・知見保存）
+<!--@process-briefing
+category: implementation
+tags: [phase4, dictionary, deprecation, vimscript]
+complexity_estimate: low
 -->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 11, 150でブリッジ化・削除関数除去が完了。廃止可能
+- **対象ファイル**: autoload/hellshake_yano_vim/dictionary.vim
+- **依存**: Process 11, 150完了後
+
+#### Orient（方向付け）
+- **方針**: 呼び出し元0件確認後にファイル削除
+
+#### Decide（実装方法）
+- ファイル削除
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `grep -r 'hellshake_yano_vim#dictionary'` で呼び出し元0件を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `autoload/hellshake_yano_vim/dictionary.vim` を削除
+- [ ] 全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: 全テストが引き続き通ることを確認
+
+---
+
+## Process 153-166: 各VimScriptファイルの廃止
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, cleanup, deprecation, vimscript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Process 152と同様のパターンで各ファイルを廃止
+
+#### Orient（方向付け）
+- 各ProcessはProcess 151-152と同じパターンで実施
+
+#### Decide（実装方法）
+- 各ファイルについて: 呼び出し元確認 → 削除 → テスト確認
+
+---
+
+### Process 153: hint_generator.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#hint_generator'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/hint_generator.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 154: japanese.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#japanese'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/japanese.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 155: word_detector.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#word_detector'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/word_detector.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 156: window_detector.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#window_detector'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/window_detector.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 157: word_filter.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#word_filter'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/word_filter.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 158: filter.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#filter'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/filter.vim` を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+### Process 159: util.vim 廃止
+
+#### Red Phase
+- [ ] `grep -r 'hellshake_yano_vim#util'` で呼び出し元0件確認
+
+#### Green Phase
+- [ ] `autoload/hellshake_yano_vim/util.vim` を削除（必要な関数はブリッジ層に移動済み）
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification完了
+
+---
+
+## Process 160: display.vim → ブリッジ層統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, display, bridge, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: autoload/hellshake_yano_vim/display.vim がProcess 50-54でブリッジ化済み。残存する関数をブリッジ層に統合して廃止
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/display.vim
+  - autoload/hellshake_yano/display.vim
+
+#### Orient（方向付け）
+- **方針**: display.vim の残存関数を全てブリッジ層に移動後、ファイル廃止
+- **依存**: Process 50-54, 150完了後
+
+#### Decide（実装方法）
+- 残存関数の呼び出し元確認 → ブリッジ層への移動 → ファイル削除
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] display.vim の残存関数の呼び出し元リストを作成
+- [ ] ブリッジ層統合後のテストを記述
+
+### Green Phase: 最小実装と成功確認
+- [ ] autoload/hellshake_yano/display.vim に残存関数を移動
+- [ ] autoload/hellshake_yano_vim/display.vim を削除
+- [ ] 全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#display'` で呼び出し元がないことを確認
+
+---
+
+## Process 161: core.vim → ブリッジ層統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, core, bridge, integration]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: autoload/hellshake_yano_vim/core.vim がPhase 1-2でブリッジ化済み。カテゴリ3のon_focus_gained/on_terminal_leaveはProcess 104でブリッジ層に移動済み
+- **対象ファイル**:
+  - autoload/hellshake_yano_vim/core.vim
+  - autoload/hellshake_yano/core.vim
+
+#### Orient（方向付け）
+- **方針**: core.vim の全関数がブリッジ層経由になっていることを確認後、ファイル廃止
+- **依存**: Process 16, 55-60, 104, 150完了後
+
+#### Decide（実装方法）
+- 残存関数の確認 → autoload/hellshake_yano/core.vim への統合 → ファイル削除
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] core.vim の残存関数リストを作成・確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] autoload/hellshake_yano_vim/core.vim を削除
+- [ ] 全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#core'` で呼び出し元がないことを確認
+
+---
+
+## Process 162-166: 残存VimScriptファイルのブリッジ層統合
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, bridge, integration, vimscript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+各ファイルについてProcess 160-161と同じパターンで実施
+
+---
+
+### Process 162: motion.vim → ブリッジ層統合（expr系のみ残存）
+
+#### Green Phase
+- [ ] motion.vim から削除可能な関数（カテゴリ1, 2, 4）を確認・削除済みを確認
+- [ ] expr系5関数 (handle_expr, handle_with_count, handle_visual_expr, handle_visual_internal, visual_schedule) がautoload/hellshake_yano/に移動済みを確認
+- [ ] autoload/hellshake_yano_vim/motion.vim を廃止（またはexpr系のみ残すスタブに）
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#motion'` で残存呼び出しを確認
+
+---
+
+### Process 163: visual.vim → ブリッジ層統合
+
+#### Green Phase
+- [ ] autoload/hellshake_yano_vim/visual.vim を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#visual'` で呼び出し元がないことを確認
+
+---
+
+### Process 164: input.vim → ブリッジ層責務移動
+
+#### Green Phase
+- [ ] カテゴリ3の4関数がautoload/hellshake_yano/input.vimに移動済みを確認（Process 104）
+- [ ] カテゴリ2の1関数（get_partial_matches）がブリッジ化済みを確認（Process 66）
+- [ ] autoload/hellshake_yano_vim/input.vim を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#input'` で呼び出し元がないことを確認
+
+---
+
+### Process 165: jump.vim → ブリッジ層責務移動
+
+#### Green Phase
+- [ ] jump系2関数がautoload/hellshake_yano/jump.vimに移動済みを確認（Process 104）
+- [ ] autoload/hellshake_yano_vim/jump.vim を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#jump'` で呼び出し元がないことを確認
+
+---
+
+### Process 166: key_repeat.vim → ブリッジ層統合
+
+#### Green Phase
+- [ ] key_repeat系6関数がautoload/hellshake_yano/key_repeat.vimに移動済みを確認（Process 104）
+- [ ] autoload/hellshake_yano_vim/key_repeat.vim を削除
+- [ ] 全テストが通ることを確認
+
+#### Refactor Phase
+- [ ] Impact Verification: `grep -r 'hellshake_yano_vim#key_repeat'` で呼び出し元がないことを確認
+
+---
+
+## Process 167: plugin/hellshake-yano-vim.vim 廃止検討
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, plugin, deprecation, vimscript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: plugin/hellshake-yano-vim.vim がVim専用エントリポイント。Denops必須化した場合は廃止可能
+- **対象ファイル**:
+  - plugin/hellshake-yano-vim.vim
+  - plugin/hellshake-yano-unified.vim (代替エントリポイント)
+
+#### Orient（方向付け）
+- **方針**: C-02制約（Vim8でDeno必須）の確認後、廃止か維持かを決定
+- **制約**: C-02（Pure VimScript完全廃止は環境制約あり）
+- **依存**: Process 151-166完了後
+
+#### Decide（実装方法）
+- autoload/hellshake_yano_vim/ の全ファイルが廃止済みであれば plugin/hellshake-yano-vim.vim も廃止
+- unified.vim で全環境をカバーできることを確認
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] plugin/hellshake-yano-vim.vim なし環境でのテストを追加
+- [ ] Vim + Denops 環境でunified.vimだけで動作することを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] C-02制約の影響範囲を確認
+- [ ] 廃止可能であれば plugin/hellshake-yano-vim.vim を削除
+- [ ] unified.vimがVim環境でも動作することを確認
+
+### Refactor Phase: 品質改善
+- [ ] README.md からVim専用セクションを更新
+- [ ] Impact Verification: Vim環境での全機能テスト
+
+---
+
+## Process 168: Phase 4 回帰テスト
+
+<!--@process-briefing
+category: implementation
+tags: [phase4, test, regression]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Phase 4でautoload/hellshake_yano_vim/の全ファイルが廃止完了。全機能の回帰テストが必要
+
+#### Orient（方向付け）
+- **方針**: Neovim + Vim 両環境での全機能回帰テストを実施
+- **依存**: Process 150-167全て完了後
+
+#### Decide（実装方法）
+- `tests-vim/phase4_regression_test.vim` を作成してE2Eテストを実施
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests-vim/phase4_regression_test.vim` を作成
+- [ ] 全Phase（1-4）の関数テストを網羅
+
+### Green Phase: 最小実装と成功確認
+- [ ] 全テストが通ることを確認
+
+### Refactor Phase: 品質改善
+- [ ] テスト結果サマリーを作成
+- [ ] Impact Verification: `autoload/hellshake_yano_vim/` ディレクトリが空または廃止済みであることを確認
+
+
+---
+
+## Process 200: vim-bridge.ts 不要メソッド削除
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, bridge, cleanup, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/bridge/vim-bridge.ts の VimBridge class に、Phase 4廃止後に不要になったメソッドが存在する可能性
+- **対象ファイル**:
+  - denops/hellshake-yano/vim/bridge/vim-bridge.ts
+
+#### Orient（方向付け）
+- **方針**: VimBridgeのメソッドのうち、autoload/hellshake_yano_vim/廃止後に呼び出されなくなるものを特定・削除
+- **制約**: C-05（PopupDisplayAdapterは維持）、C-03（IPC契約維持）
+- **依存**: Process 168完了後
+
+#### Decide（実装方法）
+- 各メソッドの呼び出し元を grep で確認し、呼び出し元0件のものを削除
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/vim/bridge/vim-bridge.test.ts` の各メソッドテストを確認
+- [ ] 削除予定メソッドのテストを先に削除
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] VimBridgeの不要メソッドを削除
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 201: config-mapper.ts 統合検討
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, config, mapper, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/config/config-mapper.ts の ConfigMapper class がVim専用。Neovim共通化の検討
+- **対象ファイル**:
+  - denops/hellshake-yano/vim/config/config-mapper.ts
+  - denops/hellshake-yano/neovim/ (共通config)
+
+#### Orient（方向付け）
+- **方針**: ConfigMapperがVim専用APIに依存している部分を特定。共通化可能であればcommon/configに移動
+- **依存**: Process 168完了後
+
+#### Decide（実装方法）
+- Vim専用依存がなければ `common/config/config-mapper.ts` に移動
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] ConfigMapperのVim専用依存箇所を特定するテストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] 共通化可能な場合: `common/config/config-mapper.ts` に移動
+- [ ] Vim専用の場合: 現状維持に決定
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 202: config-migrator.ts 統合検討
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, config, migrator, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/config/config-migrator.ts の ConfigMigrator class がVim専用
+- **対象ファイル**: denops/hellshake-yano/vim/config/config-migrator.ts
+- **依存**: Process 201完了後（config系を一括検討）
+
+#### Orient（方向付け）
+- **方針**: ConfigMigratorの共通化可否を検討
+
+#### Decide（実装方法）
+- 共通化可能な場合: `common/config/config-migrator.ts` に移動
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] Process 201と同様のパターンで実施
+- [ ] `deno test` / `deno check` で確認
+
+---
+
+## Process 203: config-unifier.ts 統合検討
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, config, unifier, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/config/config-unifier.ts の ConfigUnifier class がVim専用
+- **対象ファイル**: denops/hellshake-yano/vim/config/config-unifier.ts
+- **依存**: Process 201-202完了後
+
+#### Orient（方向付け）
+- **方針**: ConfigUnifierの共通化可否を検討
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] Process 201と同様のパターンで実施
+- [ ] `deno test` / `deno check` で確認
+
+---
+
+## Process 204: highlight.ts (vim/) → neovim/display統合
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, highlight, integration, typescript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/display/highlight.ts の VimHighlight class がVim専用ハイライト実装。neovim/display/highlight.ts の HighlightManager との統合を検討
+- **対象ファイル**:
+  - denops/hellshake-yano/vim/display/highlight.ts (VimHighlight)
+  - denops/hellshake-yano/neovim/display/highlight.ts (HighlightManager)
+
+#### Orient（方向付け）
+- **方針**: ハイライトグループ定義等の共通部分を `common/display/highlight-common.ts` に移動。Vim固有/Neovim固有部分は各層に維持
+- **依存**: Process 168完了後
+
+#### Decide（実装方法）
+- 共通部分を抽出してcommon層に移動
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/display/highlight-common.test.ts` を作成
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `common/display/highlight-common.ts` を作成して共通部分を移動
+- [ ] VimHighlight / HighlightManager が共通クラスを使用するよう更新
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 205: popup-display.ts 維持確認
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, popup, maintenance, c05]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/display/popup-display.ts の VimPopupDisplay が C-05 により維持必須
+- **対象ファイル**: denops/hellshake-yano/vim/display/popup-display.ts
+- **依存**: Process 168完了後
+
+#### Orient（方向付け）
+- **方針**: C-05制約を確認。VimPopupDisplay + PopupDisplayAdapter(Process 6)が正しく動作していることをテストで確認
+- **制約**: C-05（維持必須）
+
+#### Decide（実装方法）
+- PopupDisplayAdapterのテストを追加して維持確認
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] `tests/unit/vim/display/popup-display.test.ts` でPopupDisplayAdapterの全メソッドをテスト
+- [ ] `deno test` でテスト成功を確認
+- [ ] C-05維持確認をドキュメント化
+
+---
+
+## Process 206: japanese.ts (vim/) → common/統合
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, japanese, common, integration]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/features/japanese.ts の VimJapaneseSupport class がVim専用。日本語セグメント処理は共通化可能な可能性
+- **対象ファイル**:
+  - denops/hellshake-yano/vim/features/japanese.ts (VimJapaneseSupport)
+
+#### Orient（方向付け）
+- **方針**: VimJapaneseSupportのロジックを `common/features/japanese.ts` に移動可否を検討
+- **依存**: Process 13完了後
+
+#### Decide（実装方法）
+- Vim固有依存がなければ common/features/ に移動
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] VimJapaneseSupportのVim固有依存を確認
+- [ ] 共通化可能な場合: `common/features/japanese.ts` に移動
+- [ ] `deno test` / `deno check` で確認
+
+---
+
+## Process 207: motion.ts (vim/) — VimMotionDetector 責務確認
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, motion, responsibility, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/features/motion.ts の VimMotionDetector class の責務確認
+- **対象ファイル**: denops/hellshake-yano/vim/features/motion.ts
+- **依存**: Process 168完了後
+
+#### Orient（方向付け）
+- **方針**: VimMotionDetectorの責務を確認し、Phase 2-3で移行したモーション処理との重複を解消
+
+#### Decide（実装方法）
+- 重複処理を特定して削除または共通化
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] VimMotionDetectorの残存責務を列挙
+- [ ] 不要部分を削除または共通化
+- [ ] `deno test` / `deno check` で確認
+
+---
+
+## Process 208: visual.ts (vim/) — VimVisual 責務確認
+
+<!--@process-briefing
+category: implementation
+tags: [denops-vim, visual, responsibility, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: denops/hellshake-yano/vim/features/visual.ts の VimVisual class の責務確認
+- **対象ファイル**: denops/hellshake-yano/vim/features/visual.ts
+- **依存**: Process 63-64, 168完了後
+
+#### Orient（方向付け）
+- **方針**: VimVisualの残存責務を確認し、Phase 2で移行したVisualRange処理との重複を解消
+
+#### Decide（実装方法）
+- 重複処理を特定して削除または共通化
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] VimVisualの残存責務を列挙
+- [ ] 不要部分を削除または共通化
+- [ ] `deno test` / `deno check` で確認
+
+
+---
+
+## Process 250: Vim/Neovim共通dispatcher統合 (21メソッド)
+
+<!--@process-briefing
+category: implementation
+tags: [dispatcher, common, integration, typescript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: main.ts のVim Layer(initializeVimLayer:198-554)とNeovim Layer(initializeNeovimLayer:595-1023)に共通dispatcher21メソッドが重複して存在する可能性
+- **対象ファイル**:
+  - denops/hellshake-yano/main.ts:198 (initializeVimLayer)
+  - denops/hellshake-yano/main.ts:595 (initializeNeovimLayer)
+- **共通dispatcher**: enable, disable, toggle, updateConfig, getConfig, validateConfig, segmentJapaneseText, healthCheck, getStatistics, debug, clearCache, reloadDictionary, addToDictionary, editDictionary, showDictionary, validateDictionary, isInDictionary, detectWordsVisible, detectWordsMultiWindow, getMinWordLength, generateHints
+
+#### Orient（方向付け）
+- **方針**: 共通21メソッドを `initializeCommonLayer()` として抽出し、Vim/Neovim両Layer から呼び出す形に整理
+- **制約**: C-03（IPC契約3メソッド維持）、C-04（core.ts変更最小化）
+- **依存**: Process 200-208完了後
+
+#### Decide（実装方法）
+- `initializeCommonLayer(denops)` 関数を main.ts に追加
+- 21メソッドをcommonLayerに移動
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] `tests/unit/main-dispatcher.test.ts` に共通dispatcher統合テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `denops/hellshake-yano/main.ts` に `initializeCommonLayer()` を追加
+- [ ] 21メソッドを共通Layer に移動
+- [ ] initializeVimLayer / initializeNeovimLayer から共通Layerを呼び出し
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] コメントで共通/Vim専用/Neovim専用の境界を明示
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 251: Vim専用dispatcher見直し (12メソッド)
+
+<!--@process-briefing
+category: implementation
+tags: [dispatcher, vim-only, review, typescript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Vim専用dispatcher12メソッドが main.ts に存在。Phase 2で一部がDisplayAdapter経由に変更済み
+- **対象ファイル**: denops/hellshake-yano/main.ts:198-554 (Vim Layer)
+- **Vim専用dispatcher**: displayShowHint(386), displayShowHintWithWindow(403), displayHideAll(420), displayHighlightPartialMatches(425), displayGetPopupCount(433), motionDetect(441), motionResetState(476), motionSetThreshold(482), motionSetTimeout(490), motionGetState(498), getVisualRange(511), detectWordsInVisualRange(534)
+
+#### Orient（方向付け）
+- **方針**: DisplayAdapter経由化済みのdispatcherはAdapterに委譲する形に整理。displayGetPopupCount(433)はカテゴリ4で削除済みを確認
+- **依存**: Process 250完了後
+
+#### Decide（実装方法）
+- 各Vim専用dispatcherの委譲先をDisplayAdapter / MotionDetectorインターフェース経由に統一
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] 各Vim専用dispatcherのテストを更新
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] displayGetPopupCount が削除済みであることを確認（Process 150）
+- [ ] 残存11メソッドをDisplayAdapter/MotionDetector経由に整理
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 252: Neovim専用dispatcher整理 (20メソッド)
+
+<!--@process-briefing
+category: implementation
+tags: [dispatcher, neovim-only, review, typescript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Neovim専用dispatcher20メソッドが main.ts に存在
+- **対象ファイル**: denops/hellshake-yano/main.ts:595-1023 (Neovim Layer)
+- **Neovim専用dispatcher**: setCount(615), setTimeout(623), showHints(630), hideHints(648), highlightCandidateHints(660), detectWords(672), showHintsWithKey(767), showHintsMultiWindow(844), hideHintsMultiWindow(852), toggleMultiWindowMode(862), getVisibleWindows(871), enableMultiWindowMode(921), disableMultiWindowMode(938), + Process 55-64で追加したdispatcher
+
+#### Orient（方向付け）
+- **方針**: Neovim専用dispatcherをExtmarkDisplayAdapter経由に整理
+- **依存**: Process 251完了後
+
+#### Decide（実装方法）
+- 各Neovim専用dispatcherをExtmarkDisplayAdapter/NeovimCore経由に統一
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] Neovim専用dispatcherのテストを更新
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] 各dispatcherをAdapter経由に整理
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 253: initializeVimLayer / initializeNeovimLayer 統合検討
+
+<!--@process-briefing
+category: implementation
+tags: [dispatcher, layer, integration, typescript]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: main.ts に initializeVimLayer(198) と initializeNeovimLayer(595) の2関数が存在。Process 250で共通Layer抽出済み
+- **対象ファイル**: denops/hellshake-yano/main.ts
+- **依存**: Process 252完了後
+
+#### Orient（方向付け）
+- **方針**: 2つのLayer関数の統合可否を検討。完全統合 or 共通呼び出しパターン維持かを判断
+- **制約**: C-04（core.ts変更最小化）
+
+#### Decide（実装方法）
+- 統合可能であれば `initializeLayer(denops, editorType)` に統合
+- Vim/Neovim固有部分が多い場合は共通Layer呼び出しパターンを維持
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] 統合後のLayer初期化テストを追加
+- [ ] `deno test` でテスト失敗を確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] 統合判断に基づいて実装
+- [ ] `deno test` でテスト成功を確認
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: `deno check denops/hellshake-yano/main.ts` でコンパイルエラーなし確認
+
+---
+
+## Process 254: IPC契約3メソッドの最終確認
+
+<!--@process-briefing
+category: implementation
+tags: [ipc, contract, verification, typescript]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: C-03制約として守るべきIPC契約3メソッド（updateConfig, showHintsWithKey, generic bridge）が全Phase完了後も維持されていることを確認
+- **対象ファイル**:
+  - denops/hellshake-yano/main.ts:220 (updateConfig)
+  - denops/hellshake-yano/main.ts:767 (showHintsWithKey)
+  - denops/hellshake-yano/vim/bridge/vim-bridge.ts (generic bridge)
+
+#### Orient（方向付け）
+- **方針**: Process 7で作成したIPC契約テストを全再実行して契約維持を確認
+- **制約**: C-03（維持必須）
+- **依存**: Process 253完了後
+
+#### Decide（実装方法）
+- `deno test tests/contract/ipc-contract.test.ts` を実行して全テスト通過を確認
+
+---
+
+### Red Phase: テスト作成と失敗確認
+- [ ] 全Phaseでの変更を踏まえてIPC契約テストを更新
+- [ ] 破壊的変更がないことを確認
+
+### Green Phase: 最小実装と成功確認
+- [ ] `deno test tests/contract/ipc-contract.test.ts` で全テスト通過を確認
+- [ ] updateConfig / showHintsWithKey / generic bridge の入出力仕様が変わっていないことを確認
+
+### Refactor Phase: 品質改善
+- [ ] C-03制約の最終確認をドキュメント化
+- [ ] Impact Verification: 外部ツール（他プラグイン等）からのIPC呼び出しが引き続き動作することを確認
+
+---
+
+## Process 280: Vim + Denops環境での全機能テスト
+
+<!--@process-briefing
+category: implementation
+tags: [test, vim, denops, e2e, final]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: 全Phase完了。Vim + Denops環境での全機能E2Eテストが必要
+- **対象ファイル**: tests-vim/ 配下の全テスト
+- **依存**: Process 254完了後
+
+#### Orient（方向付け）
+- **方針**: Vim 8/9 + Denops環境での全機能テストを実施
+
+#### Decide（実装方法）
+- `tests-vim/final_e2e_vim_test.vim` を作成して全機能テストを実施
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] `tests-vim/final_e2e_vim_test.vim` を作成
+- [ ] Vim環境での全機能テストを実施
+- [ ] 全テスト通過を確認
+- [ ] Impact Verification: Vim環境でのパフォーマンスが劣化していないことを確認
+
+---
+
+## Process 281: Neovim + Denops環境での全機能テスト
+
+<!--@process-briefing
+category: implementation
+tags: [test, neovim, denops, e2e, final]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: Neovim + Denops環境での全機能E2Eテストが必要
+- **対象ファイル**: tests/ 配下の全テスト
+- **依存**: Process 254完了後
+
+#### Orient（方向付け）
+- **方針**: Neovim最新版 + Denops環境での全機能テストを実施
+
+#### Decide（実装方法）
+- `tests/e2e/final_e2e_neovim_test.ts` を作成して全機能テストを実施
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] `tests/e2e/final_e2e_neovim_test.ts` を作成
+- [ ] Neovim環境での全機能テストを実施
+- [ ] `deno test tests/e2e/` で全テスト通過を確認
+
+---
+
+## Process 282: Denopsなし環境でのフォールバックテスト
+
+<!--@process-briefing
+category: implementation
+tags: [test, fallback, no-denops, e2e]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: C-02制約（Denops必須化）の影響確認。Denopsなし環境でのフォールバック動作を確認
+- **依存**: Process 167完了後
+
+#### Orient（方向付け）
+- **方針**: Denopsなし環境でのフォールバック動作（エラーメッセージ等）が適切であることを確認
+
+#### Decide（実装方法）
+- Denopsなし環境でのフォールバック動作テストを実施
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] Denopsなし環境でのテスト手順を作成
+- [ ] フォールバックメッセージが適切に表示されることを確認
+- [ ] Impact Verification: ユーザーが Denops なし環境でも適切なエラーガイダンスを受けることを確認
+
+---
+
+## Process 283: パフォーマンステスト
+
+<!--@process-briefing
+category: implementation
+tags: [test, performance, ipc, benchmark]
+complexity_estimate: medium
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: VimScript直接呼び出しからDenops IPC経由への移行によるパフォーマンスへの影響を確認
+- **依存**: Process 280-282完了後
+
+#### Orient（方向付け）
+- **方針**: IPC overhead を計測し、許容範囲内であることを確認（目安: 1呼び出しあたり10ms以内）
+
+#### Decide（実装方法）
+- `tests/benchmark/ipc-overhead.ts` を作成してIPC latencyを計測
+
+---
+
+### Red Phase / Green Phase / Refactor Phase
+- [ ] `tests/benchmark/ipc-overhead.ts` を作成
+- [ ] 主要dispatcher（showHints, detectWords等）のlatencyを計測
+- [ ] 計測結果を `tests/benchmark/RESULTS.md` に記録
+- [ ] Impact Verification: IPC overhead が許容範囲内（10ms以内）であることを確認
+
+---
+
+## Process 290: CHANGELOG更新
+
+<!--@process-briefing
+category: implementation
+tags: [docs, changelog, release]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: 全Phase完了。CHANGELOGを更新して今回の大規模リファクタリング内容を記録
+- **依存**: Process 280-283完了後
+
+#### Decide（実装方法）
+- CHANGELOG.md に "Vim→Denops実装集約" セクションを追加
+
+---
+
+### Green Phase: 最小実装と成功確認
+- [ ] CHANGELOG.md に以下を追加:
+  - Breaking Changes: autoload/hellshake_yano_vim/ の廃止
+  - Migration Guide: ユーザー向け移行手順
+  - New Features: 追加された新規API一覧
+  - Removed: 削除された関数一覧
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: CHANGELOG の記述が正確であることを確認
+
+---
+
+## Process 291: README更新
+
+<!--@process-briefing
+category: implementation
+tags: [docs, readme, architecture]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: README.md のアーキテクチャ図が古い3層構造を示している。Denops集約後の構造に更新が必要
+- **対象ファイル**: README.md, README_ja.md
+- **依存**: Process 290完了後
+
+#### Decide（実装方法）
+- README.md / README_ja.md のアーキテクチャセクションを更新
+
+---
+
+### Green Phase: 最小実装と成功確認
+- [ ] README.md のアーキテクチャ図を更新（Pure VimScript層廃止後の2層構造）
+- [ ] README_ja.md を同様に更新
+- [ ] インストール手順を確認・更新
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: README の内容が現在のコードと一致していることを確認
+
+---
+
+## Process 300: リリース準備
+
+<!--@process-briefing
+category: implementation
+tags: [release, version, tag]
+complexity_estimate: low
+-->
+
+### Briefing (auto-generated)
+
+#### Observe（観察）
+- **現状**: 全Phase + ドキュメント更新が完了。リリース準備
+- **依存**: Process 290, 291完了後
+
+#### Orient（方向付け）
+- **方針**: セマンティックバージョニングに従ってバージョンをバンプ。今回は破壊的変更（autoload/hellshake_yano_vim/廃止）があるためメジャーバージョンアップ検討
+
+#### Decide（実装方法）
+- バージョンバンプ → gitタグ作成 → リリースノート作成
+
+---
+
+### Green Phase: 最小実装と成功確認
+- [ ] バージョン番号を更新（deno.jsonc, plugin/ 内のバージョン定義）
+- [ ] `git tag v<major>.<minor>.<patch>` でタグを作成
+- [ ] GitHub Releases にリリースノートを作成
+
+### Refactor Phase: 品質改善
+- [ ] Impact Verification: タグが正しく作成され、リリースノートがCHANGELOGと一致していることを確認
+
