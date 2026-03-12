@@ -151,25 +151,25 @@ describe("ImplementationSelector", () => {
 
       // Denops利用可能、Vim/Neovim、ユーザー設定なし
       assertEquals(
-        selector.getImplementationMatrix(true, true, "vim", undefined),
+        selector.getImplementationMatrix(true, true, undefined),
         "denops-unified",
       );
 
-      // Denops利用可能、Vim/Neovim、legacy=true
+      // Denops利用可能、legacy=true
       assertEquals(
-        selector.getImplementationMatrix(true, true, "vim", "legacy"),
+        selector.getImplementationMatrix(true, true, "legacy"),
         "vimscript-pure",
       );
 
-      // Denops停止/不在、Vim
+      // Denops停止/不在
       assertEquals(
-        selector.getImplementationMatrix(false, false, "vim", undefined),
+        selector.getImplementationMatrix(false, false, undefined),
         "vimscript-pure",
       );
 
-      // Denops停止/不在、Neovim
+      // Denops停止/不在（Neovimでも同じ結果）
       assertEquals(
-        selector.getImplementationMatrix(false, false, "neovim", undefined),
+        selector.getImplementationMatrix(false, false, undefined),
         "vimscript-pure",
       );
     });
