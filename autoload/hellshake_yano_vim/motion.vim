@@ -187,6 +187,10 @@ endfunction
 "   " 3回連打でヒント表示されるようになる
 function! hellshake_yano_vim#motion#set_threshold(count) abort
   let s:motion_state.threshold = a:count
+  " Phase 1集約: Denops側に同期
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'updateConfig', [{'threshold': a:count}])
+  endif
 endfunction
 
 " hellshake_yano_vim#motion#set_timeout(ms) - タイムアウトの設定
@@ -205,6 +209,10 @@ endfunction
 "   " 1.5秒以内に連打する必要がある
 function! hellshake_yano_vim#motion#set_timeout(ms) abort
   let s:motion_state.timeout_ms = a:ms
+  " Phase 1集約: Denops側に同期
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'updateConfig', [{'motionTimeout': a:ms}])
+  endif
 endfunction
 
 " hellshake_yano_vim#motion#get_motion_count(key) - キー別モーションカウントの取得

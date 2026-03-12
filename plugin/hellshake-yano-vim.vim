@@ -184,7 +184,7 @@ endfunction
 " Denops辞書システムの辞書を再読み込みする
 function! s:dict_reload() abort
   try
-    call hellshake_yano_vim#dictionary#reload()
+    call hellshake_yano#dictionary#reload()
   catch
     call s:show_dict_error('Reload', v:exception)
   endtry
@@ -208,7 +208,7 @@ function! s:dict_add(...) abort
   let l:type = a:0 >= 3 ? a:3 : 'custom'
 
   try
-    call hellshake_yano_vim#dictionary#add(l:word, l:meaning, l:type)
+    call hellshake_yano#dictionary#add(l:word)
   catch
     call s:show_dict_error('Add', v:exception)
   endtry
@@ -220,7 +220,7 @@ endfunction
 function! s:dict_edit() abort
   try
     " Show dictionary first
-    call hellshake_yano_vim#dictionary#show()
+    call hellshake_yano#dictionary#show()
     echo ''
     echohl WarningMsg
     echo '[Dictionary] Please edit the dictionary file directly using your editor.'
@@ -235,7 +235,7 @@ endfunction
 " Denops辞書システムの辞書内容を表示する
 function! s:dict_show() abort
   try
-    call hellshake_yano_vim#dictionary#show()
+    call hellshake_yano#dictionary#show()
   catch
     call s:show_dict_error('Show', v:exception)
   endtry
@@ -245,7 +245,7 @@ endfunction
 " Denops辞書システムの辞書整合性を検証する
 function! s:dict_validate() abort
   try
-    call hellshake_yano_vim#dictionary#validate()
+    call hellshake_yano#dictionary#validate()
   catch
     call s:show_dict_error('Validate', v:exception)
   endtry

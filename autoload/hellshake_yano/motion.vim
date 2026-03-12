@@ -119,3 +119,19 @@ endfunction
 function! hellshake_yano#motion#should_trigger_hints_for_key(bufnr, key) abort
   return s:should_trigger_hints_for_key(a:bufnr, a:key)
 endfunction
+
+" hellshake_yano#motion#handle() - motion#process のブリッジエイリアス (Process 62)
+" @param key String モーションキー
+" @return String キー（noremap用）
+function! hellshake_yano#motion#handle(key) abort
+  return hellshake_yano#motion#process(a:key)
+endfunction
+
+" hellshake_yano#motion#get_state() - モーション状態取得 (Process 61 bridge)
+" @return Dictionary モーション状態
+function! hellshake_yano#motion#get_state() abort
+  if hellshake_yano#utils#is_denops_ready()
+    return denops#request('hellshake-yano', 'motionGetState', [])
+  endif
+  return {}
+endfunction

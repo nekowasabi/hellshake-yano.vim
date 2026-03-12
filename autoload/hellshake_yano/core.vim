@@ -32,6 +32,11 @@ function! hellshake_yano#core#init() abort
 
   " Focus Restore Feature: FocusGained autocmd の設定
   call s:setup_focus_gained_autocmd()
+
+  " Denops側コアを有効化（enable dispatcher: 共通）
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'enable', [])
+  endif
 endfunction
 
 " s:setup_focus_gained_autocmd() - FocusGained/TermLeave autocmd の設定
@@ -196,6 +201,67 @@ endfunction
 " @return Boolean redraw すべきなら true、スキップすべきなら false
 function! hellshake_yano#core#should_redraw() abort
   return !s:focus_just_restored
+endfunction
+
+" ==========================================================
+" Phase 1集約: show/hide ブリッジ
+" ==========================================================
+
+" hellshake_yano#core#show() - ヒント表示 (Denops委譲)
+"
+" hint.vim の show() に委譲してDenops側 showHints dispatcher を呼ぶ。
+" VimScript版の hellshake_yano_vim#core#show() の代替。
+function! hellshake_yano#core#show() abort
+  call hellshake_yano#hint#show()
+endfunction
+
+" hellshake_yano#core#hide() - ヒント非表示 (Denops委譲)
+"
+" Neovim: hideHints dispatcher 経由（extmark削除）
+" Vim8:   displayHideAll dispatcher 経由（popup削除）
+function! hellshake_yano#core#hide() abort
+  if !hellshake_yano#utils#is_denops_ready()
+    return
+  endif
+  if has('nvim')
+    " Neovim: hideHints (extmark対応) - hint#hide()経由で state管理も行う
+    call hellshake_yano#hint#hide()
+  else
+    " Vim8: displayHideAll (popup対応) - C-02制約
+    call denops#request('hellshake-yano', 'displayHideAll', [])
+    call hellshake_yano#state#set_hints_visible(v:false)
+  endif
+endfunction
+
+" hellshake_yano#core#show_delayed() - 遅延ヒント表示 (Denops委譲)
+" Process 57 bridge
+" @param delay Number 遅延ミリ秒
+function! hellshake_yano#core#show_delayed(delay) abort
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'showDelayed', [a:delay])
+  else
+    call timer_start(a:delay, {-> hellshake_yano#core#show()})
+  endif
+endfunction
+
+" hellshake_yano#core#get_state() - コア状態取得 (Denops委譲)
+" Process 58 bridge
+" @return Dictionary コア状態
+function! hellshake_yano#core#get_state() abort
+  if hellshake_yano#utils#is_denops_ready()
+    return denops#request('hellshake-yano', 'getStatistics', [])
+  endif
+  return {}
+endfunction
+
+" hellshake_yano#core#get_fixed_positions() - 固定ヒント位置リスト (Denops委譲)
+" Process 59 bridge
+" @return List 固定位置リスト
+function! hellshake_yano#core#get_fixed_positions() abort
+  if hellshake_yano#utils#is_denops_ready()
+    return denops#request('hellshake-yano', 'getFixedPositions', [])
+  endif
+  return []
 endfunction
 
 let &cpo = s:save_cpo

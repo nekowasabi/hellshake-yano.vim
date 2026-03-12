@@ -131,3 +131,22 @@ function! hellshake_yano#config#get(key, ...) abort
   let l:default = a:0 > 0 ? a:1 : v:null
   return get(g:hellshake_yano, a:key, l:default)
 endfunction
+
+" hellshake_yano#config#set() - Denops側に設定を同期するブリッジ関数
+" @param key String 設定キー (TypeScript camelCase)
+" @param value any 設定値
+function! hellshake_yano#config#set(key, value) abort
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#request('hellshake-yano', 'updateConfig', [{a:key: a:value}])
+  endif
+endfunction
+
+" hellshake_yano#config#reload() - Denops側から設定を再取得してg:hellshake_yanoを更新
+function! hellshake_yano#config#reload() abort
+  if hellshake_yano#utils#is_denops_ready()
+    let l:config = denops#request('hellshake-yano', 'getConfig', [])
+    if type(l:config) == v:t_dict
+      call extend(g:hellshake_yano, l:config, 'force')
+    endif
+  endif
+endfunction

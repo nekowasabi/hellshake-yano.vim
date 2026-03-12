@@ -68,6 +68,11 @@ function! hellshake_yano_vim#core#init() abort
 
   " Focus Restore Feature: FocusGained autocmd の設定
   call s:setup_focus_gained_autocmd()
+
+  " Phase 1集約: Denops側に enable を通知
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'enable', [])
+  endif
 endfunction
 
 " hellshake_yano_vim#core#get_state() - 状態変数の取得（テスト用）
@@ -620,6 +625,11 @@ function! hellshake_yano_vim#core#hide() abort
 
   " 4. 状態の更新
   let s:state.hints_visible = v:false
+
+  " Phase 1集約: Denops側にも hide を同期
+  if hellshake_yano#utils#is_denops_ready()
+    call denops#notify('hellshake-yano', 'displayHideAll', [])
+  endif
 endfunction
 
 " ===========================
