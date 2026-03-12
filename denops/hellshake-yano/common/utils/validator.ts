@@ -268,6 +268,61 @@ export function validateHighlightColor(
   return { valid: false, errors };
 }
 
+// ========== 文字種判定 ==========
+
+const VALID_SYMBOL_SET = new Set([
+  ";",
+  ":",
+  "[",
+  "]",
+  "'",
+  '"',
+  ",",
+  ".",
+  "/",
+  "\\",
+  "-",
+  "=",
+  "`",
+  "@",
+]);
+
+/**
+ * 有効なシンボル文字かどうかを判定
+ */
+export function isValidSymbol(char: string): boolean {
+  return VALID_SYMBOL_SET.has(char);
+}
+
+/**
+ * 英数字かどうかを判定
+ */
+export function isAlphanumeric(char: string): boolean {
+  return /^[a-zA-Z0-9]$/.test(char);
+}
+
+/**
+ * 数字かどうかを判定
+ */
+export function isDigit(char: string): boolean {
+  return /^\d$/.test(char);
+}
+
+/**
+ * 空白文字かどうかを判定
+ */
+export function isWhitespace(char: string): boolean {
+  return /^\s$/.test(char);
+}
+
+/**
+ * 制御文字かどうかを判定
+ */
+export function isControlCharacter(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (code >= 0x00 && code <= 0x1F) || (code >= 0x7F && code <= 0x9F);
+}
+
 /**
  * カラー名を正規化
  *

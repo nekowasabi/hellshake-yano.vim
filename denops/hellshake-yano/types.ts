@@ -1,6 +1,7 @@
 import type { Config } from "./config.ts";
 import type { Denops as DenopsStd } from "@denops/std";
 export type { Config } from "./config.ts";
+export type { HighlightColor } from "./common/types/config.ts";
 export type Denops = DenopsStd;
 export interface Word {
   text: string;
@@ -58,10 +59,6 @@ export interface CoreState {
   currentHints: HintMapping[];
   hintsVisible: boolean;
   isActive: boolean;
-}
-export interface HighlightColor {
-  fg?: string;
-  bg?: string;
 }
 export interface PerformanceMetrics {
   showHints: number[];
@@ -154,12 +151,6 @@ export interface CacheEntry<T> {
   value: T;
   timestamp: Timestamp;
   ttl?: number;
-}
-export interface ValidationResult<T> {
-  isValid: boolean;
-  value?: T;
-  errors: string[];
-  warnings?: string[];
 }
 export interface PerformanceMetric {
   duration: number;
@@ -258,78 +249,6 @@ export type DeepReadonly<T> = {
 export type RequiredProperties<T, K extends keyof T> = T & Required<Pick<T, K>>;
 export type SafeKeys<T> = keyof T;
 export type ValueOf<T> = T[keyof T];
-export function createMinimalConfig(): Config {
-  return {
-    enabled: true,
-    markers: [
-      "A",
-      "B",
-      "C",
-      "D",
-      "E",
-      "F",
-      "G",
-      "H",
-      "I",
-      "J",
-      "K",
-      "L",
-      "M",
-      "N",
-      "O",
-      "P",
-      "Q",
-      "R",
-      "S",
-      "T",
-      "U",
-      "V",
-      "W",
-      "X",
-      "Y",
-      "Z",
-    ],
-    motionCount: 3,
-    motionTimeout: 2000,
-    hintPosition: "start",
-    triggerOnHjkl: true,
-    countedMotions: [],
-    maxHints: 100,
-    debounceDelay: 50,
-    useNumbers: false,
-    directionalHintFilter: false,
-    highlightSelected: false,
-    debugCoordinates: false,
-    singleCharKeys: [],
-    multiCharKeys: [],
-    useHintGroups: false,
-    continuousHintMode: false,
-    recenterCommand: "normal! zz",
-    maxContinuousJumps: 50,
-    highlightHintMarker: "DiffAdd",
-    highlightHintMarkerCurrent: "DiffText",
-    suppressOnKeyRepeat: true,
-    keyRepeatThreshold: 50,
-    useJapanese: false,
-    wordDetectionStrategy: "hybrid",
-    enableTinySegmenter: true,
-    segmenterThreshold: 4,
-    japaneseMinWordLength: 2,
-    japaneseMergeParticles: true,
-    japaneseMergeThreshold: 2,
-    defaultMinWordLength: 3,
-    defaultMotionCount: 3,
-    debugMode: false,
-    performanceLog: false,
-    motionCounterEnabled: true,
-    motionCounterThreshold: 3,
-    motionCounterTimeout: 2000,
-    showHintOnMotionThreshold: true,
-    multiWindowMode: false,
-    multiWindowExcludeTypes: ["help", "quickfix", "terminal", "popup", "nofile"],
-    multiWindowMaxWindows: 4,
-  };
-}
 export interface WordDetectionConfig {
   minLength?: number;
   maxWords?: number;

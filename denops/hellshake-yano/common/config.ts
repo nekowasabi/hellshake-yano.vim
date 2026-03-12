@@ -43,14 +43,3 @@ export function createMinimalConfig(partial: Partial<Config> = {}): Config {
   return { ...DEFAULT_CONFIG, ...partial };
 }
 
-/**
- * DEFAULT_UNIFIED_CONFIGをエクスポート（互換性のため）
- */
-export const DEFAULT_UNIFIED_CONFIG: Config = DEFAULT_CONFIG;
-
-/**
- * getDefaultUnifiedConfigをエクスポート（互換性のため）
- */
-export function getDefaultUnifiedConfig(): Config {
-  return DEFAULT_UNIFIED_CONFIG;
-}

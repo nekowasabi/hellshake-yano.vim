@@ -94,6 +94,26 @@ export class LRUCache<K, V> {
     this.hits = 0;
     this.misses = 0;
   }
+
+  keys(): IterableIterator<K> {
+    return this.cache.keys();
+  }
+
+  values(): IterableIterator<V> {
+    return this.cache.values();
+  }
+
+  entries(): IterableIterator<[K, V]> {
+    return this.cache.entries();
+  }
+
+  forEach(callbackfn: (value: V, key: K, map: Map<K, V>) => void, thisArg?: unknown): void {
+    this.cache.forEach(callbackfn, thisArg);
+  }
+
+  getStatistics(): CacheStatistics {
+    return this.getStats();
+  }
 }
 
 /**
@@ -109,6 +129,13 @@ export enum CacheType {
   HINT_ASSIGNMENT_VISUAL = "HINT_ASSIGNMENT_VISUAL",
   HINT_ASSIGNMENT_OTHER = "HINT_ASSIGNMENT_OTHER",
   WORD_DETECTION = "WORD_DETECTION",
+  LANGUAGE_RULES = "LANGUAGE_RULES",
+  SYNTAX_CONTEXT = "SYNTAX_CONTEXT",
+  DICTIONARY = "DICTIONARY",
+  CHAR_WIDTH = "CHAR_WIDTH",
+  CHAR_TYPE = "CHAR_TYPE",
+  BYTE_LENGTH = "BYTE_LENGTH",
+  ADJACENCY = "ADJACENCY",
 }
 
 /**
@@ -153,6 +180,13 @@ export class GlobalCache {
         size: 100,
         description: "単語検出のキャッシュ",
       },
+      [CacheType.LANGUAGE_RULES]: { size: 50, description: "言語ルールのキャッシュ" },
+      [CacheType.SYNTAX_CONTEXT]: { size: 200, description: "シンタックスコンテキストのキャッシュ" },
+      [CacheType.DICTIONARY]: { size: 2000, description: "辞書データのキャッシュ" },
+      [CacheType.CHAR_WIDTH]: { size: 500, description: "文字幅計算のキャッシュ" },
+      [CacheType.CHAR_TYPE]: { size: 1000, description: "文字種判定のキャッシュ" },
+      [CacheType.BYTE_LENGTH]: { size: 300, description: "バイト長計算のキャッシュ" },
+      [CacheType.ADJACENCY]: { size: 200, description: "隣接単語のキャッシュ" },
     };
     this.initializeCaches();
   }
@@ -195,6 +229,16 @@ export class GlobalCache {
   public clearByType(type: CacheType): void {
     const cache = this.caches.get(type);
     if (cache) cache.clear();
+  }
+
+  public getCacheConfigs(): Readonly<Record<CacheType, CacheConfig>> {
+    return this.cacheConfigs;
+  }
+
+  public getCacheConfig(type: CacheType): Readonly<CacheConfig> {
+    const config = this.cacheConfigs[type];
+    if (!config) throw new Error(`Config for cache type '${type}' not found`);
+    return config;
   }
 }
 
