@@ -1626,10 +1626,7 @@ export class Core {
 
           // MULTI_BUFFER_EXTMARK_STATE に追跡登録
           if (extmarkId !== undefined) {
-            if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
-              MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
-            }
-            MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+            MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
           }
         } catch (error) {
         }
@@ -1649,10 +1646,7 @@ export class Core {
 
           // MULTI_BUFFER_EXTMARK_STATE に追跡登録
           if (extmarkId !== undefined) {
-            if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
-              MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
-            }
-            MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+            MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
           }
         } catch (error) {
         }
@@ -1679,10 +1673,7 @@ export class Core {
 
                 // MULTI_BUFFER_EXTMARK_STATE に追跡登録
                 if (extmarkId !== undefined) {
-                  if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
-                    MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
-                  }
-                  MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+                  MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
                 }
               } catch (error) {
               }
@@ -1701,10 +1692,7 @@ export class Core {
 
                 // MULTI_BUFFER_EXTMARK_STATE に追跡登録
                 if (extmarkId !== undefined) {
-                  if (!MULTI_BUFFER_EXTMARK_STATE.has(targetBufnr)) {
-                    MULTI_BUFFER_EXTMARK_STATE.set(targetBufnr, new Set());
-                  }
-                  MULTI_BUFFER_EXTMARK_STATE.get(targetBufnr)!.add(extmarkId);
+                  MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
                 }
               } catch (error) {
               }

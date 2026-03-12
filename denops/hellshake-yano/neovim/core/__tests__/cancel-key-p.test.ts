@@ -185,29 +185,24 @@ describe("Test 4: MULTI_BUFFER_EXTMARK_STATE management (regression)", () => {
     MULTI_BUFFER_EXTMARK_STATE.clear();
   });
 
-  it("MULTI_BUFFER_EXTMARK_STATE is an exported Map", () => {
+  it("MULTI_BUFFER_EXTMARK_STATE is an exported Set", () => {
     assertEquals(
-      MULTI_BUFFER_EXTMARK_STATE instanceof Map,
+      MULTI_BUFFER_EXTMARK_STATE instanceof Set,
       true,
-      "MULTI_BUFFER_EXTMARK_STATE should be an exported Map",
+      "MULTI_BUFFER_EXTMARK_STATE should be an exported Set",
     );
   });
 
   it("getMultiBufferExtmarkState returns a snapshot copy of state", () => {
-    // エントリを追加
+    // エントリを追加（Setはバッファ番号のみ追跡）
     const dummyBufnr = 9999;
-    MULTI_BUFFER_EXTMARK_STATE.set(dummyBufnr, new Set([1, 2, 3]));
+    MULTI_BUFFER_EXTMARK_STATE.add(dummyBufnr);
 
     const snapshot = getMultiBufferExtmarkState();
     assertEquals(
       snapshot.has(dummyBufnr),
       true,
       "Snapshot should reflect current MULTI_BUFFER_EXTMARK_STATE",
-    );
-    assertEquals(
-      snapshot.get(dummyBufnr)?.size,
-      3,
-      "Snapshot extmark IDs should match",
     );
 
     // スナップショットを変更しても元の状態に影響しないこと
@@ -220,8 +215,8 @@ describe("Test 4: MULTI_BUFFER_EXTMARK_STATE management (regression)", () => {
   });
 
   it("MULTI_BUFFER_EXTMARK_STATE.clear() empties the state", () => {
-    MULTI_BUFFER_EXTMARK_STATE.set(1, new Set([10]));
-    MULTI_BUFFER_EXTMARK_STATE.set(2, new Set([20]));
+    MULTI_BUFFER_EXTMARK_STATE.add(1);
+    MULTI_BUFFER_EXTMARK_STATE.add(2);
     assertEquals(MULTI_BUFFER_EXTMARK_STATE.size, 2);
 
     MULTI_BUFFER_EXTMARK_STATE.clear();
@@ -233,23 +228,22 @@ describe("Test 4: MULTI_BUFFER_EXTMARK_STATE management (regression)", () => {
   });
 
   it("hideHintsOptimized clears MULTI_BUFFER_EXTMARK_STATE via clearHintsMultiBuffer (design assertion)", () => {
-    // core.ts:544-547 の実装を確認:
+    // core.ts の実装を確認:
     //   if (MULTI_BUFFER_EXTMARK_STATE.size > 0) {
     //     await clearHintsMultiBuffer(denops, extmarkNamespace);
     //   }
-    // clearHintsMultiBuffer (extmark-display.ts:499-517) は最終的に
+    // clearHintsMultiBuffer (extmark-display.ts) は最終的に
     // MULTI_BUFFER_EXTMARK_STATE.clear() を呼ぶ。
     //
     // このテストは設計要件の文書化：
     // denops インスタンスなしで hideHintsOptimized を呼べないが、
     // clearHintsMultiBuffer が呼ばれた場合の期待動作を確認する。
 
-    MULTI_BUFFER_EXTMARK_STATE.set(1, new Set([100, 200]));
-    MULTI_BUFFER_EXTMARK_STATE.set(2, new Set([300]));
+    MULTI_BUFFER_EXTMARK_STATE.add(1);
+    MULTI_BUFFER_EXTMARK_STATE.add(2);
     assertNotEquals(MULTI_BUFFER_EXTMARK_STATE.size, 0, "Setup: state must have entries");
 
     // clearHintsMultiBuffer の最終ステップを模倣（MULTI_BUFFER_EXTMARK_STATE.clear()）
-    // 実際の hideHintsOptimized は denops 経由で nvim_buf_clear_namespace を呼んだ後にこれを実行する
     MULTI_BUFFER_EXTMARK_STATE.clear();
 
     assertEquals(

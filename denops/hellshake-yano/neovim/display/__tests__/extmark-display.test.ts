@@ -74,10 +74,10 @@ describe("Single Buffer Tracking State Management", () => {
  * Test Group 3: Multi-Buffer Tracking State
  */
 describe("Multi-Buffer Tracking State", () => {
-  it("should return a Map from getMultiBufferExtmarkState", () => {
+  it("should return a Set from getMultiBufferExtmarkState", () => {
     const state = getMultiBufferExtmarkState();
     assertExists(state, "State should exist");
-    assertEquals(state instanceof Map, true, "State should be a Map");
+    assertEquals(state instanceof Set, true, "State should be a Set");
   });
 });
 
@@ -100,8 +100,8 @@ describe("Integration Structure Verification", () => {
       "Single buffer state should be number or null"
     );
 
-    // Multi buffer state is a Map
-    assertEquals(multiState instanceof Map, true, "Multi buffer state should be a Map");
+    // Multi buffer state is a Set (tracks buffer numbers only)
+    assertEquals(multiState instanceof Set, true, "Multi buffer state should be a Set");
   });
 
   it("should allow clearing state without errors", () => {
