@@ -6,9 +6,54 @@
  */
 
 import { test } from "../../testRunner.ts";
-import { assertEquals, assertExists } from "@std/assert";
+import { assertEquals, assertExists, assertNotEquals } from "@std/assert";
+import { describe, it } from "jsr:@std/testing@^1.0.0/bdd";
 import { detectWords } from "../../../denops/hellshake-yano/neovim/core/word.ts";
+import * as wordModule from "../../../denops/hellshake-yano/neovim/core/word.ts";
 import { DEFAULT_CONFIG } from "../../../denops/hellshake-yano/config.ts";
+
+// Task 1-B RED: createCacheKey is not exported yet → will be TypeError at runtime.
+// GREEN: export createCacheKey with changedtick param → tests pass.
+// deno-lint-ignore no-explicit-any
+const createCacheKeyFn = (wordModule as any).createCacheKey as (
+  bufnr: number,
+  topLine: number,
+  bottomLine: number,
+  config: Record<string, unknown>,
+  context: undefined,
+  changedtick: number,
+) => string;
+
+// ---------------------------------------------------------------------------
+// Task 1-B: createCacheKey must include changedtick (RED → GREEN)
+// ---------------------------------------------------------------------------
+describe("Task 1-B: createCacheKey must include changedtick", () => {
+  it("different changedtick values produce different cache keys", () => {
+    const key1 = createCacheKeyFn(1, 1, 50, {}, undefined, 100);
+    const key2 = createCacheKeyFn(1, 1, 50, {}, undefined, 101);
+    assertNotEquals(
+      key1,
+      key2,
+      "changedtick change must produce different cache key to invalidate stale cache after buffer modification",
+    );
+  });
+
+  it("changedtick value appears in cache key string", () => {
+    const tick = 9999;
+    const key = createCacheKeyFn(1, 1, 50, {}, undefined, tick);
+    assertEquals(
+      key.includes(`${tick}`),
+      true,
+      `Cache key must contain changedtick value (${tick}). Got: "${key}"`,
+    );
+  });
+
+  it("same changedtick produces same cache key (cache hit preserved)", () => {
+    const key1 = createCacheKeyFn(1, 1, 50, {}, undefined, 42);
+    const key2 = createCacheKeyFn(1, 1, 50, {}, undefined, 42);
+    assertEquals(key1, key2, "Same changedtick must produce same key for cache reuse");
+  });
+});
 
 test("Word Detection: 基本的な単語検出", async (denops) => {
   // テスト用のバッファを作成

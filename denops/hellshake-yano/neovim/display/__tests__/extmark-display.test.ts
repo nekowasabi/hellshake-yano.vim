@@ -115,3 +115,4 @@ describe("Integration Structure Verification", () => {
     assertEquals(error, null, "clearSingleBufferExtmarkState should not throw");
   });
 });
+
