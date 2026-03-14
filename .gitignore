@@ -49,7 +49,7 @@ temp/
 
 # Debug files
 *.stackdump
-core
+/core
 
 # OS specific
 Thumbs.db
