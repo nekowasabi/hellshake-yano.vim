@@ -19,6 +19,7 @@ import { initializeDebugMode } from "./common/utils/logger.ts";
 
 // Neovim固有のインポート（従来の実装維持）
 import { generateHints } from "./neovim/core/hint.ts";
+import type { GenerateHintsOptions } from "./neovim/core/hint.ts";
 import { Core } from "./neovim/core/core.ts";
 import {
   clearCaches,
@@ -378,14 +379,7 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
           if (count <= 0) {
             return [];
           }
-          const hintConfig = {
-            singleCharKeys: config.singleCharKeys,
-            multiCharKeys: config.multiCharKeys,
-            maxSingleCharHints: config.maxSingleCharHints,
-            useNumericMultiCharHints: config.useNumericMultiCharHints,
-            markers: config.markers || ["a", "s", "d", "f"],
-          };
-          return generateHints(count, hintConfig);
+          return generateHints(count, createHintConfig(config));
         } finally {
           recordPerformance("hintGeneration", performance.now() - startTime);
         }
@@ -736,16 +730,7 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         const startTime = performance.now();
         try {
           const count = typeof wordCount === "number" ? wordCount : 0;
-          // singleCharKeysとmultiCharKeysを使用するように修正
-          const hintConfig = {
-            singleCharKeys: config.singleCharKeys,
-            multiCharKeys: config.multiCharKeys,
-            maxSingleCharHints: config.maxSingleCharHints,
-            useNumericMultiCharHints: config.useNumericMultiCharHints,
-            // フォールバック用にmarkersも設定
-            markers: config.markers || ["a", "s", "d", "f"],
-          };
-          return generateHints(count, hintConfig);
+          return generateHints(count, createHintConfig(config));
         } finally {
           recordPerformance("hintGeneration", performance.now() - startTime);
         }
@@ -1224,3 +1209,28 @@ export function highlightCandidateHintsAsync(
 
 // Re-export highlightCandidateHintsHybrid from display.ts
 export { highlightCandidateHintsHybrid };
+
+// Why: WeakMap instead of Map — Config objects are GC-able when no longer referenced, preventing memory leaks
+const _hintConfigCache = new WeakMap<Config, GenerateHintsOptions>();
+
+/**
+ * hintConfig をメモ化して返す。
+ * 同じ Config オブジェクト参照に対しては常に同一オブジェクトを返す。
+ *
+ * Why: inline object literal を毎回生成すると generateHints 呼び出しのたびに
+ *      新しいオブジェクトが作られ GC 負荷が増える。Config 参照が同じなら
+ *      同一 hintConfig を再利用することで不要なアロケーションを排除する。
+ */
+export function createHintConfig(config: Config): GenerateHintsOptions {
+  const cached = _hintConfigCache.get(config);
+  if (cached !== undefined) return cached;
+  const hintConfig: GenerateHintsOptions = {
+    singleCharKeys: config.singleCharKeys,
+    multiCharKeys: config.multiCharKeys,
+    maxSingleCharHints: config.maxSingleCharHints,
+    useNumericMultiCharHints: config.useNumericMultiCharHints,
+    markers: config.markers || ["a", "s", "d", "f"],
+  };
+  _hintConfigCache.set(config, hintConfig);
+  return hintConfig;
+}

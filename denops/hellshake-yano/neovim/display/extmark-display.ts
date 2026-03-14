@@ -3,6 +3,7 @@ import type { Config, HintMapping, Word } from "../../types.ts";
 import { assignHintsToWords, calculateHintPosition } from "../core/hint.ts";
 import { generateHintsFromConfig, recordPerformance } from "../../common/utils/performance.ts";
 import { clearDetectionCache } from "../core/word.ts";
+import { batchGet, callAtomic } from "../../common/utils/batch.ts";
 
 /** Module-level singleton to avoid per-line TextEncoder instantiation */
 const TEXT_ENCODER = new TextEncoder();
@@ -113,7 +114,8 @@ async function displayHintsBatched(
       } else if (fallbackMatchIds) {
         await processMatchaddBatched(denops, batch, config, fallbackMatchIds);
       }
-      if (i + HIGHLIGHT_BATCH_SIZE < hints.length) await new Promise((r) => setTimeout(r, 1));
+      // Why: setTimeout(r, 1) ではなく Promise.resolve() — 1ms の人工遅延はスループットを下げるだけで UIブロッキング防止には不要
+      if (i + HIGHLIGHT_BATCH_SIZE < hints.length) await Promise.resolve();
     }
   } finally {
     _isRenderingHints = false;
@@ -424,8 +426,38 @@ async function processExtmarksForBuffer(
   const highlightGroup = getHighlightGroupName(config);
   const extmarkIds: number[] = [];
 
-  // Pre-fetch line lengths for validation to prevent E5555 errors
+  // Why: callAtomic (一括取得) instead of per-hint nvim_buf_get_lines — O(N) IPC を O(1) に削減。
+  // 制約 C2: callAtomic はエラー発生時に途中停止するため、事前に uniqueLines の重複を除去して呼び出す。
+  const uniqueLines = [...new Set(hints.map((h) => h.word.line - 1))].filter((l) => l >= 0);
   const lineLengthCache = new Map<number, number>();
+
+  if (uniqueLines.length > 0) {
+    const lineCalls: Array<[string, ...unknown[]]> = uniqueLines.map((line) => [
+      "nvim_buf_get_lines",
+      bufnr,
+      line,
+      line + 1,
+      false,
+    ]);
+    try {
+      const lineResults = await callAtomic(denops, lineCalls);
+      for (let i = 0; i < uniqueLines.length; i++) {
+        const lineContent = lineResults[i] as string[];
+        const byteLen = lineContent.length > 0 ? TEXT_ENCODER.encode(lineContent[0]).length : 0;
+        lineLengthCache.set(uniqueLines[i], byteLen);
+      }
+    } catch {
+      // Buffer might not exist — individual hints will be skipped below via cache miss
+    }
+  }
+
+  // Why: callAtomic (一括送信) instead of per-hint nvim_buf_set_extmark — O(N) IPC を O(1) に削減。
+  // ヒント50個で 50 IPC → 1 IPC（-98%削減）。
+  // C2: callAtomic はエラー時途中停止するため、事前に行長チェック（Task 3-B）で
+  //     無効な extmark を除外済みであることが前提。
+  const extmarkCalls: Array<[string, ...unknown[]]> = [];
+  // validHints は extmarkCalls と同インデックスで対応し、結果からIDを復元するために使用
+  const validHints: Array<{ line: number; col: number }> = [];
 
   for (const h of hints) {
     if (!_isRenderingHints) break;
@@ -444,23 +476,11 @@ async function processExtmarksForBuffer(
       continue; // Skip invalid positions
     }
 
-    // Get line length from cache or fetch it
-    let lineLength = lineLengthCache.get(line);
+    // Get line length from pre-fetched cache; skip if buffer/line unavailable
+    const lineLength = lineLengthCache.get(line);
     if (lineLength === undefined) {
-      try {
-        const lineContent = await denops.call(
-          "nvim_buf_get_lines",
-          bufnr,
-          line,
-          line + 1,
-          false,
-        ) as string[];
-        lineLength = lineContent.length > 0 ? TEXT_ENCODER.encode(lineContent[0]).length : 0;
-        lineLengthCache.set(line, lineLength);
-      } catch {
-        // Buffer or line doesn't exist, skip this hint
-        continue;
-      }
+      // Buffer or line doesn't exist, skip this hint
+      continue;
     }
 
     // Skip if col is beyond line length (would cause E5555)
@@ -468,29 +488,32 @@ async function processExtmarksForBuffer(
       continue;
     }
 
-    try {
-      // Use bufnr directly instead of 0 (current buffer)
-      const extmarkId = await denops.call(
-        "nvim_buf_set_extmark",
-        bufnr,
-        extmarkNamespace,
-        line,
-        col,
-        {
-          // id オプションを省略してNeovimに自動割り当てさせる
-          virt_text: [[h.hint, highlightGroup]],
-          virt_text_pos: "overlay",
-          priority: DEFAULT_HINT_PRIORITY,
-        },
-      ) as number;
+    extmarkCalls.push([
+      "nvim_buf_set_extmark",
+      bufnr,
+      extmarkNamespace,
+      line,
+      col,
+      {
+        // id オプションを省略してNeovimに自動割り当てさせる
+        virt_text: [[h.hint, highlightGroup]],
+        virt_text_pos: "overlay",
+        priority: DEFAULT_HINT_PRIORITY,
+      },
+    ]);
+    validHints.push({ line, col });
+  }
 
-      extmarkIds.push(extmarkId);
+  if (extmarkCalls.length > 0) {
+    try {
+      const results = await callAtomic(denops, extmarkCalls);
+      for (const result of results) {
+        extmarkIds.push(result as number);
+      }
     } catch (error) {
-      // Buffer might not exist, line/col out of range, or byte column mismatch
+      // callAtomic failed — log and return partial IDs collected so far
       console.warn(
-        `[hellshake-yano] Failed to set extmark in buffer ${bufnr} at line ${line + 1}, col ${
-          col + 1
-        }:`,
+        `[hellshake-yano] callAtomic failed for nvim_buf_set_extmark in buffer ${bufnr}:`,
         error,
       );
     }
@@ -509,16 +532,40 @@ export async function clearHintsMultiBuffer(
   denops: Denops,
   extmarkNamespace: number,
 ): Promise<void> {
-  for (const bufnr of MULTI_BUFFER_EXTMARK_STATE) {
+  const buffers = [...MULTI_BUFFER_EXTMARK_STATE];
+
+  if (buffers.length > 0) {
+    // Why: batchGet instead of sequential bufexists calls — O(N) IPC を O(1) に削減。
+    // Step 1: bufexists を一括チェック
+    let existResults: number[];
     try {
-      // Check if buffer still exists
-      const bufExists = await denops.call("bufexists", bufnr) as number;
-      if (bufExists) {
-        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
-      }
+      existResults = await batchGet(denops, (helper) =>
+        buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>)
+      ) as number[];
     } catch (error) {
-      // Buffer might have been deleted
-      console.error(`[hellshake-yano] Failed to clear namespace in buffer ${bufnr}:`, error);
+      console.error("[hellshake-yano] Failed to batch check bufexists:", error);
+      existResults = buffers.map(() => 0);
+    }
+
+    // Why: callAtomic instead of sequential nvim_buf_clear_namespace calls — 制約 C2 対応のため
+    // existResults で事前フィルタし、存在するバッファのみを atomic 呼び出しに渡す。
+    // Step 2: 存在するバッファだけ clear_namespace を一括実行
+    const clearCalls = buffers
+      .filter((_, i) => existResults[i])
+      .map((bufnr) => [
+        "nvim_buf_clear_namespace",
+        bufnr,
+        extmarkNamespace,
+        0,
+        -1,
+      ] as [string, ...unknown[]]);
+
+    if (clearCalls.length > 0) {
+      try {
+        await callAtomic(denops, clearCalls);
+      } catch (error) {
+        console.error("[hellshake-yano] Failed to atomic clear namespaces:", error);
+      }
     }
   }
 
@@ -538,16 +585,40 @@ export async function clearHintsForBuffers(
   extmarkNamespace: number,
   buffers: number[],
 ): Promise<void> {
-  for (const bufnr of buffers) {
+  if (buffers.length === 0) return;
+
+  // Why: batchGet + callAtomic instead of sequential per-buffer calls — clearHintsMultiBuffer と同様の IPC削減。
+  // 制約 C2: callAtomic は途中停止するため batchGet で存在確認してからフィルタする。
+  let existResults: number[];
+  try {
+    existResults = await batchGet(denops, (helper) =>
+      buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>)
+    ) as number[];
+  } catch (error) {
+    console.error("[hellshake-yano] Failed to batch check bufexists:", error);
+    existResults = buffers.map(() => 0);
+  }
+
+  const clearCalls = buffers
+    .filter((_, i) => existResults[i])
+    .map((bufnr) => [
+      "nvim_buf_clear_namespace",
+      bufnr,
+      extmarkNamespace,
+      0,
+      -1,
+    ] as [string, ...unknown[]]);
+
+  if (clearCalls.length > 0) {
     try {
-      const bufExists = await denops.call("bufexists", bufnr) as number;
-      if (bufExists) {
-        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
-      }
-      MULTI_BUFFER_EXTMARK_STATE.delete(bufnr);
+      await callAtomic(denops, clearCalls);
     } catch (error) {
-      console.error(`[hellshake-yano] Failed to clear namespace in buffer ${bufnr}:`, error);
+      console.error("[hellshake-yano] Failed to atomic clear namespaces:", error);
     }
+  }
+
+  for (const bufnr of buffers) {
+    MULTI_BUFFER_EXTMARK_STATE.delete(bufnr);
   }
 }
 
@@ -629,7 +700,11 @@ export async function displayHintsAutoMultiBuffer(
 
   if (hasMultiBuffer && denops.meta.host === "nvim" && extmarkNamespace !== undefined) {
     // Use multi-buffer display
-    const cp = await denops.call("getpos", ".") as [number, number, number, number];
+    // Why: batchGet instead of two sequential denops.call — reduces IPC round-trips from 2 to 1
+    const [cp, currentWinId] = await batchGet(denops, (helper) => [
+      helper.call("getpos", ".") as Promise<[number, number, number, number]>,
+      helper.call("win_getid") as Promise<number>,
+    ] as const);
     const cl = cp[1], cc = cp[2];
 
     let ah = hints;
@@ -638,7 +713,6 @@ export async function displayHintsAutoMultiBuffer(
     }
 
     // Apply distance penalty for non-current windows
-    const currentWinId = await denops.call("win_getid") as number;
     const adjustedWords = words.map(w => ({
       ...w,
       line: w.winid !== currentWinId ? w.line + MULTI_WINDOW_LINE_OFFSET : w.line,

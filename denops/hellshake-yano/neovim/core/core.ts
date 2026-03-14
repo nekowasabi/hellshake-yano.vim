@@ -1728,6 +1728,13 @@ export class Core {
     const highlightGroup = this.getHighlightGroupName(isCandidate);
 
     try {
+      // Why: bufexists guard added here — the async microtask path in highlightCandidateHintsHybrid
+      // captures currentBufnr at call time but runs later; the buffer may be deleted by then.
+      // Checking here covers both sync and async callers without duplicating the guard.
+      const bufValid = await denops.call("bufexists", bufnr) as number;
+      if (!bufValid) {
+        return undefined;
+      }
       const extmarkId = await denops.call(
         "nvim_buf_set_extmark",
         bufnr,

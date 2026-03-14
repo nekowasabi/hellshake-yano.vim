@@ -6,6 +6,7 @@ import { CacheType, GlobalCache } from "../../cache.ts";
 import type { Config } from "../../types.ts";
 import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../../config.ts";
 import { resolveConfigType } from "../../common/utils/config.ts";
+import { batchGet } from "../../common/utils/batch.ts";
 import type {
   DetectionContext,
   Word,
@@ -198,12 +199,16 @@ function cleanupCache() {
 
 // キャッシュキー生成関数
 // Fix: 日本語設定パラメータをキャッシュキーに含めることで設定変更時の誤キャッシュヒットを防止
-function createCacheKey(
+// Why: export を追加 — changedtick 対応のテスト (Task 1-B) が直接検証できるようにするため
+export function createCacheKey(
   bufnr: number,
   topLine: number,
   bottomLine: number,
   config: EnhancedWordConfig,
   context?: DetectionContext,
+  // Why: changedtick=0 をデフォルトに設定 — undefined より明示的で、
+  // 取得失敗時にフォールバックしても同一バッファ内でキーが安定する
+  changedtick: number = 0,
 ): string {
   const keyContext = config.currentKeyContext || 'default';
   const minLength = context?.minWordLength ??
@@ -218,7 +223,9 @@ function createCacheKey(
   const segmenterThreshold = config.segmenterThreshold ?? 10;
   const japaneseMergeThreshold = config.japaneseMergeThreshold ?? 3;
 
-  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${config.useJapanese ?? true}:jp${japaneseMinLength}:seg${segmenterThreshold}:merge${japaneseMergeThreshold}`;
+  // Why: `:tick${changedtick}` をキー末尾に追加 — b:changedtick はバッファ変更ごとに
+  // インクリメントされるため、バッファ内容変更後の誤キャッシュヒットを防止できる
+  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${config.useJapanese ?? true}:jp${japaneseMinLength}:seg${segmenterThreshold}:merge${japaneseMergeThreshold}:tick${changedtick}`;
 }
 
 export async function detectWordsWithManager(
@@ -227,13 +234,22 @@ export async function detectWordsWithManager(
   context?: DetectionContext,
   skipCache?: boolean,
 ): Promise<WordDetectionResult> {
-  // バッファ番号と画面範囲を取得
-  const bufnr = await denops.call("bufnr", "%") as number;
-  const topLine = await denops.call("line", "w0") as number;
-  const bottomLine = await denops.call("line", "w$") as number;
+  // Why: batchGet で4呼び出しを1往復に統合 — 直列 denops.call×4 より IPC ラウンドトリップを
+  // 75% 削減（Task 2-C: changedtick を同一バッチに統合）。
+  // Why: nvim_buf_get_changedtick の引数に 0 を使用 — バッチ内では bufnr がまだ取得されていないため
+  // カレントバッファを意味する 0 を使用。collect の制約 C1 により await 不可。
+  const [bufnr, topLine, bottomLine, changedtick] = await batchGet(
+    denops,
+    (helper) => [
+      helper.call("bufnr", "%"),
+      helper.call("line", "w0"),
+      helper.call("line", "w$"),
+      helper.call("nvim_buf_get_changedtick", 0),
+    ] as const,
+  ) as [number, number, number, number];
 
   // キャッシュキーを生成
-  const cacheKey = createCacheKey(bufnr, topLine, bottomLine, config, context);
+  const cacheKey = createCacheKey(bufnr, topLine, bottomLine, config, context, changedtick);
 
   // キャッシュチェック（skipCache=trueの場合はスキップ）
   if (!skipCache) {
