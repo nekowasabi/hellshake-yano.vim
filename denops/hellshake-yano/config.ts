@@ -347,6 +347,34 @@ function normalizeLegacyKeys(input: Partial<Config>): Partial<Config> {
   if (Object.prototype.hasOwnProperty.call(normalized, "directional_hint_filter")) {
     delete normalized["directional_hint_filter"];
   }
+
+  // Why: snake_case -> camelCase conversion for per_key_motion_count / default_motion_count
+  // — plugin/hellshake-yano.vim sets these in snake_case, but Config type uses camelCase
+  const snakeToCamelMappings: [string, keyof Config][] = [
+    ["per_key_motion_count", "perKeyMotionCount"],
+    ["default_motion_count", "defaultMotionCount"],
+    ["per_key_min_length", "perKeyMinLength"],
+    ["default_min_word_length", "defaultMinWordLength"],
+    ["min_word_length", "defaultMinWordLength"],
+    ["motion_count", "motionCount"],
+    ["motion_timeout", "motionTimeout"],
+    ["key_repeat_threshold", "keyRepeatThreshold"],
+    ["key_repeat_reset_delay", "keyRepeatResetDelay"],
+    ["suppress_on_key_repeat", "suppressOnKeyRepeat"],
+  ];
+
+  for (const [snakeKey, camelKey] of snakeToCamelMappings) {
+    if (
+      Object.prototype.hasOwnProperty.call(normalized, snakeKey) &&
+      normalized[camelKey] === undefined
+    ) {
+      (normalized as Record<string, unknown>)[camelKey] = normalized[snakeKey];
+    }
+    if (Object.prototype.hasOwnProperty.call(normalized, snakeKey)) {
+      delete normalized[snakeKey];
+    }
+  }
+
   return normalized;
 }
 

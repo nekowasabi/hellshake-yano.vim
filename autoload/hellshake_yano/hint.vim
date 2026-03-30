@@ -90,7 +90,8 @@ function! hellshake_yano#hint#show_hints_with_key_internal(key) abort
     " 現在のモードを検出
     let current_mode = hellshake_yano#hint#detect_current_mode()
     " Denops側のshowHintsWithKeyメソッドを呼び出し（モード情報付き）
-    call denops#notify('hellshake-yano', 'showHintsWithKey', [a:key, current_mode])
+    " Why: silent! as belt-and-suspenders with try-catch — denops#notify is fire-and-forget
+    silent! call denops#notify('hellshake-yano', 'showHintsWithKey', [a:key, current_mode])
   catch
     call hellshake_yano#utils#show_error('show_hints_with_key', v:exception)
   endtry

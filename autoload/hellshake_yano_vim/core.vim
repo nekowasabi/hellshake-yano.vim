@@ -70,8 +70,9 @@ function! hellshake_yano_vim#core#init() abort
   call s:setup_focus_gained_autocmd()
 
   " Phase 1集約: Denops側に enable を通知
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
-    call denops#notify('hellshake-yano', 'enable', [])
+    silent! call denops#notify('hellshake-yano', 'enable', [])
   endif
 endfunction
 
@@ -627,8 +628,9 @@ function! hellshake_yano_vim#core#hide() abort
   let s:state.hints_visible = v:false
 
   " Phase 1集約: Denops側にも hide を同期
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
-    call denops#notify('hellshake-yano', 'displayHideAll', [])
+    silent! call denops#notify('hellshake-yano', 'displayHideAll', [])
   endif
 endfunction
 

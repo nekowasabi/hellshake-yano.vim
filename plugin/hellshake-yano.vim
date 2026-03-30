@@ -601,7 +601,8 @@ function! s:on_denops_ready() abort
   call hellshake_yano#core#init()
 
   " ユーザー設定をdenops側に送信（TypeScript側でデフォルト値とマージ）
-  call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+  silent! call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
 endfunction
 
 " プラグインの初期化を遅延実行

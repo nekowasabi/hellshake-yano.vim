@@ -205,6 +205,13 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
       config.motionTimeout ?? 2000,
       config.motionCount ?? 2
     );
+    // Why: setPerKeyMotionCount here instead of passing to constructor
+    // — perKeyMotionCount/defaultMotionCount are optional extended config,
+    //   constructor only accepts the legacy motionCount threshold
+    motionDetector.setPerKeyMotionCount(
+      config.perKeyMotionCount,
+      config.defaultMotionCount,
+    );
 
     // Dispatcher登録（Vim環境用の最小実装）
     denops.dispatcher = {
@@ -466,10 +473,17 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         let validConfig = defaultKeyRepeatConfig;
         if (typeof keyRepeatConfig === "object" && keyRepeatConfig !== null) {
           const cfg = keyRepeatConfig as Record<string, unknown>;
+          // Why: accept both reset_delay (VimScript snake_case) and resetDelay (camelCase)
+          // — VimScript s:get_key_repeat_config() produces { reset_delay: N }
+          const resetDelay = typeof cfg.resetDelay === "number"
+            ? cfg.resetDelay
+            : typeof cfg.reset_delay === "number"
+              ? cfg.reset_delay
+              : 300;
           validConfig = {
             enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : true,
             threshold: typeof cfg.threshold === "number" ? cfg.threshold : 50,
-            resetDelay: typeof cfg.resetDelay === "number" ? cfg.resetDelay : 300,
+            resetDelay,
           };
         }
 
@@ -638,6 +652,16 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
 
     await initializeDictionarySystem(denops);
 
+    // Why: Vim層(204-207行)と同様にVimMotionDetectorを初期化。Neovim層でもmotion系関数が必要なため
+    const neovimMotionDetector = new VimMotionDetector(
+      config.motionTimeout ?? 2000,
+      config.motionCount ?? 2,
+    );
+    neovimMotionDetector.setPerKeyMotionCount(
+      config.perKeyMotionCount,
+      config.defaultMotionCount,
+    );
+
     denops.dispatcher = {
       // deno-lint-ignore require-await
       async enable(): Promise<void> {
@@ -692,6 +716,19 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
       },
 
       async hideHints(): Promise<void> {
+        await hideHintsDisplay(
+          denops,
+          extmarkNamespace,
+          fallbackMatchIds,
+          { value: hintsVisible },
+          currentHints,
+        );
+        hintsVisible = false;
+      },
+
+      // Why: Neovim層にdisplayHideAll未登録でVimScript側(core.vim:631)から呼ばれてエラー
+      // displayHideAll: VimScript互換API - 全ヒント非表示
+      async displayHideAll(): Promise<void> {
         await hideHintsDisplay(
           denops,
           extmarkNamespace,
@@ -843,6 +880,20 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         // currentHints のうち入力中のプレフィックスにマッチするものを返す
         // 現状は highlightCandidateHints が担うため空配列を返す
         return [];
+      },
+
+      // Why: Vim層(516行)にgetVisualRangeが存在するため、Neovim層にもスタブを追加。
+      // Neovim向けビジュアル範囲取得はPhase 2後半で実装予定
+      // deno-lint-ignore require-await
+      async getVisualRange(): Promise<Record<string, unknown>> {
+        // TODO: Neovim向けビジュアル範囲取得は Phase 2 後半で実装予定 (C-04制約)
+        return {
+          mode: "none",
+          start_line: 0,
+          start_col: 0,
+          end_line: 0,
+          end_col: 0,
+        };
       },
 
       // Process 63: detectWordsInVisualRange — Neovim用ビジュアル範囲単語検出
@@ -1124,6 +1175,172 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
           if (typeof val === "number" && val > 0) return val;
         }
         return config.defaultMinWordLength ?? 3;
+      },
+
+      // ========================================
+      // Process 1: Display functions (Neovim extmark)
+      // ========================================
+
+      // Why: Vim層(391-405行)はpopup_createで画面座標を使うが、Neovim層はextmarkで
+      // バッファ座標(0-indexed)を使う。screenpos変換は不要
+      async displayShowHint(lnum: unknown, col: unknown, hint: unknown): Promise<number> {
+        if (typeof lnum !== "number" || typeof col !== "number" || typeof hint !== "string") {
+          return -1;
+        }
+        if (!extmarkNamespace) return -1;
+        try {
+          const bufnr = await denops.call("nvim_get_current_buf");
+          // Why: Neovim extmark APIは0-indexed、Vim APIは1-indexed。lnum-1, col-1で変換
+          const extmarkId = await denops.call(
+            "nvim_buf_set_extmark",
+            bufnr,
+            extmarkNamespace,
+            lnum - 1,
+            col - 1,
+            { virt_text: [[hint, "HellshakeYanoHint"]], virt_text_pos: "overlay" },
+          ) as number;
+          return extmarkId;
+        } catch {
+          return -1;
+        }
+      },
+
+      // Why: Vim層(408-422行)はwinidからscreenpos変換するが、Neovim層はwinbufnrで
+      // バッファを特定してextmarkを設置する
+      async displayShowHintWithWindow(
+        winid: unknown,
+        lnum: unknown,
+        col: unknown,
+        hint: unknown,
+      ): Promise<number> {
+        if (
+          typeof winid !== "number" || typeof lnum !== "number" ||
+          typeof col !== "number" || typeof hint !== "string"
+        ) {
+          return -1;
+        }
+        if (!extmarkNamespace) return -1;
+        try {
+          const bufnr = await denops.call("winbufnr", winid);
+          const extmarkId = await denops.call(
+            "nvim_buf_set_extmark",
+            bufnr,
+            extmarkNamespace,
+            lnum - 1,
+            col - 1,
+            { virt_text: [[hint, "HellshakeYanoHint"]], virt_text_pos: "overlay" },
+          ) as number;
+          return extmarkId;
+        } catch {
+          return -1;
+        }
+      },
+
+      // ========================================
+      // Process 2: Display highlight & popup count
+      // ========================================
+
+      // Why: Vim層(430-434行)はVimPopupDisplay.highlightPartialMatchesに委譲するが、
+      // Neovim層は既存のhighlightCandidateHintsAsyncInternalを再利用する
+      // deno-lint-ignore require-await
+      async displayHighlightPartialMatches(matches: unknown): Promise<void> {
+        if (!Array.isArray(matches)) return;
+        const input = matches.filter((m): m is string => typeof m === "string").join("");
+        if (input.length === 0) return;
+        // Why: highlightCandidateHintsAsyncInternalを使う。既にNeovim層の
+        // highlightCandidateHints dispatcherと同じパターン
+        highlightCandidateHintsAsyncInternal(
+          denops,
+          input,
+          currentHints,
+          config,
+          extmarkNamespace,
+          fallbackMatchIds,
+        );
+      },
+
+      // Why: Vim層(438-440行)はvimDisplay.getPopupCount()を呼ぶが、
+      // Neovim層ではextmarkベースなのでcurrentHints.lengthが等価
+      // deno-lint-ignore require-await
+      async displayGetPopupCount(): Promise<number> {
+        return currentHints.length;
+      },
+
+      // ========================================
+      // Process 3 & 4: Motion functions
+      // ========================================
+
+      // Why: Vim層(446-477行)と同じmotionDetectorパターンだが、Neovim層にも
+      // 独立したインスタンスが必要。config.motionTimeout/motionCountで初期化
+      // deno-lint-ignore require-await
+      async motionDetect(
+        motionKey: unknown,
+        count: unknown,
+        keyRepeatConfig: unknown,
+      ): Promise<{
+        shouldShowHints: boolean;
+        skipReason?: string;
+        newCount: number;
+      }> {
+        if (typeof motionKey !== "string" || typeof count !== "number") {
+          return { shouldShowHints: false, skipReason: "invalid_params", newCount: 0 };
+        }
+
+        // keyRepeatConfig の型検証
+        const defaultKeyRepeatConfig: KeyRepeatConfig = {
+          enabled: true,
+          threshold: 50,
+          resetDelay: 300,
+        };
+
+        let validConfig = defaultKeyRepeatConfig;
+        if (typeof keyRepeatConfig === "object" && keyRepeatConfig !== null) {
+          const cfg = keyRepeatConfig as Record<string, unknown>;
+          // Why: accept both reset_delay (VimScript snake_case) and resetDelay (camelCase)
+          // — VimScript s:get_key_repeat_config() produces { reset_delay: N }
+          const resetDelay = typeof cfg.resetDelay === "number"
+            ? cfg.resetDelay
+            : typeof cfg.reset_delay === "number"
+              ? cfg.reset_delay
+              : 300;
+          validConfig = {
+            enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : true,
+            threshold: typeof cfg.threshold === "number" ? cfg.threshold : 50,
+            resetDelay,
+          };
+        }
+
+        return neovimMotionDetector.detectMotion(motionKey, count, validConfig);
+      },
+
+      // deno-lint-ignore require-await
+      async motionResetState(): Promise<void> {
+        neovimMotionDetector.resetState();
+      },
+
+      // deno-lint-ignore require-await
+      async motionSetThreshold(threshold: unknown): Promise<void> {
+        if (typeof threshold === "number" && threshold > 0) {
+          neovimMotionDetector.setThreshold(threshold);
+        }
+      },
+
+      // deno-lint-ignore require-await
+      async motionSetTimeout(timeoutMs: unknown): Promise<void> {
+        if (typeof timeoutMs === "number" && timeoutMs > 0) {
+          neovimMotionDetector.setTimeout(timeoutMs);
+        }
+      },
+
+      // deno-lint-ignore require-await
+      async motionGetState(): Promise<{
+        lastMotion: string;
+        lastMotionTime: number;
+        motionCount: number;
+        timeoutMs: number;
+        threshold: number;
+      }> {
+        return neovimMotionDetector.getState();
       },
     };
     // updatePluginStateはcore.tsに統合されたため、必要に応じてCoreクラス経由で呼び出し

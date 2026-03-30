@@ -75,7 +75,8 @@ endfunction
 function! hellshake_yano#config#notify_denops_config() abort
   if hellshake_yano#utils#is_denops_ready()
     try
-      call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
+      " Why: silent! as belt-and-suspenders with try-catch — denops#notify is fire-and-forget
+      silent! call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
     catch
       call hellshake_yano#utils#show_error('[hellshake-yano] Error: Failed to update denops config: ' . v:exception)
     endtry

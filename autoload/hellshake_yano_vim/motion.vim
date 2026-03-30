@@ -188,8 +188,9 @@ endfunction
 function! hellshake_yano_vim#motion#set_threshold(count) abort
   let s:motion_state.threshold = a:count
   " Phase 1集約: Denops側に同期
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
-    call denops#notify('hellshake-yano', 'updateConfig', [{'threshold': a:count}])
+    silent! call denops#notify('hellshake-yano', 'updateConfig', [{'threshold': a:count}])
   endif
 endfunction
 
@@ -210,8 +211,9 @@ endfunction
 function! hellshake_yano_vim#motion#set_timeout(ms) abort
   let s:motion_state.timeout_ms = a:ms
   " Phase 1集約: Denops側に同期
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
-    call denops#notify('hellshake-yano', 'updateConfig', [{'motionTimeout': a:ms}])
+    silent! call denops#notify('hellshake-yano', 'updateConfig', [{'motionTimeout': a:ms}])
   endif
 endfunction
 
@@ -239,18 +241,26 @@ function! hellshake_yano_vim#motion#get_motion_count(key) abort
     return l:default_count
   endif
 
-  " defaultMotionCount の取得
+  " defaultMotionCount の取得（camelCase / snake_case 両対応）
+  " Why: default_motion_count (snake_case) instead of only defaultMotionCount (camelCase)
+  " — plugin/hellshake-yano.vim sets default_motion_count, so both must be checked
   if has_key(g:hellshake_yano, 'defaultMotionCount')
     let l:default_count = g:hellshake_yano.defaultMotionCount
+  elseif has_key(g:hellshake_yano, 'default_motion_count')
+    let l:default_count = g:hellshake_yano.default_motion_count
   endif
 
-  " perKeyMotionCount の取得
-  if has_key(g:hellshake_yano, 'perKeyMotionCount')
-    let l:per_key = g:hellshake_yano.perKeyMotionCount
-    if type(l:per_key) == v:t_dict && has_key(l:per_key, a:key)
-      return l:per_key[a:key]
+  " perKeyMotionCount の取得（camelCase / snake_case 両対応）
+  " Why: per_key_motion_count (snake_case) instead of only perKeyMotionCount (camelCase)
+  " — plugin/hellshake-yano.vim sets per_key_motion_count, so both must be checked
+  for l:key_name in ['perKeyMotionCount', 'per_key_motion_count']
+    if has_key(g:hellshake_yano, l:key_name)
+      let l:per_key = g:hellshake_yano[l:key_name]
+      if type(l:per_key) == v:t_dict && has_key(l:per_key, a:key)
+        return l:per_key[a:key]
+      endif
     endif
-  endif
+  endfor
 
   " デフォルトを返す
   return l:default_count

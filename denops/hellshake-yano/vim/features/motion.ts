@@ -110,6 +110,11 @@ export class VimMotionDetector {
   private state: MotionState;
   private lastKeyTime: number = 0;
   private isKeyRepeating: boolean = false;
+  // Why: perKeyMotionCount/defaultMotionCount instead of constructor threshold alone
+  // — VimScript fallback path uses get_motion_count(key) which resolves per-key overrides.
+  // Denops path must replicate this to produce identical behavior.
+  private perKeyMotionCount?: Record<string, number>;
+  private defaultMotionCount: number;
 
   constructor(
     timeoutMs: number = 2000,
@@ -122,6 +127,9 @@ export class VimMotionDetector {
       timeoutMs,
       threshold,
     };
+    // Why: defaultMotionCount initialized from threshold — this is the constructor-level
+    // default; perKeyMotionCount can override per-key via setPerKeyMotionCount()
+    this.defaultMotionCount = threshold;
   }
 
   /**
@@ -185,10 +193,21 @@ export class VimMotionDetector {
     this.state.lastMotionTime = currentTime;
 
     // 6. 閾値チェック
-    if (this.state.motionCount >= this.state.threshold) {
+    // Why: VimMotionDetector.getMotionCount() instead of this.state.threshold
+    // — matches VimScript fallback path which calls get_motion_count(motionKey)
+    //   to resolve perKeyMotionCount overrides (e.g. { w: 2 })
+    const effectiveThreshold = VimMotionDetector.getMotionCount(
+      motionKey,
+      this.perKeyMotionCount,
+      this.defaultMotionCount,
+    );
+    if (this.state.motionCount >= effectiveThreshold) {
+      // Why: reset to 0 after threshold — matches VimScript fallback path (motion.vim:459-460)
+      // Without this, hints would fire on every subsequent keystroke instead of every N-th
+      this.state.motionCount = 0;
       return {
         shouldShowHints: true,
-        newCount: this.state.motionCount,
+        newCount: 0,
       };
     }
 
@@ -247,6 +266,23 @@ export class VimMotionDetector {
    */
   setThreshold(threshold: number): void {
     this.state.threshold = threshold;
+    this.defaultMotionCount = threshold;
+  }
+
+  /**
+   * キー別モーション閾値を設定
+   *
+   * @param perKeyMotionCount キー別閾値マップ (例: { w: 2, j: 5 })
+   * @param defaultMotionCount デフォルト閾値
+   */
+  setPerKeyMotionCount(
+    perKeyMotionCount?: Record<string, number>,
+    defaultMotionCount?: number,
+  ): void {
+    this.perKeyMotionCount = perKeyMotionCount;
+    if (defaultMotionCount !== undefined) {
+      this.defaultMotionCount = defaultMotionCount;
+    }
   }
 
   /**

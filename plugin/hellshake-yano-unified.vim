@@ -98,15 +98,16 @@ function! s:initialize_unified_callback() abort
       \ get(g:, 'hellshake_yano_vim_config', {}),
       \ get(g:, 'hellshake_yano', {})
     \ )
-    call denops#notify('hellshake-yano', 'updateConfig', [l:config])
+    " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+    silent! call denops#notify('hellshake-yano', 'updateConfig', [l:config])
 
     " コマンド定義
     command! -nargs=0 HellshakeYanoShow
-      \ call denops#notify('hellshake-yano', 'showHints', [])
+      \ silent! call denops#notify('hellshake-yano', 'showHints', [])
     command! -nargs=0 HellshakeYanoHide
-      \ call denops#notify('hellshake-yano', 'hideHints', [])
+      \ silent! call denops#notify('hellshake-yano', 'hideHints', [])
     command! -nargs=0 HellshakeYanoToggle
-      \ call denops#notify('hellshake-yano', 'toggle', [])
+      \ silent! call denops#notify('hellshake-yano', 'toggle', [])
 
     " キーマッピング
     call s:setup_unified_mappings()
@@ -272,8 +273,9 @@ endfunction
 " ビジュアルモードでヒント表示を呼び出し
 function! s:show_hints_visual() abort
   " Denopsチャネル状態を確認
+  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if denops#server#status() ==# 'running'
-    call denops#notify('hellshake-yano', 'showHints', [])
+    silent! call denops#notify('hellshake-yano', 'showHints', [])
   else
     echohl ErrorMsg
     echo '[hellshake-yano] Denops is not available. Hints cannot be shown.'
