@@ -14,6 +14,7 @@ import type {
   Word,
   WordDetectionResult,
 } from "../../types.ts";
+import { asByteCol, asOneLine } from "../../types.ts";
 import type { WordDetectionConfig as ImportedWordDetectionConfig, WordDetector as ImportedWordDetector } from "./word/word-detector-strategies.ts";
 import { RegexWordDetector as ImportedRegexWordDetector, TinySegmenterWordDetector as ImportedTinySegmenterWordDetector, HybridWordDetector as ImportedHybridWordDetector } from "./word/word-detector-strategies.ts";
 export interface EnhancedWordConfig extends WordDetectionManagerConfig {
@@ -651,9 +652,9 @@ export function extractWords(
       const displayCol = getDisplayColumn(lineText, match.index);
       words.push({
         text: match.text,
-        line: lineNumber,
+        line: asOneLine(lineNumber),
         col: displayCol + 1, // Vimの列番号は1から始まる（タブ展開後の表示位置）
-        byteCol: byteIndex + 1, // Vimのバイト列番号は1から始まる
+        byteCol: asByteCol(byteIndex + 1), // Vimのバイト列番号は1から始まる
       });
     }
     return words;
@@ -754,9 +755,9 @@ export function extractWords(
     const displayCol = getDisplayColumn(lineText, match.index);
     words.push({
       text: match.text,
-      line: lineNumber,
+      line: asOneLine(lineNumber),
       col: displayCol + 1, // Vimの列番号は1から始まる（タブ展開後の表示位置）
-      byteCol: byteIndex + 1, // Vimのバイト列番号は1から始まる
+      byteCol: asByteCol(byteIndex + 1), // Vimのバイト列番号は1から始まる
     });
   }
   return words;

@@ -3,6 +3,31 @@ import type { Denops as DenopsStd } from "@denops/std";
 export type { Config } from "./config.ts";
 export type { HighlightColor } from "./common/types/config.ts";
 export type Denops = DenopsStd;
+
+// Why: col/line の単位混在は extmark 'out of range' の根本原因だった。branded type で型レベル検出
+/** 1-indexed byte column offset (Vim byteCol) */
+export type ByteCol = number & { readonly __brand: "ByteCol" };
+/** 0-indexed character column offset */
+export type CharCol = number & { readonly __brand: "CharCol" };
+/** 0-indexed line number */
+export type ZeroLine = number & { readonly __brand: "ZeroLine" };
+/** 1-indexed line number (Vim line) */
+export type OneLine = number & { readonly __brand: "OneLine" };
+
+/** Cast a plain number to ByteCol (1-indexed byte offset) */
+export const asByteCol = (n: number): ByteCol => n as ByteCol;
+/** Cast a plain number to CharCol (0-indexed char offset) */
+export const asCharCol = (n: number): CharCol => n as CharCol;
+/** Cast a plain number to ZeroLine (0-indexed) */
+export const asZeroLine = (n: number): ZeroLine => n as ZeroLine;
+/** Cast a plain number to OneLine (1-indexed) */
+export const asOneLine = (n: number): OneLine => n as OneLine;
+
+/** Convert 1-indexed line to 0-indexed line */
+export const oneLineToZeroLine = (l: OneLine): ZeroLine => (l - 1) as ZeroLine;
+/** Convert 0-indexed line to 1-indexed line */
+export const zeroLineToOneLine = (l: ZeroLine): OneLine => (l + 1) as OneLine;
+
 export interface Word {
   text: string;
   line: number;
