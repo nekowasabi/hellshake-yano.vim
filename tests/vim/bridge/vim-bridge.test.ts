@@ -14,10 +14,7 @@
 import { test } from "../../testRunner.ts";
 import { assertEquals, assertExists } from "@std/assert";
 import type { Denops } from "@denops/std";
-import {
-  VimBridge,
-  type Word,
-} from "../../../denops/hellshake-yano/vim/bridge/vim-bridge.ts";
+import { VimBridge, type Word } from "../../../denops/hellshake-yano/vim/bridge/vim-bridge.ts";
 
 /**
  * VimScript版のdetect_visible()を呼び出して結果を取得

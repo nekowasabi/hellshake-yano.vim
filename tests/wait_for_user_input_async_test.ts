@@ -4,7 +4,11 @@
  */
 
 import { Denops } from "https://deno.land/x/denops_std@v6.4.0/mod.ts";
-import { assertEquals, assertExists, assertRejects } from "https://deno.land/std@0.201.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertExists,
+  assertRejects,
+} from "https://deno.land/std@0.201.0/assert/mod.ts";
 import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
 import type { HintMapping, Word } from "../denops/hellshake-yano/types.ts";
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
@@ -183,7 +187,7 @@ Deno.test("waitForUserInput - RED: Should continue immediately to 2nd character 
 
   // 元のgetcharをラップして呼び出し時間を記録
   const originalCall = mockDenops.call.bind(mockDenops);
-  mockDenops.call = async function(method: string, ...args: any[]) {
+  mockDenops.call = async function (method: string, ...args: any[]) {
     if (method === "getchar") {
       timestamps.push(Date.now());
     }
@@ -198,7 +202,11 @@ Deno.test("waitForUserInput - RED: Should continue immediately to 2nd character 
   // 現在の同期実装では、ハイライト処理が完了するまで2文字目の入力待機が遅延する
   if (timestamps.length >= 2) {
     const timeBetweenInputs = timestamps[1] - timestamps[0];
-    assertEquals(timeBetweenInputs < 50, true, "Should immediately continue to 2nd character input");
+    assertEquals(
+      timeBetweenInputs < 50,
+      true,
+      "Should immediately continue to 2nd character input",
+    );
   }
 });
 
@@ -219,7 +227,7 @@ Deno.test("waitForUserInput - RED: Should be type-safe with deno check", async (
       mockDenops as unknown as Denops,
       mockHints,
       "a",
-      { mode: "normal" }
+      { mode: "normal" },
     );
     assertEquals(result, undefined, "Should return undefined (fire-and-forget)");
 

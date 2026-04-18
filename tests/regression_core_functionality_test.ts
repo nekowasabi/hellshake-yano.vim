@@ -27,8 +27,7 @@ Deno.test({
     ];
     const hints = ["a", "b"];
 
-    const mappings = assignHintsToWords(words, hints, 0, 0, "normal", {hintPosition: "start",
-    });
+    const mappings = assignHintsToWords(words, hints, 0, 0, "normal", { hintPosition: "start" });
 
     assertEquals(mappings.length, 2);
     assertEquals(mappings[0].hint, "a");
@@ -50,8 +49,9 @@ Deno.test({
     const hints = ["A", "B"];
 
     // 日本語の終端位置のテスト（隣接検出をスキップして両方の単語にヒントを割り当てる）
-    const mappings = assignHintsToWords(words, hints, 0, 0, "normal", {hintPosition: "end",
-    }, { skipOverlapDetection: true });
+    const mappings = assignHintsToWords(words, hints, 0, 0, "normal", { hintPosition: "end" }, {
+      skipOverlapDetection: true,
+    });
 
     assertEquals(mappings.length, 2);
 
@@ -70,7 +70,8 @@ Deno.test({
 
     // 多くの単語でフォールバック機能をテスト
     const wordCount = 30; // 単文字（26）+ 2文字（4） = 30
-    const config = {singleCharKeys: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+    const config = {
+      singleCharKeys: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
       multiCharKeys: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
     };
     const hints = generateHints(wordCount, { groups: true, ...config });
@@ -109,13 +110,11 @@ Deno.test({
     const hints = ["A"];
 
     // 1回目の呼び出し
-    const result1 = assignHintsToWords([baseWord], hints, 0, 0, "normal", {hintPosition: "end",
-    });
+    const result1 = assignHintsToWords([baseWord], hints, 0, 0, "normal", { hintPosition: "end" });
 
     // 2回目の呼び出し（同じ条件）
     textAccessCount = 0;
-    const result2 = assignHintsToWords([baseWord], hints, 0, 0, "normal", {hintPosition: "end",
-    });
+    const result2 = assignHintsToWords([baseWord], hints, 0, 0, "normal", { hintPosition: "end" });
 
     // キャッシュが効いていることを確認
     assertEquals(textAccessCount, 0, "キャッシュにより2回目のアクセスは発生しない");
@@ -129,24 +128,40 @@ Deno.test({
     const { detectWordsWithManager } = await import("../denops/hellshake-yano/neovim/core/word.ts");
 
     // Mock Denops
+    // Why: batchGet (collect) が denops.batch を使用するため、batch モックが必要。
+    // getFoldedLines も denops.eval を使用するため eval モックも必要。
+    const callHandler = async (func: string, ...args: any[]): Promise<any> => {
+      switch (func) {
+        case "line":
+          return args[0] === "w0" ? 1 : 5;
+        case "getbufline":
+          return ["hello world test"];
+        case "bufnr":
+          return 1;
+        case "bufexists":
+          return 1;
+        case "foldclosed":
+          return -1; // fold されていない行は -1 を返す
+        case "foldclosedend":
+          return -1; // fold されていない行は -1 を返す
+        default:
+          return null;
+      }
+    };
     const mockDenops = {
-      call: async (func: string, ...args: any[]) => {
-        switch (func) {
-          case "line":
-            return args[0] === "w0" ? 1 : 5;
-          case "getbufline":
-            return ["hello world test"];
-          case "bufnr":
-            return 1;
-          case "bufexists":
-            return 1;
-          case "foldclosed":
-            return -1; // fold されていない行は -1 を返す
-          case "foldclosedend":
-            return -1; // fold されていない行は -1 を返す
-          default:
-            return null;
+      call: callHandler,
+      // Why: collect は denops.batch(...calls) を内部的に呼ぶ。
+      batch: async (...calls: [string, ...any[]][]): Promise<any[]> => {
+        const results: any[] = [];
+        for (const [fn, ...args] of calls) {
+          results.push(await callHandler(fn, ...args));
         }
+        return results;
+      },
+      eval: async (expr: string): Promise<any> => {
+        // getFoldedLines が filter(range(...)) を eval する — fold 無しを想定
+        if (typeof expr === "string" && expr.includes("foldclosed")) return [];
+        return [];
       },
       meta: { host: "nvim" },
     } as any;

@@ -17,17 +17,17 @@ for (const key in core) {
 
 // Check if our new methods exist
 const methodsToCheck = [
-  'enablePlugin',
-  'disablePlugin',
-  'togglePlugin',
-  'isPluginEnabled',
-  'setMotionCount',
-  'setMotionTimeout',
-  'toggleDebugMode',
-  'getCommandFactory'
+  "enablePlugin",
+  "disablePlugin",
+  "togglePlugin",
+  "isPluginEnabled",
+  "setMotionCount",
+  "setMotionTimeout",
+  "toggleDebugMode",
+  "getCommandFactory",
 ];
 
 console.log("\nChecking for specific methods:");
-methodsToCheck.forEach(method => {
+methodsToCheck.forEach((method) => {
   console.log(`- ${method}: ${typeof (core as any)[method]}`);
 });

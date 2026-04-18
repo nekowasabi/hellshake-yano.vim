@@ -43,7 +43,11 @@ class TestRunner {
 
   assertEquals<T>(actual: T, expected: T, message?: string): void {
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      throw new Error(`${message || "Assertion failed"}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+      throw new Error(
+        `${message || "Assertion failed"}: expected ${JSON.stringify(expected)}, got ${
+          JSON.stringify(actual)
+        }`,
+      );
     }
   }
 
@@ -65,7 +69,7 @@ class TestRunner {
 
   printResults(): void {
     console.log("\n=== Hint Overlap Detection Test Results ===");
-    this.results.forEach(result => {
+    this.results.forEach((result) => {
       const status = result.passed ? "✅ PASS" : "❌ FAIL";
       console.log(`${status}: ${result.name}`);
       if (!result.passed && result.error) {
@@ -73,7 +77,7 @@ class TestRunner {
       }
     });
 
-    const passed = this.results.filter(r => r.passed).length;
+    const passed = this.results.filter((r) => r.passed).length;
     const total = this.results.length;
     console.log(`\nSummary: ${passed}/${total} tests passed`);
   }
@@ -85,23 +89,23 @@ const runner = new TestRunner();
 
 // Import the actual implementations from hint.ts
 import {
+  assignHintsToWords,
   detectAdjacentWords,
+  generateHints,
   isSymbolWord,
   shouldSkipHintForOverlap,
-  assignHintsToWords,
-  generateHints
 } from "../denops/hellshake-yano/neovim/core/hint.ts";
 
 // ===== Test Data =====
 
 const createTestWords = (): Word[] => [
-  { text: "-", line: 1, col: 1, byteCol: 1 },           // markdown symbol
+  { text: "-", line: 1, col: 1, byteCol: 1 }, // markdown symbol
   { text: "**保守性**", line: 1, col: 3, byteCol: 3 }, // adjacent markdown with Japanese
-  { text: "の", line: 1, col: 11, byteCol: 15 },        // particle (should be adjacent)
-  { text: "向上", line: 1, col: 13, byteCol: 17 },      // normal word
-  { text: "hello", line: 2, col: 1, byteCol: 1 },       // normal word on different line
-  { text: "world", line: 2, col: 7, byteCol: 7 },       // adjacent to hello
-  { text: "test", line: 3, col: 1, byteCol: 1 },        // isolated word
+  { text: "の", line: 1, col: 11, byteCol: 15 }, // particle (should be adjacent)
+  { text: "向上", line: 1, col: 13, byteCol: 17 }, // normal word
+  { text: "hello", line: 2, col: 1, byteCol: 1 }, // normal word on different line
+  { text: "world", line: 2, col: 7, byteCol: 7 }, // adjacent to hello
+  { text: "test", line: 3, col: 1, byteCol: 1 }, // isolated word
 ];
 
 const createSymbolWords = (): Word[] => [
@@ -129,14 +133,14 @@ const createNormalWords = (): Word[] => [
 runner.test("detectAdjacentWords: should detect words on same line within 1 column", () => {
   const words: Word[] = [
     { text: "hello", line: 1, col: 1 },
-    { text: "world", line: 1, col: 7 },  // col 7, hello ends at col 5, gap of 1
-    { text: "test", line: 2, col: 1 },   // different line
+    { text: "world", line: 1, col: 7 }, // col 7, hello ends at col 5, gap of 1
+    { text: "test", line: 2, col: 1 }, // different line
   ];
 
   const result = detectAdjacentWords(words);
 
   // hello and world should be adjacent (gap <= 1)
-  const helloResult = result.find(r => r.word.text === "hello");
+  const helloResult = result.find((r) => r.word.text === "hello");
   runner.assertTrue(!!helloResult, "Should find hello in results");
   runner.assertEquals(helloResult!.adjacentWords.length, 1);
   runner.assertEquals(helloResult!.adjacentWords[0].text, "world");
@@ -150,20 +154,20 @@ runner.test("detectAdjacentWords: should not detect words with large gaps", () =
 
   const result = detectAdjacentWords(words);
 
-  const helloResult = result.find(r => r.word.text === "hello");
+  const helloResult = result.find((r) => r.word.text === "hello");
   runner.assertTrue(!!helloResult, "Should find hello in results");
   runner.assertEquals(helloResult!.adjacentWords.length, 0);
 });
 
 runner.test("detectAdjacentWords: should handle UTF-8 with byteCol correctly", () => {
   const words: Word[] = [
-    { text: "保守", line: 1, col: 1, byteCol: 1 },     // 2 characters, 6 bytes
-    { text: "性", line: 1, col: 3, byteCol: 7 },       // starts right after
+    { text: "保守", line: 1, col: 1, byteCol: 1 }, // 2 characters, 6 bytes
+    { text: "性", line: 1, col: 3, byteCol: 7 }, // starts right after
   ];
 
   const result = detectAdjacentWords(words);
 
-  const firstResult = result.find(r => r.word.text === "保守");
+  const firstResult = result.find((r) => r.word.text === "保守");
   runner.assertTrue(!!firstResult, "Should find 保守 in results");
   runner.assertEquals(firstResult!.adjacentWords.length, 1);
   runner.assertEquals(firstResult!.adjacentWords[0].text, "性");
@@ -177,7 +181,7 @@ runner.test("detectAdjacentWords: should handle words on different lines", () =>
 
   const result = detectAdjacentWords(words);
 
-  result.forEach(r => {
+  result.forEach((r) => {
     runner.assertEquals(r.adjacentWords.length, 0, `${r.word.text} should have no adjacent words`);
   });
 });
@@ -192,7 +196,7 @@ runner.test("detectAdjacentWords: should handle empty input", () => {
 runner.test("isSymbolWord: should identify markdown symbols", () => {
   const symbols = ["-", "*", "**", "***", "###", "```", "[", "]", "(", ")"];
 
-  symbols.forEach(symbol => {
+  symbols.forEach((symbol) => {
     const word: Word = { text: symbol, line: 1, col: 1 };
     runner.assertTrue(isSymbolWord(word), `${symbol} should be identified as symbol`);
   });
@@ -201,7 +205,7 @@ runner.test("isSymbolWord: should identify markdown symbols", () => {
 runner.test("isSymbolWord: should not identify normal words as symbols", () => {
   const normalWords = ["hello", "world", "test", "保守性", "向上"];
 
-  normalWords.forEach(text => {
+  normalWords.forEach((text) => {
     const word: Word = { text, line: 1, col: 1 };
     runner.assertFalse(isSymbolWord(word), `${text} should not be identified as symbol`);
   });
@@ -218,7 +222,11 @@ runner.test("isSymbolWord: should handle mixed content correctly", () => {
 
   mixedWords.forEach(({ text, expected }) => {
     const word: Word = { text, line: 1, col: 1 };
-    runner.assertEquals(isSymbolWord(word), expected, `${text} should be ${expected ? 'symbol' : 'not symbol'}`);
+    runner.assertEquals(
+      isSymbolWord(word),
+      expected,
+      `${text} should be ${expected ? "symbol" : "not symbol"}`,
+    );
   });
 });
 
@@ -232,7 +240,11 @@ runner.test("isSymbolWord: should handle edge cases", () => {
 
   edgeCases.forEach(({ text, expected }) => {
     const word: Word = { text, line: 1, col: 1 };
-    runner.assertEquals(isSymbolWord(word), expected, `"${text}" should be ${expected ? 'symbol' : 'not symbol'}`);
+    runner.assertEquals(
+      isSymbolWord(word),
+      expected,
+      `"${text}" should be ${expected ? "symbol" : "not symbol"}`,
+    );
   });
 });
 
@@ -296,8 +308,8 @@ runner.test("shouldSkipHintForOverlap: complex priority rules", () => {
   // Test multiple adjacent words with different priorities
   const currentWord: Word = { text: "**", line: 1, col: 5 };
   const adjacentWords: Word[] = [
-    { text: "-", line: 1, col: 1 },      // symbol (lower priority than current)
-    { text: "test", line: 1, col: 8 },   // word (higher priority than current)
+    { text: "-", line: 1, col: 1 }, // symbol (lower priority than current)
+    { text: "test", line: 1, col: 8 }, // word (higher priority than current)
   ];
   const priorityRules = { symbolsPriority: 1, wordsPriority: 2 };
 
@@ -336,7 +348,7 @@ runner.test("Integration: overlap detection with real markdown scenario", () => 
   const adjacencyResults = detectAdjacentWords(markdownWords);
 
   // Symbol "-" should be adjacent to "**保守性**"
-  const dashResult = adjacencyResults.find(r => r.word.text === "-");
+  const dashResult = adjacencyResults.find((r) => r.word.text === "-");
   runner.assertTrue(!!dashResult, "Should find dash in results");
   runner.assertTrue(dashResult!.adjacentWords.length > 0, "Dash should have adjacent words");
 
@@ -347,7 +359,7 @@ runner.test("Integration: overlap detection with real markdown scenario", () => 
   const dashShouldSkip = shouldSkipHintForOverlap(
     dashResult!.word,
     dashResult!.adjacentWords,
-    priorityRules
+    priorityRules,
   );
   runner.assertTrue(dashShouldSkip, "Dash should skip due to priority rules");
 });
@@ -379,9 +391,9 @@ runner.test("Caching: repeated calls should use cache", () => {
 
 runner.test("assignHintsToWords: should exclude overlapping symbols", () => {
   const words: Word[] = [
-    { text: "-", line: 1, col: 1 },         // should be skipped (symbol adjacent to word)
+    { text: "-", line: 1, col: 1 }, // should be skipped (symbol adjacent to word)
     { text: "**保守性**", line: 1, col: 3 }, // should get hint
-    { text: "向上", line: 2, col: 1 },        // should get hint (isolated)
+    { text: "向上", line: 2, col: 1 }, // should get hint (isolated)
   ];
 
   const hints = generateHints(10);
@@ -391,25 +403,25 @@ runner.test("assignHintsToWords: should exclude overlapping symbols", () => {
   runner.assertEquals(mappings.length, 2, "Should exclude overlapping symbol");
 
   // Check that the symbol "-" is not in the mappings
-  const symbolMapping = mappings.find(m => m.word.text === "-");
+  const symbolMapping = mappings.find((m) => m.word.text === "-");
   runner.assertTrue(!symbolMapping, "Symbol should not have mapping due to overlap");
 
   // Check that other words have mappings
-  const markdownMapping = mappings.find(m => m.word.text === "**保守性**");
-  const normalMapping = mappings.find(m => m.word.text === "向上");
+  const markdownMapping = mappings.find((m) => m.word.text === "**保守性**");
+  const normalMapping = mappings.find((m) => m.word.text === "向上");
   runner.assertTrue(!!markdownMapping, "Non-symbol word should have mapping");
   runner.assertTrue(!!normalMapping, "Isolated word should have mapping");
 });
 
 runner.test("assignHintsToWords: should handle complex overlap scenarios", () => {
   const words: Word[] = [
-    { text: "-", line: 1, col: 1 },           // symbol, should skip
-    { text: "**", line: 1, col: 3 },          // symbol, should skip (adjacent to word)
-    { text: "保守性", line: 1, col: 6 },       // word, should keep
-    { text: "**", line: 1, col: 12 },         // symbol, should skip
-    { text: "の", line: 1, col: 15 },          // particle, should keep
-    { text: "向上", line: 1, col: 17 },        // word, should keep
-    { text: "test", line: 2, col: 1 },        // isolated word, should keep
+    { text: "-", line: 1, col: 1 }, // symbol, should skip
+    { text: "**", line: 1, col: 3 }, // symbol, should skip (adjacent to word)
+    { text: "保守性", line: 1, col: 6 }, // word, should keep
+    { text: "**", line: 1, col: 12 }, // symbol, should skip
+    { text: "の", line: 1, col: 15 }, // particle, should keep
+    { text: "向上", line: 1, col: 17 }, // word, should keep
+    { text: "test", line: 2, col: 1 }, // isolated word, should keep
   ];
 
   const hints = generateHints(10);
@@ -419,26 +431,29 @@ runner.test("assignHintsToWords: should handle complex overlap scenarios", () =>
   // This is correct behavior according to the priority rules
 
   // Verify symbols are excluded
-  const symbolMappings = mappings.filter(m => isSymbolWord(m.word));
+  const symbolMappings = mappings.filter((m) => isSymbolWord(m.word));
   runner.assertEquals(symbolMappings.length, 0, "No symbols should have mappings");
 
   // Check that we have at least the expected non-adjacent words
   const expectedMinWords = ["保守性", "test"]; // These should definitely be included
-  expectedMinWords.forEach(expectedText => {
-    const mapping = mappings.find(m => m.word.text === expectedText);
+  expectedMinWords.forEach((expectedText) => {
+    const mapping = mappings.find((m) => m.word.text === expectedText);
     runner.assertTrue(!!mapping, `${expectedText} should have mapping`);
   });
 
   // Total should be at least 3 (including の and 向上 if not filtered)
-  runner.assertTrue(mappings.length >= 3, `Should have at least 3 mappings, got ${mappings.length}`);
+  runner.assertTrue(
+    mappings.length >= 3,
+    `Should have at least 3 mappings, got ${mappings.length}`,
+  );
 });
 
 runner.test("assignHintsToWords: should preserve hint ordering after overlap filtering", () => {
   const words: Word[] = [
-    { text: "first", line: 1, col: 1 },      // distance: 0
-    { text: "-", line: 1, col: 7 },          // distance: 1, should skip (symbol)
-    { text: "second", line: 1, col: 9 },     // distance: 3, should keep
-    { text: "third", line: 2, col: 1 },      // distance: 1000, should keep
+    { text: "first", line: 1, col: 1 }, // distance: 0
+    { text: "-", line: 1, col: 7 }, // distance: 1, should skip (symbol)
+    { text: "second", line: 1, col: 9 }, // distance: 3, should keep
+    { text: "third", line: 2, col: 1 }, // distance: 1000, should keep
   ];
 
   const hints = ["A", "B", "C"];
@@ -448,9 +463,9 @@ runner.test("assignHintsToWords: should preserve hint ordering after overlap fil
   runner.assertEquals(mappings.length, 3);
 
   // Verify hints are assigned in distance order
-  const firstMapping = mappings.find(m => m.word.text === "first");
-  const secondMapping = mappings.find(m => m.word.text === "second");
-  const thirdMapping = mappings.find(m => m.word.text === "third");
+  const firstMapping = mappings.find((m) => m.word.text === "first");
+  const secondMapping = mappings.find((m) => m.word.text === "second");
+  const thirdMapping = mappings.find((m) => m.word.text === "third");
 
   runner.assertTrue(!!firstMapping, "first should have mapping");
   runner.assertTrue(!!secondMapping, "second should have mapping");
@@ -472,7 +487,10 @@ runner.test("assignHintsToWords: should handle edge case with all symbols", () =
 
   // When all words are symbols and adjacent, behavior depends on priority rules
   // Based on our implementation, only the rightmost (later) symbol should remain
-  runner.assertTrue(mappings.length <= 1, "Should have at most 1 mapping when all are adjacent symbols");
+  runner.assertTrue(
+    mappings.length <= 1,
+    "Should have at most 1 mapping when all are adjacent symbols",
+  );
 });
 
 runner.test("assignHintsToWords: should handle empty input gracefully", () => {
@@ -502,9 +520,15 @@ runner.test("Integration performance: large dataset with overlap detection", () 
   const mappings = assignHintsToWords(largeWords, hints, 10, 25);
   const duration = Date.now() - startTime;
 
-  runner.assertTrue(duration < 200, `Integration performance should be under 200ms, got ${duration}ms`);
+  runner.assertTrue(
+    duration < 200,
+    `Integration performance should be under 200ms, got ${duration}ms`,
+  );
   runner.assertTrue(mappings.length > 0, "Should produce mappings");
-  runner.assertTrue(mappings.length < largeWords.length, "Should filter out some overlapping words");
+  runner.assertTrue(
+    mappings.length < largeWords.length,
+    "Should filter out some overlapping words",
+  );
 });
 
 // ===== Deno-native tests for skipOverlapDetection propagation (Red-Green-Refactor) =====
@@ -558,12 +582,18 @@ Deno.test({
     const droppedWith = words.length - mappingsWith.length;
 
     // Red phase assertion: the flag should eliminate all drops
-    assertEquals(droppedWith, 0, `Expected 0 dropped with skipOverlapDetection, got ${droppedWith} (total: ${words.length}, mappings: ${mappingsWith.length})`);
+    assertEquals(
+      droppedWith,
+      0,
+      `Expected 0 dropped with skipOverlapDetection, got ${droppedWith} (total: ${words.length}, mappings: ${mappingsWith.length})`,
+    );
 
     // Also verify that without the flag, drops actually occur (proves the problem exists)
     // This confirms the test is meaningful -- if this ever becomes 0, the underlying
     // overlap detection has been fixed and the skip flag is no longer needed.
-    console.log(`[INFO] Without skipOverlapDetection: ${droppedWithout} dropped out of ${words.length}`);
+    console.log(
+      `[INFO] Without skipOverlapDetection: ${droppedWithout} dropped out of ${words.length}`,
+    );
     console.log(`[INFO] With skipOverlapDetection: ${droppedWith} dropped out of ${words.length}`);
   },
 });
@@ -596,15 +626,23 @@ Deno.test({
     }, { skipOverlapDetection: true });
     const droppedWith = words.length - mappingsWith.length;
 
-    assertEquals(droppedWith, 0, `Expected 0 dropped with skipOverlapDetection in direction-switch scenario, got ${droppedWith} (total: ${words.length}, mappings: ${mappingsWith.length})`);
+    assertEquals(
+      droppedWith,
+      0,
+      `Expected 0 dropped with skipOverlapDetection in direction-switch scenario, got ${droppedWith} (total: ${words.length}, mappings: ${mappingsWith.length})`,
+    );
 
     // Log for diagnostic purposes
     const mappingsWithout = assignHintsToWords(words, hints, cursorLine, cursorCol, "normal", {
       hintPosition: "start",
     });
     const droppedWithout = words.length - mappingsWithout.length;
-    console.log(`[INFO] Direction switch - Without skipOverlapDetection: ${droppedWithout} dropped out of ${words.length}`);
-    console.log(`[INFO] Direction switch - With skipOverlapDetection: ${droppedWith} dropped out of ${words.length}`);
+    console.log(
+      `[INFO] Direction switch - Without skipOverlapDetection: ${droppedWithout} dropped out of ${words.length}`,
+    );
+    console.log(
+      `[INFO] Direction switch - With skipOverlapDetection: ${droppedWith} dropped out of ${words.length}`,
+    );
   },
 });
 

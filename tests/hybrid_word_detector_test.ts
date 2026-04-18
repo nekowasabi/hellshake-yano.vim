@@ -15,9 +15,13 @@
  * 8. プロパティの確認（name, priority, supportedLanguages）
  */
 
-import { assertEquals, assertExists, assertInstanceOf } from "https://deno.land/std@0.212.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertExists,
+  assertInstanceOf,
+} from "https://deno.land/std@0.212.0/assert/mod.ts";
 import { HybridWordDetector } from "../denops/hellshake-yano/neovim/core/word.ts";
-import type { Word, DetectionContext } from "../denops/hellshake-yano/types.ts";
+import type { DetectionContext, Word } from "../denops/hellshake-yano/types.ts";
 
 Deno.test("HybridWordDetector - プロパティの確認", () => {
   const detector = new HybridWordDetector();
@@ -56,8 +60,8 @@ Deno.test("HybridWordDetector - 英数字のみのテキスト", async () => {
   });
 
   // 位置の確認
-  assertEquals(words[0].col, 1);  // "hello"
-  assertEquals(words[1].col, 7);  // "world"
+  assertEquals(words[0].col, 1); // "hello"
+  assertEquals(words[1].col, 7); // "world"
   assertEquals(words[2].col, 13); // "test"
   assertEquals(words[3].col, 18); // "123"
 });
@@ -95,7 +99,9 @@ Deno.test("HybridWordDetector - 日本語と英数字の混在テキスト", asy
   assertEquals(englishWords.length >= 3, true); // hello, world, test
 
   // 日本語の単語が含まれること（TinySegmenterによる分割）
-  const hasJapanese = words.some((w: Word) => /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(w.text));
+  const hasJapanese = words.some((w: Word) =>
+    /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(w.text)
+  );
   assertEquals(hasJapanese, true);
 
   // すべて同じ行
@@ -161,7 +167,7 @@ Deno.test("HybridWordDetector - 複数行の処理", async () => {
     assertEquals(
       prev.line < curr.line || (prev.line === curr.line && prev.col <= curr.col),
       true,
-      `Words should be sorted by position. Previous: ${prev.line}:${prev.col}, Current: ${curr.line}:${curr.col}`
+      `Words should be sorted by position. Previous: ${prev.line}:${prev.col}, Current: ${curr.line}:${curr.col}`,
     );
   }
 });
@@ -186,7 +192,7 @@ Deno.test("HybridWordDetector - 位置順ソート", async () => {
 
     assertEquals(
       prev.line < curr.line || (prev.line === curr.line && prev.col <= curr.col),
-      true
+      true,
     );
   }
 });
@@ -197,7 +203,7 @@ Deno.test("HybridWordDetector - DetectionContextの使用", async () => {
     currentKey: "f",
     minWordLength: 2,
     metadata: { source: "test" },
-    bufnr: 1
+    bufnr: 1,
   };
 
   const text = "hello こんにちは";

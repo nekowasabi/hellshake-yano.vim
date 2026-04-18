@@ -12,4 +12,4 @@ const context: DetectionContext = {
 };
 
 const words = await detector.detectWords(text, 1, context);
-console.log("Result:", words.map(w => w.text));
+console.log("Result:", words.map((w) => w.text));

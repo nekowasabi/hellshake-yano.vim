@@ -18,7 +18,7 @@
  */
 
 import { assertEquals, assertNotEquals } from "jsr:@std/assert@^1.0.0";
-import { describe, it, beforeEach } from "jsr:@std/testing@^1.0.0/bdd";
+import { beforeEach, describe, it } from "jsr:@std/testing@^1.0.0/bdd";
 import { DEFAULT_CONFIG } from "../../../config.ts";
 import {
   getMultiBufferExtmarkState,
@@ -91,7 +91,9 @@ describe("Test 2: validKeysSet must not include 'P' with DEFAULT_CONFIG", () => 
       false,
       `'P' must not be in validKeysSet. When 'P' is in validKeysSet, ` +
         `waitForUserInput treats it as a hint key instead of passing it through via feedkeys. ` +
-        `This causes paste (P) to be swallowed. Current validKeysSet: ${JSON.stringify([...validKeysSet])}`,
+        `This causes paste (P) to be swallowed. Current validKeysSet: ${
+          JSON.stringify([...validKeysSet])
+        }`,
     );
   });
 

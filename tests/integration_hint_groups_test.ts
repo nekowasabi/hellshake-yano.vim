@@ -19,7 +19,8 @@ describe("Integration: Hint Groups Feature", () => {
   describe("Configuration and Hint Generation", () => {
     it("should use hint groups when configured", () => {
       // 設定例: ホームポジションキーと上段キーを分ける
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";"],
         multiCharKeys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
         maxSingleCharHints: 10,
       };
@@ -40,7 +41,8 @@ describe("Integration: Hint Groups Feature", () => {
 
     it("should validate configuration before use", () => {
       // 無効な設定
-      const invalidConfig: HintKeyConfig = {singleCharKeys: ["A", "S", "D"],
+      const invalidConfig: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D"],
         multiCharKeys: ["A", "Q"], // Aが重複
         maxSingleCharHints: 3,
       };
@@ -64,7 +66,8 @@ describe("Integration: Hint Groups Feature", () => {
   describe("Real-world Scenarios", () => {
     it("should handle Vim-like home row configuration", () => {
       // Vimのホームロウを1文字ヒントに、それ以外を2文字に
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "J", "K", "L", ";"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "J", "K", "L", ";"],
         multiCharKeys: ["G", "H", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
         maxSingleCharHints: 8,
       };
@@ -81,7 +84,8 @@ describe("Integration: Hint Groups Feature", () => {
 
     it("should handle limited single-char scenario", () => {
       // 少数の1文字ヒント、多数の2文字ヒント
-      const config: HintKeyConfig = {singleCharKeys: ["F", "J"], // 最も押しやすい2キーのみ
+      const config: HintKeyConfig = {
+        singleCharKeys: ["F", "J"], // 最も押しやすい2キーのみ
         multiCharKeys: ["A", "S", "D", "G", "H", "K", "L"],
         maxSingleCharHints: 2,
       };
@@ -101,7 +105,8 @@ describe("Integration: Hint Groups Feature", () => {
 
   describe("Performance", () => {
     it("should generate hints efficiently for large word counts", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
         multiCharKeys: ["Q", "W", "E", "R", "T"],
         maxSingleCharHints: 9,
       };
@@ -125,9 +130,7 @@ describe("Integration: Hint Groups Feature", () => {
     });
 
     it("should handle edge case with very few keys", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A"],
-        multiCharKeys: ["B", "C"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A"], multiCharKeys: ["B", "C"] };
 
       const hints = generateHints(10, { groups: true, ...config });
 
@@ -163,7 +166,8 @@ describe("Integration: Hint Groups Feature", () => {
     });
 
     it("should prioritize new config over legacy markers", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "B"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "B"],
         markers: ["X", "Y", "Z"], // これは無視される
       };
 

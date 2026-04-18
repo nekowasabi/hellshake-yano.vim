@@ -11,10 +11,10 @@
 import { assertEquals, assertExists } from "jsr:@std/assert@1";
 import {
   validateConfig,
-  validateConfigValue,
   validateConfigObject,
-  type ValidationRules,
+  validateConfigValue,
   type ValidationResult,
+  type ValidationRules,
 } from "../denops/hellshake-yano/config.ts";
 
 /**

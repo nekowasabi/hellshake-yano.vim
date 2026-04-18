@@ -7,7 +7,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
   await t.step("Basic single character detection", async (t) => {
     await t.step("should detect single alphabetic characters with improved detection", () => {
       const line = "A B C D E F G H I J K L";
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, 12);
       assertEquals(words.map((w) => w.text), [
@@ -33,14 +33,14 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
       const line = "A B C D E F G H I J K L";
       // Process4 Analysis: この行は意図的に従来動作をテストしています
       // useImprovedDetection=false により新実装内で従来動作をエミュレート
-      const words = extractWords(line, 1, {useImprovedDetection: false});
+      const words = extractWords(line, 1, { useImprovedDetection: false });
 
       assertEquals(words.length, 0); // 従来版では1文字単語は検出されない
     });
 
     await t.step("should detect single digits with improved detection", () => {
       const line = "1 2 3 4 5 6 7 8 9 0";
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, 10);
       assertEquals(words.map((w) => w.text), ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]);
@@ -50,7 +50,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
   await t.step("Mixed content detection", async (t) => {
     await t.step("should detect both single and multi-character words", () => {
       const line = "test a I word hello world the end";
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       const singleCharWords = words.filter((w) => w.text.length === 1);
       const multiCharWords = words.filter((w) => w.text.length > 1);
@@ -68,7 +68,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
 
     await t.step("should preserve column positions correctly", () => {
       const line = "A B C";
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, 3);
       // プロパティ毎に個別にテスト（byteColが自動追加されるため）
@@ -110,7 +110,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
         "P",
       ];
       const line = problemChars.join(" ");
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, problemChars.length);
       assertEquals(words.map((w) => w.text), problemChars);
@@ -119,7 +119,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
     await t.step("should detect singleCharKeys", () => {
       const singleCharKeys = ["A", "S", "D", "F", "G", "H", "J", "K", "L", "N", "M"];
       const line = singleCharKeys.join(" ");
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, singleCharKeys.length);
       assertEquals(words.map((w) => w.text), singleCharKeys);
@@ -144,7 +144,7 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
         "Z",
       ];
       const line = multiCharKeys.join(" ");
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       assertEquals(words.length, multiCharKeys.length);
       assertEquals(words.map((w) => w.text), multiCharKeys);
@@ -153,18 +153,18 @@ Deno.test("Single Character Word Detection Tests", async (t) => {
 
   await t.step("Edge cases", async (t) => {
     await t.step("should handle empty lines", () => {
-      const words = extractWords("", 1, {useImprovedDetection: true});
+      const words = extractWords("", 1, { useImprovedDetection: true });
       assertEquals(words.length, 0);
     });
 
     await t.step("should handle whitespace-only lines", () => {
-      const words = extractWords("   ", 1, {useImprovedDetection: true});
+      const words = extractWords("   ", 1, { useImprovedDetection: true });
       assertEquals(words.length, 0);
     });
 
     await t.step("should handle mixed punctuation", () => {
       const line = "A, B; C. D! E? F:";
-      const words = extractWords(line, 1, {useImprovedDetection: true});
+      const words = extractWords(line, 1, { useImprovedDetection: true });
 
       const singleCharWords = words.filter((w) => w.text.length === 1);
       assertEquals(singleCharWords.map((w) => w.text), ["A", "B", "C", "D", "E", "F"]);

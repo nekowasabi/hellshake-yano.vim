@@ -31,10 +31,11 @@ function buildCheckboxTestData() {
   ];
   const text = lines.join("\n");
 
-  // 各行の先頭文字位置 (0-based offset in joined text)
-  const offsetA = lines[0].indexOf("A"); // 6
-  const offsetB = lines[0].length + 1 + lines[1].indexOf("B"); // 6+1+6 = 13
-  const offsetOther = lines[0].length + 1 + lines[1].length + 1 + lines[2].indexOf("S"); // 6+1+6+1+0 = 14... actually "Some" starts at col 0 in line 3
+  // Why: applyHintPatterns は行単位で走査するため、col は行内 0-based offset である必要がある。
+  //      以前は joined text 内の offset を使っていたが、lines[] を渡すように変更したため修正。
+  const offsetA = lines[0].indexOf("A"); // 6 (行内)
+  const offsetB = lines[1].indexOf("B"); // 6 (行内)
+  const offsetOther = lines[2].indexOf("S"); // 0 (行内)
 
   const words = [
     { text: "Alpha", line: 1, col: offsetA, byteCol: offsetA },
@@ -66,10 +67,10 @@ Deno.test({
     const HintPatternProcessorCtor = (wordModule as any).HintPatternProcessor;
     const processor = new HintPatternProcessorCtor();
 
-    const { text, words, patterns } = buildCheckboxTestData();
+    const { words, patterns, lines } = buildCheckboxTestData();
 
     // deno-lint-ignore no-explicit-any
-    const result = processor.applyHintPatterns(words, text, patterns) as any[];
+    const result = processor.applyHintPatterns(words, lines, patterns) as any[];
 
     // prioritizedCount: hintPriority > 0 の words を数える
     const prioritizedCount = result.filter(
@@ -131,10 +132,10 @@ Deno.test({
     const HintPatternProcessorCtor = (wordModule as any).HintPatternProcessor;
     const processor = new HintPatternProcessorCtor();
 
-    const { text, words, patterns } = buildCheckboxTestData();
+    const { words, patterns, lines } = buildCheckboxTestData();
 
     // deno-lint-ignore no-explicit-any
-    const result = processor.applyHintPatterns(words, text, patterns) as any[];
+    const result = processor.applyHintPatterns(words, lines, patterns) as any[];
 
     // sortByHintPriority により hintPriority=100 の Alpha/Bravo が先頭に来る
     assertExists(result[0].hintPriority, "先頭要素に hintPriority が付与されていること");
@@ -165,10 +166,10 @@ Deno.test({
     const HintPatternProcessorCtor = (wordModule as any).HintPatternProcessor;
     const processor = new HintPatternProcessorCtor();
 
-    const { text, words, patterns } = buildCheckboxTestData();
+    const { words, patterns, lines } = buildCheckboxTestData();
 
     // deno-lint-ignore no-explicit-any
-    const result = processor.applyHintPatterns(words, text, patterns) as any[];
+    const result = processor.applyHintPatterns(words, lines, patterns) as any[];
 
     const alpha = result.find(
       (w: { text: string }) => w.text === "Alpha",
@@ -218,11 +219,11 @@ Deno.test({
     const HintPatternProcessorCtor = (wordModule as any).HintPatternProcessor;
     const processor = new HintPatternProcessorCtor();
 
-    const { text, words, patterns } = buildCheckboxTestData();
+    const { words, patterns, lines } = buildCheckboxTestData();
 
     // applyHintPatterns → 戻り値を assignHintsToWords に渡す
     // deno-lint-ignore no-explicit-any
-    const enhancedWords = processor.applyHintPatterns(words, text, patterns) as any[];
+    const enhancedWords = processor.applyHintPatterns(words, lines, patterns) as any[];
 
     const hints = ["a", "b", "c"];
     const mappings = hintModule.assignHintsToWords(

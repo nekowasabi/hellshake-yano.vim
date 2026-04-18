@@ -5,10 +5,7 @@
  */
 
 import { assertEquals, assertRejects } from "@std/assert";
-import {
-  batchGet,
-  callAtomic,
-} from "../../../../denops/hellshake-yano/common/utils/batch.ts";
+import { batchGet, callAtomic } from "../../../../denops/hellshake-yano/common/utils/batch.ts";
 import type { Denops } from "@denops/std";
 import { BatchError } from "jsr:@denops/core@^7.0.1/error";
 
@@ -69,11 +66,12 @@ Deno.test("batchGet: 正しい型で結果を返す", async () => {
   // モック: denops.batch が [42, "hello", true] を返す
   const denops = createBatchDenops([42, "hello", true]) as unknown as Denops;
 
-  const [num, str, bool] = await batchGet(denops, (d) => [
-    d.eval("42"),
-    d.eval("'hello'"),
-    d.eval("v:true"),
-  ] as const);
+  const [num, str, bool] = await batchGet(denops, (d) =>
+    [
+      d.eval("42"),
+      d.eval("'hello'"),
+      d.eval("v:true"),
+    ] as const);
 
   assertEquals(num, 42);
   assertEquals(str, "hello");
@@ -91,9 +89,10 @@ Deno.test("batchGet: 空のコールバックで空配列を返す", async () =>
 Deno.test("batchGet: 単一呼び出しで正しい値を返す", async () => {
   const denops = createBatchDenops([99]) as unknown as Denops;
 
-  const [val] = await batchGet(denops, (d) => [
-    d.call("bufnr", "%"),
-  ] as const);
+  const [val] = await batchGet(denops, (d) =>
+    [
+      d.call("bufnr", "%"),
+    ] as const);
 
   assertEquals(val, 99);
 });
@@ -109,11 +108,12 @@ Deno.test("batchGet: denops.batch が1回だけ呼ばれる", async () => {
     eval: (_expr: string) => Promise.resolve(undefined),
   };
 
-  await batchGet(mockDenops as unknown as Denops, (d) => [
-    d.eval("line('w0')"),
-    d.eval("line('w$')"),
-    d.call("bufnr", "%"),
-  ] as const);
+  await batchGet(mockDenops as unknown as Denops, (d) =>
+    [
+      d.eval("line('w0')"),
+      d.eval("line('w$')"),
+      d.call("bufnr", "%"),
+    ] as const);
 
   assertEquals(batchCallCount, 1);
 });

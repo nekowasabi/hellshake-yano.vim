@@ -15,15 +15,15 @@ import { assertEquals, assertExists } from "@std/assert";
 import { DEFAULT_CONFIG } from "../denops/hellshake-yano/config.ts";
 import type {
   Config,
-  DetectionContext,
-  WordDetectionConfig,
-  DetectWordsParams,
-  HintGenerationConfig,
-  GenerateHintsParams,
-  HintOperationsConfig,
   DebugInfo,
-  Word,
+  DetectionContext,
+  DetectWordsParams,
+  GenerateHintsParams,
+  HintGenerationConfig,
   HintMapping,
+  HintOperationsConfig,
+  Word,
+  WordDetectionConfig,
 } from "../denops/hellshake-yano/types.ts";
 import type { Denops } from "@denops/std";
 

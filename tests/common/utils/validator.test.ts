@@ -6,17 +6,17 @@
 
 import { assertEquals } from "jsr:@std/assert";
 import {
+  generateHighlightCommand,
+  isValidColorName,
+  isValidHexColor,
+  normalizeColorName,
+  validateConfig,
+  validateHighlightColor,
+  validateHighlightConfig,
+  validateHighlightGroupName,
   validateInList,
   validateNonEmpty,
   validateRange,
-  validateHighlightGroupName,
-  isValidColorName,
-  isValidHexColor,
-  validateHighlightColor,
-  normalizeColorName,
-  generateHighlightCommand,
-  validateHighlightConfig,
-  validateConfig,
 } from "../../../denops/hellshake-yano/common/utils/validator.ts";
 
 // ========== 基本バリデーション ==========

@@ -7,7 +7,7 @@ import type { Denops } from "https://deno.land/x/denops_std@v6.4.0/mod.ts";
 import { assertEquals, assertExists } from "https://deno.land/std@0.201.0/assert/mod.ts";
 import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
 import type { HintMapping, Word } from "../denops/hellshake-yano/types.ts";
-import { getDefaultConfig, type Config } from "../denops/hellshake-yano/config.ts";
+import { type Config, getDefaultConfig } from "../denops/hellshake-yano/config.ts";
 import { MockDenops as BaseMockDenops } from "./helpers/mock.ts";
 
 // 遅延をシミュレートする拡張MockDenops
@@ -61,9 +61,25 @@ declare global {
   var pendingHighlightTimerId: number | undefined;
   var gc: (() => void) | undefined;
   var clearHintDisplay: (denops: Denops) => Promise<void>;
-  var calculateHintPositionWithCoordinateSystem: (word: Word, hintPosition: string, debugCoordinates: boolean) => { line: number; col: number };
-  var processExtmarksBatched: (denops: Denops, matchingHints: HintMapping[], nonMatchingHints: HintMapping[], inputPrefix: string, bufnr: number, signal: AbortSignal) => Promise<void>;
-  var processMatchaddBatched: (denops: Denops, matchingHints: HintMapping[], nonMatchingHints: HintMapping[], signal: AbortSignal) => Promise<void>;
+  var calculateHintPositionWithCoordinateSystem: (
+    word: Word,
+    hintPosition: string,
+    debugCoordinates: boolean,
+  ) => { line: number; col: number };
+  var processExtmarksBatched: (
+    denops: Denops,
+    matchingHints: HintMapping[],
+    nonMatchingHints: HintMapping[],
+    inputPrefix: string,
+    bufnr: number,
+    signal: AbortSignal,
+  ) => Promise<void>;
+  var processMatchaddBatched: (
+    denops: Denops,
+    matchingHints: HintMapping[],
+    nonMatchingHints: HintMapping[],
+    signal: AbortSignal,
+  ) => Promise<void>;
 }
 
 // highlightCandidateHintsAsync関数をインポート
@@ -98,7 +114,7 @@ function cleanupTimers() {
   // 既存のハイライトタイマーをクリア
   try {
     // グローバルのpendingHighlightTimerIdがある場合はクリア
-    if (typeof globalThis !== 'undefined' && globalThis.pendingHighlightTimerId !== undefined) {
+    if (typeof globalThis !== "undefined" && globalThis.pendingHighlightTimerId !== undefined) {
       clearTimeout(globalThis.pendingHighlightTimerId);
       globalThis.pendingHighlightTimerId = undefined;
     }
@@ -129,22 +145,22 @@ function setupTestEnvironment() {
       hint: "ab",
       word: { line: 1, col: 1, byteCol: 1, text: "test1" },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     },
     {
       hint: "cd",
       word: { line: 2, col: 1, byteCol: 1, text: "test2" },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     },
     {
       hint: "ae",
       word: { line: 3, col: 1, byteCol: 1, text: "test3" },
       hintByteCol: 1,
-      hintCol: 1
-    }
+      hintCol: 1,
+    },
   ];
-  testConfig = {highlightSelected: true };
+  testConfig = { highlightSelected: true };
   testExtmarkNamespace = 1;
   testHintsVisible = false;
 
@@ -159,28 +175,60 @@ function setupTestEnvironment() {
   globalThis.clearHintDisplay = async (denops: Denops) => {
     // モック実装：clearHintDisplay呼び出しを記録
     if (mockDenops && mockDenops.getCallHistory) {
-      (mockDenops.getCallHistory() as Array<{ method: string; args: unknown[] }>).push({ method: "clearHintDisplay", args: [] });
+      (mockDenops.getCallHistory() as Array<{ method: string; args: unknown[] }>).push({
+        method: "clearHintDisplay",
+        args: [],
+      });
     }
   };
 
-  globalThis.calculateHintPositionWithCoordinateSystem = (word: Word, hintPosition: string, debugCoordinates: boolean) => {
+  globalThis.calculateHintPositionWithCoordinateSystem = (
+    word: Word,
+    hintPosition: string,
+    debugCoordinates: boolean,
+  ) => {
     return {
       line: word.line,
-      col: word.col
+      col: word.col,
     };
   };
 
   // バッチ処理関数のモック
-  globalThis.processExtmarksBatched = async (denops: Denops, matchingHints: HintMapping[], nonMatchingHints: HintMapping[], inputPrefix: string, bufnr: number, signal: AbortSignal) => {
-    console.log("processExtmarksBatched called with", matchingHints.length, "matching and", nonMatchingHints.length, "non-matching hints");
+  globalThis.processExtmarksBatched = async (
+    denops: Denops,
+    matchingHints: HintMapping[],
+    nonMatchingHints: HintMapping[],
+    inputPrefix: string,
+    bufnr: number,
+    signal: AbortSignal,
+  ) => {
+    console.log(
+      "processExtmarksBatched called with",
+      matchingHints.length,
+      "matching and",
+      nonMatchingHints.length,
+      "non-matching hints",
+    );
     // extmark処理をシミュレート
     for (const hint of [...matchingHints, ...nonMatchingHints]) {
       if (signal.aborted) break;
-      await denops.call("nvim_buf_set_extmark", bufnr, 1, hint.word.line - 1, hint.hintByteCol - 1, {});
+      await denops.call(
+        "nvim_buf_set_extmark",
+        bufnr,
+        1,
+        hint.word.line - 1,
+        hint.hintByteCol - 1,
+        {},
+      );
     }
   };
 
-  globalThis.processMatchaddBatched = async (denops: Denops, matchingHints: HintMapping[], nonMatchingHints: HintMapping[], signal: AbortSignal) => {
+  globalThis.processMatchaddBatched = async (
+    denops: Denops,
+    matchingHints: HintMapping[],
+    nonMatchingHints: HintMapping[],
+    signal: AbortSignal,
+  ) => {
     console.log("processMatchaddBatched called");
     // matchadd処理をシミュレート
     for (const hint of [...matchingHints, ...nonMatchingHints]) {
@@ -211,7 +259,11 @@ Deno.test("highlightCandidateHintsAsync - 基本的な非同期動作", async ()
   const duration = endTime - startTime;
 
   // 非同期呼び出しなので500ms以内で返る（大規模並列実行時のリソース競合を考慮）
-  assertEquals(duration < 500, true, "Should return immediately without blocking (allowing time for heavy parallel execution)");
+  assertEquals(
+    duration < 500,
+    true,
+    "Should return immediately without blocking (allowing time for heavy parallel execution)",
+  );
 
   // 少し待ってから結果を確認
   await delay(50);
@@ -240,7 +292,7 @@ Deno.test("highlightCandidateHintsAsync - AbortController中断テスト", async
 
   // 2番目の呼び出し分のみが処理される
   const extmarkCalls = mockDenops.getCallHistory()
-    .filter(call => call.method === "nvim_buf_set_extmark");
+    .filter((call) => call.method === "nvim_buf_set_extmark");
 
   // "b"にマッチするヒントがないため、clearのみ行われる
   assertEquals(extmarkCalls.length >= 0, true, "Should handle abort correctly");
@@ -250,7 +302,7 @@ Deno.test("highlightCandidateHintsAsync - バッチ処理テスト", async () =>
   setupTestEnvironment();
 
   // グローバル変数configがhighlightCandidateHintsOptimizedで使用される
-  globalThis.config = {highlightSelected: true };
+  globalThis.config = { highlightSelected: true };
   globalThis.extmarkNamespace = 1;
 
   // 大量のヒントを設定（バッチ処理のテスト）
@@ -260,7 +312,7 @@ Deno.test("highlightCandidateHintsAsync - バッチ処理テスト", async () =>
       hint: `a${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `test${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
@@ -280,7 +332,11 @@ Deno.test("highlightCandidateHintsAsync - バッチ処理テスト", async () =>
   // バッチ処理でも即座に返る
   const endTime = Date.now();
   const duration = endTime - startTime;
-  assertEquals(duration < 500, true, "Should return immediately even with large hints (allowing time for parallel execution)");
+  assertEquals(
+    duration < 500,
+    true,
+    "Should return immediately even with large hints (allowing time for parallel execution)",
+  );
 
   // バッチ処理完了まで待機（より長く待つ）
   await delay(500);
@@ -294,9 +350,13 @@ Deno.test("highlightCandidateHintsAsync - バッチ処理テスト", async () =>
   // bufnrまたは他のメソッドが呼ばれているか確認
   // 注: 実際の関数実行にはより複雑な環境設定が必要な可能性がある
   // テストの目的は非ブロッキング動作の確認なので、call countは重要ではない
-  const isNonBlocking = duration < 500;  // Line 230と同じ値に統一
+  const isNonBlocking = duration < 500; // Line 230と同じ値に統一
 
-  assertEquals(isNonBlocking, true, "Function should be non-blocking regardless of internal processing");
+  assertEquals(
+    isNonBlocking,
+    true,
+    "Function should be non-blocking regardless of internal processing",
+  );
 });
 
 Deno.test("highlightCandidateHintsAsync - 完了コールバックテスト", async () => {
@@ -313,7 +373,7 @@ Deno.test("highlightCandidateHintsAsync - 完了コールバックテスト", as
     mockConfig,
     () => {
       callbackExecuted = true;
-    }
+    },
   );
 
   // 完了まで待機
@@ -372,7 +432,12 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：基本動作テスト",
     const mockConfig = createMockConfig();
 
     // 関数が正常に動作することを確認
-    await highlightCandidateHintsHybrid(mockDenops as unknown as Denops, "a", mockHints, mockConfig);
+    await highlightCandidateHintsHybrid(
+      mockDenops as unknown as Denops,
+      "a",
+      mockHints,
+      mockConfig,
+    );
 
     assertEquals(true, true, "highlightCandidateHintsHybrid should work correctly");
   } catch (error) {
@@ -393,7 +458,7 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：最初の15個の同期
       hint: `a${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `test${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
@@ -404,13 +469,22 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：最初の15個の同期
     const startTime = Date.now();
 
     // ハイブリッド処理を呼び出し
-    await highlightCandidateHintsHybrid(mockDenops as unknown as Denops, "a", largeHints as HintMapping[], createMockConfig());
+    await highlightCandidateHintsHybrid(
+      mockDenops as unknown as Denops,
+      "a",
+      largeHints as HintMapping[],
+      createMockConfig(),
+    );
 
     const endTime = Date.now();
 
     // redrawが呼ばれているかテスト
-    const redrawCalls = mockDenops.getCallHistory().filter(call => call.method === "redraw");
-    assertEquals(redrawCalls.length >= 1, true, "Should call redraw after sync processing first batch");
+    const redrawCalls = mockDenops.getCallHistory().filter((call) => call.method === "redraw");
+    assertEquals(
+      redrawCalls.length >= 1,
+      true,
+      "Should call redraw after sync processing first batch",
+    );
 
     assertEquals(true, true, "Hybrid method should process sync batch correctly");
   } catch (error) {
@@ -433,7 +507,7 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：残りの非同期処�
       hint: `a${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `test${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
@@ -443,7 +517,12 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：残りの非同期処�
     mockDenops.clearCallHistory();
 
     // ハイブリッド処理を呼び出し
-    await highlightCandidateHintsHybrid(mockDenops as unknown as Denops, "a", largeHints as HintMapping[], createMockConfig());
+    await highlightCandidateHintsHybrid(
+      mockDenops as unknown as Denops,
+      "a",
+      largeHints as HintMapping[],
+      createMockConfig(),
+    );
 
     // 少し待ってから、非同期処理の実行を確認
     await delay(50);
@@ -471,10 +550,15 @@ Deno.test("highlightCandidateHintsHybrid - GREEN PHASE：redrawタイミング",
     mockDenops.clearCallHistory();
 
     // ハイブリッド処理を呼び出し
-    await highlightCandidateHintsHybrid(mockDenops as unknown as Denops, "a", mockHints, createMockConfig());
+    await highlightCandidateHintsHybrid(
+      mockDenops as unknown as Denops,
+      "a",
+      mockHints,
+      createMockConfig(),
+    );
 
     const callHistory = mockDenops.getCallHistory();
-    const redrawIndex = callHistory.findIndex(call => call.method === "redraw");
+    const redrawIndex = callHistory.findIndex((call) => call.method === "redraw");
 
     // redrawが呼ばれていることを確認
     assertEquals(redrawIndex >= 0, true, "Should call redraw after sync batch");
@@ -502,14 +586,19 @@ Deno.test("Process10 RED: Fire-and-forget - 即座に返ることの検証", asy
       hint: `h${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `word${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
   const startTime = performance.now();
 
   // Fire-and-forgetパターン: awaitを使わない
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "h", largeHints as HintMapping[], createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "h",
+    largeHints as HintMapping[],
+    createMockConfig(),
+  );
 
   const returnTime = performance.now() - startTime;
 
@@ -517,7 +606,7 @@ Deno.test("Process10 RED: Fire-and-forget - 即座に返ることの検証", asy
   assertEquals(
     returnTime < 5,
     true,
-    `Fire-and-forgetパターンがブロッキング: ${returnTime}ms > 5ms`
+    `Fire-and-forgetパターンがブロッキング: ${returnTime}ms > 5ms`,
   );
 
   // 処理が実際に実行されることを確認
@@ -533,7 +622,7 @@ Deno.test("Process10 RED: Fire-and-forget - Promiseを返さないことの確�
     mockDenops as unknown as Denops,
     "a",
     createMockHints(),
-    createMockConfig()
+    createMockConfig(),
   );
 
   // voidを返すことを確認（Promiseではない）
@@ -560,22 +649,37 @@ Deno.test("Process10 RED: AbortController - 古い処理のキャンセル", asy
       hint: `h${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `word${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
   mockDenops.clearCallHistory();
 
   // 最初の処理を開始
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "h1", largeHints as HintMapping[], createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "h1",
+    largeHints as HintMapping[],
+    createMockConfig(),
+  );
   await delay(10);
 
   // 2番目の処理を開始（古い処理をキャンセルすべき）
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "h2", largeHints as HintMapping[], createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "h2",
+    largeHints as HintMapping[],
+    createMockConfig(),
+  );
   await delay(10);
 
   // 3番目の処理（2番目をキャンセルすべき）
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "h3", largeHints as HintMapping[], createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "h3",
+    largeHints as HintMapping[],
+    createMockConfig(),
+  );
 
   // 全ての処理が完了するまで待つ
   await delay(150);
@@ -604,7 +708,7 @@ Deno.test("Process10 RED: AbortController - キャンセル時のメモリリー
       mockDenops as unknown as Denops,
       `test${i}`,
       createMockHints(),
-      createMockConfig()
+      createMockConfig(),
     );
     await delay(1);
   }
@@ -625,7 +729,7 @@ Deno.test("Process10 RED: AbortController - キャンセル時のメモリリー
   assertEquals(
     memoryIncrease < 100 * 1024,
     true,
-    `メモリリークの可能性: ${memoryIncrease} bytes`
+    `メモリリークの可能性: ${memoryIncrease} bytes`,
   );
 });
 
@@ -640,7 +744,14 @@ Deno.test("Process10 RED: バッチ処理 - 並列実行の検証", async () => 
   const batchTimings: number[] = [];
   const originalProcessExtmarks = globalThis.processExtmarksBatched;
 
-  globalThis.processExtmarksBatched = async (denops, matching, nonMatching, prefix, bufnr, signal) => {
+  globalThis.processExtmarksBatched = async (
+    denops,
+    matching,
+    nonMatching,
+    prefix,
+    bufnr,
+    signal,
+  ) => {
     const timestamp = performance.now();
     batchTimings.push(timestamp);
     // 少し遅延させる（重い処理をシミュレート）
@@ -655,11 +766,16 @@ Deno.test("Process10 RED: バッチ処理 - 並列実行の検証", async () => 
       hint: `a${i}`,
       word: { line: i + 1, col: 1, byteCol: 1, text: `test${i}` },
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "a", largeHints as HintMapping[], createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "a",
+    largeHints as HintMapping[],
+    createMockConfig(),
+  );
 
   // バッチ処理が開始されるまで待つ
   await delay(50);
@@ -671,7 +787,7 @@ Deno.test("Process10 RED: バッチ処理 - 並列実行の検証", async () => 
     assertEquals(
       timeDiff < 20,
       true,
-      `バッチが順次実行されている可能性: ${timeDiff}ms`
+      `バッチが順次実行されている可能性: ${timeDiff}ms`,
     );
   }
 
@@ -685,7 +801,12 @@ Deno.test("Process10 RED: バッチ処理 - queueMicrotaskによるイベント�
   let eventLoopReleased = false;
 
   // イベントループが解放されることを確認
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "a", createMockHints(), createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "a",
+    createMockHints(),
+    createMockConfig(),
+  );
 
   // queueMicrotaskでイベントループ解放を確認
   queueMicrotask(() => {
@@ -716,7 +837,12 @@ Deno.test("Process10 RED: 2文字目入力 - イベントループがブロッ�
 
   // ハイライト処理開始
   const startTime = performance.now();
-  highlightCandidateHintsAsync(mockDenops as unknown as Denops, "a", createMockHints(), createMockConfig());
+  highlightCandidateHintsAsync(
+    mockDenops as unknown as Denops,
+    "a",
+    createMockHints(),
+    createMockConfig(),
+  );
 
   // ハイライト処理中にgetcharが呼べることを確認
   await delay(10);
@@ -750,7 +876,12 @@ Deno.test("Process10 RED: 2文字目入力 - 高速連続入力テスト", async
 
   // 複数回のハイライト処理と入力をシミュレート
   for (let i = 0; i < inputSequence.length - 1; i++) {
-    highlightCandidateHintsAsync(mockDenops as unknown as Denops, inputSequence[i], createMockHints(), createMockConfig());
+    highlightCandidateHintsAsync(
+      mockDenops as unknown as Denops,
+      inputSequence[i],
+      createMockHints(),
+      createMockConfig(),
+    );
     await mockDenops.call("getchar");
     await delay(5); // 短い間隔で連続入力
   }
@@ -759,7 +890,7 @@ Deno.test("Process10 RED: 2文字目入力 - 高速連続入力テスト", async
   assertEquals(
     receivedInputs.length,
     inputSequence.length - 1,
-    `入力が取りこぼされた: ${receivedInputs.join(",")}`
+    `入力が取りこぼされた: ${receivedInputs.join(",")}`,
   );
 
   // クリーンアップ

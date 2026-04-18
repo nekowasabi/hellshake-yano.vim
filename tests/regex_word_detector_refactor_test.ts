@@ -8,7 +8,10 @@ import {
   assertExists,
   assertRejects,
 } from "https://deno.land/std@0.220.0/assert/mod.ts";
-import { RegexWordDetector, type WordDetectionConfig } from "../denops/hellshake-yano/neovim/core/word.ts";
+import {
+  RegexWordDetector,
+  type WordDetectionConfig,
+} from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { DetectionContext, Word } from "../denops/hellshake-yano/types.ts";
 
 Deno.test("RegexWordDetector Refactoring Tests", async (t) => {
@@ -25,12 +28,12 @@ Deno.test("RegexWordDetector Refactoring Tests", async (t) => {
     const words = await detector.detectWords(text, 1);
 
     // 英数字の単語が正しく検出されることを確認
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
     console.log("Detected words:", wordTexts);
 
     // 基本的な英数字が含まれることを確認
-    assertExists(wordTexts.find(w => w.includes("hello")));
-    assertExists(wordTexts.find(w => w.includes("world")));
+    assertExists(wordTexts.find((w) => w.includes("hello")));
+    assertExists(wordTexts.find((w) => w.includes("world")));
   });
 
   await t.step("日本語テキストでも正規表現ベースの処理のみ実行", async () => {
@@ -38,7 +41,7 @@ Deno.test("RegexWordDetector Refactoring Tests", async (t) => {
     const text = "こんにちは世界 hello world";
     const words = await detector.detectWords(text, 1);
 
-    console.log("Japanese text detection words:", words.map(w => w.text));
+    console.log("Japanese text detection words:", words.map((w) => w.text));
 
     // 現在の実装では、TinySegmenter処理が呼ばれる可能性がある
     // リファクタリング後は、正規表現ベースの処理のみになるべき
@@ -70,12 +73,16 @@ Deno.test("RegexWordDetector Refactoring Tests", async (t) => {
     const text = "a bb ccc dddd";
     const words = await detector.detectWords(text, 1);
 
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
     console.log("Filtered words (min 3 chars):", wordTexts);
 
     // 3文字以上の単語のみが残ることを確認
-    words.forEach(word => {
-      assertEquals(word.text.length >= 3, true, `Word "${word.text}" should be at least 3 characters`);
+    words.forEach((word) => {
+      assertEquals(
+        word.text.length >= 3,
+        true,
+        `Word "${word.text}" should be at least 3 characters`,
+      );
     });
   });
 
@@ -107,12 +114,16 @@ Deno.test("RegexWordDetector Refactoring Tests", async (t) => {
     const text = "a bb ccc dddd eeeee";
     const words = await detector.detectWords(text, 1, context);
 
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
     console.log("Context filtered words (min 5 chars):", wordTexts);
 
     // コンテキストで指定した最小文字数が適用されることを確認
-    words.forEach(word => {
-      assertEquals(word.text.length >= 5, true, `Word "${word.text}" should be at least 5 characters`);
+    words.forEach((word) => {
+      assertEquals(
+        word.text.length >= 5,
+        true,
+        `Word "${word.text}" should be at least 5 characters`,
+      );
     });
   });
 });
@@ -138,8 +149,8 @@ Deno.test("RegexWordDetector Internal Method Tests", async (t) => {
     const japaneseWords = await detector.detectWords(japaneseText, 1);
     const englishWords = await detector.detectWords(englishText, 1);
 
-    console.log("Japanese text result:", japaneseWords.map(w => w.text));
-    console.log("English text result:", englishWords.map(w => w.text));
+    console.log("Japanese text result:", japaneseWords.map((w) => w.text));
+    console.log("English text result:", englishWords.map((w) => w.text));
 
     // 現在の動作を記録（リファクタリング後の比較のため）
     assertExists(japaneseWords);

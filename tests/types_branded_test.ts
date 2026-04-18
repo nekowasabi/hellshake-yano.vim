@@ -16,18 +16,12 @@ import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 
 // Branded types とヘルパーを types.ts からインポート（Green フェーズで実装）
-import type {
-  ByteCol,
-  CharCol,
-  ZeroLine,
-  OneLine,
-  Word,
-} from "../denops/hellshake-yano/types.ts";
+import type { ByteCol, CharCol, OneLine, Word, ZeroLine } from "../denops/hellshake-yano/types.ts";
 import {
   asByteCol,
   asCharCol,
-  asZeroLine,
   asOneLine,
+  asZeroLine,
   oneLineToZeroLine,
   zeroLineToOneLine,
 } from "../denops/hellshake-yano/types.ts";
@@ -109,8 +103,10 @@ describe("Branded Types: 型の区別（ランタイム検証）", () => {
     const byteCol: ByteCol = asByteCol(5);
     const charCol: CharCol = asCharCol(5);
     // ランタイムでは両方とも number なので等しい
-    assertEquals(byteCol === charCol, true);
-    assertEquals(byteCol, charCol);
+    // Why: branded type 同士の直接比較は TS2367/TS2345 になるため、
+    //       number 経由でランタイム等価性を検証する
+    assertEquals(Number(byteCol) === Number(charCol), true);
+    assertEquals(Number(byteCol), Number(charCol));
   });
 
   it("branded type は number と同じように算術演算可能", () => {

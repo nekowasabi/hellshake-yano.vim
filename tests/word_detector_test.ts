@@ -328,9 +328,7 @@ Deno.test("WordDetectionManager Tests", async (t) => {
   });
 
   await t.step("Japanese filtering configuration", async () => {
-    const manager = new MockWordDetectionManager({useJapanese: false,
-      strategy: "hybrid",
-    });
+    const manager = new MockWordDetectionManager({ useJapanese: false, strategy: "hybrid" });
     manager.addDetector(new MockRegexWordDetector());
     manager.addDetector(new MockTinySegmenterWordDetector());
 
@@ -427,7 +425,8 @@ Deno.test("WordDetectionConfig Tests", async (t) => {
   });
 
   await t.step("Boolean configuration validation", () => {
-    const config: WordDetectionConfig = {useJapanese: true,
+    const config: WordDetectionConfig = {
+      useJapanese: true,
       useImprovedDetection: false,
       enableTinySegmenter: true,
       enableFallback: false,

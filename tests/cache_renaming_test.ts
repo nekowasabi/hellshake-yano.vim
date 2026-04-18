@@ -6,7 +6,11 @@
  * 実装を進めて全てのテストが通るようにします。
  */
 
-import { assertEquals, assertExists, assertThrows } from "https://deno.land/std@0.190.0/testing/asserts.ts";
+import {
+  assertEquals,
+  assertExists,
+  assertThrows,
+} from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import { CacheType } from "../denops/hellshake-yano/common/cache/unified-cache.ts";
 
 // Phase 1 Red: これらのインポートは現在失敗するはずです
@@ -50,7 +54,10 @@ Deno.test("TDD Red Phase: GlobalCache.getInstance() should work (現在は失敗
     assertEquals(typeof instance.getCache, "function", "Instance should have getCache method");
   } catch (error) {
     // 現在は期待される失敗
-    console.log("Expected failure: GlobalCache.getInstance() not available:", (error as Error).message);
+    console.log(
+      "Expected failure: GlobalCache.getInstance() not available:",
+      (error as Error).message,
+    );
     throw error;
   }
 });
@@ -87,7 +94,11 @@ Deno.test("TDD Red Phase: GlobalCache functionality (should now work)", async ()
     const instanceViaUnified = UnifiedCache.getInstance();
     const instanceViaGlobal = GlobalCache.getInstance();
 
-    assertEquals(instanceViaUnified, instanceViaGlobal, "Both aliases should return the same instance");
+    assertEquals(
+      instanceViaUnified,
+      instanceViaGlobal,
+      "Both aliases should return the same instance",
+    );
   } catch (error) {
     // 現在は期待される失敗
     console.log("Expected failure: UnifiedCache alias not available:", (error as Error).message);
@@ -151,9 +162,15 @@ Deno.test("Validate CacheType enum still works", () => {
 
   // 全てのCacheTypeが定義されていることを確認（unified-cache.tsで定義されているもののみ）
   const expectedTypes = [
-    "WORDS", "HINTS", "DISPLAY", "ANALYSIS", "TEMP",
-    "HINT_ASSIGNMENT_NORMAL", "HINT_ASSIGNMENT_VISUAL", "HINT_ASSIGNMENT_OTHER",
-    "WORD_DETECTION"
+    "WORDS",
+    "HINTS",
+    "DISPLAY",
+    "ANALYSIS",
+    "TEMP",
+    "HINT_ASSIGNMENT_NORMAL",
+    "HINT_ASSIGNMENT_VISUAL",
+    "HINT_ASSIGNMENT_OTHER",
+    "WORD_DETECTION",
   ];
 
   for (const type of expectedTypes) {

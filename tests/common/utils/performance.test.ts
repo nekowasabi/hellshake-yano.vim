@@ -4,16 +4,16 @@
  * パフォーマンス計測機能のテスト
  */
 
-import { assertEquals, assertExists, assert } from "jsr:@std/assert";
+import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import {
-  getPerformanceMetrics,
-  recordPerformance,
-  resetPerformanceMetrics,
+  clearCaches,
   clearDebugInfo,
   collectDebugInfo,
-  clearCaches,
-  getWordsCache,
   getHintsCache,
+  getPerformanceMetrics,
+  getWordsCache,
+  recordPerformance,
+  resetPerformanceMetrics,
 } from "../../../denops/hellshake-yano/common/utils/performance.ts";
 
 // ========== 基本パフォーマンス計測 ==========

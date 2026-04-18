@@ -14,8 +14,8 @@ import type { Config } from "../denops/hellshake-yano/config.ts";
 import {
   DEFAULT_CONFIG,
   getDefaultConfig,
-  validateConfig,
   mergeConfig,
+  validateConfig,
 } from "../denops/hellshake-yano/config.ts";
 
 describe("Process3 Sub1: ハイライトシステムの維持", () => {
@@ -34,7 +34,10 @@ describe("Process3 Sub1: ハイライトシステムの維持", () => {
 
     // displayHintsBatched()を使用する公開関数が正しく動作する
     assertExists(mainModule.hideHints, "hideHints関数が存在する");
-    assertExists(mainModule.highlightCandidateHintsHybrid, "highlightCandidateHintsHybrid関数が存在する");
+    assertExists(
+      mainModule.highlightCandidateHintsHybrid,
+      "highlightCandidateHintsHybrid関数が存在する",
+    );
     assertExists(mainModule.cleanupPendingTimers, "cleanupPendingTimers関数が存在する");
   });
 
@@ -52,7 +55,11 @@ describe("Process3 Sub1: ハイライトシステムの維持", () => {
 
     // デフォルト値の検証
     assertEquals(config.highlightHintMarker, "DiffAdd", "highlightHintMarkerのデフォルト値");
-    assertEquals(config.highlightHintMarkerCurrent, "DiffText", "highlightHintMarkerCurrentのデフォルト値");
+    assertEquals(
+      config.highlightHintMarkerCurrent,
+      "DiffText",
+      "highlightHintMarkerCurrentのデフォルト値",
+    );
     assertEquals(config.highlightSelected, false, "highlightSelectedのデフォルト値");
   });
 });

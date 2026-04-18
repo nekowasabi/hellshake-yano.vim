@@ -8,7 +8,7 @@ import type { Denops } from "@denops/std";
 import { test } from "@denops/test";
 import { HintManager } from "../denops/hellshake-yano/neovim/core/hint.ts";
 import type { Config } from "../denops/hellshake-yano/types.ts";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 
 test({
   mode: "all",

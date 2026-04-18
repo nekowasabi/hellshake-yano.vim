@@ -1,9 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import {
-  type Config,
-  getDefaultConfig,
-  validateConfig,
-} from "../denops/hellshake-yano/main.ts";
+import { type Config, getDefaultConfig, validateConfig } from "../denops/hellshake-yano/main.ts";
 import {
   generateHighlightCommand,
   validateHighlightConfig,
@@ -199,11 +195,18 @@ Deno.test("Integration - パフォーマンスと限界値テスト", () => {
   const longGroupName = "A".repeat(101); // 100文字を超える
   const validGroupName = "A".repeat(100); // 100文字ちょうど
 
-  assertEquals(validateHighlightConfig({ highlightHintMarker: { fg: "Red", bg: "Blue" } }).valid, true);
-  assertEquals(validateHighlightConfig({ highlightHintMarker: { fg: "Red", bg: "Blue" } }).valid, true);
+  assertEquals(
+    validateHighlightConfig({ highlightHintMarker: { fg: "Red", bg: "Blue" } }).valid,
+    true,
+  );
+  assertEquals(
+    validateHighlightConfig({ highlightHintMarker: { fg: "Red", bg: "Blue" } }).valid,
+    true,
+  );
 
   // 多数の設定項目を持つ設定オブジェクト
-  const largeConfig = {highlightHintMarker: { fg: "Red", bg: "Blue" },
+  const largeConfig = {
+    highlightHintMarker: { fg: "Red", bg: "Blue" },
     highlightHintMarkerCurrent: { fg: "Green", bg: "Yellow" },
     markers: Array.from({ length: 100 }, (_, i) => String.fromCharCode(65 + (i % 26))),
     maxHints: 10000,

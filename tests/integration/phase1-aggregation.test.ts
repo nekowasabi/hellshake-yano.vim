@@ -17,7 +17,8 @@ import type { Config } from "../../denops/hellshake-yano/common/types/config.ts"
 
 function makeDefaultConfig(): Partial<Config> {
   return {
-    hintChars: "asdfghjkl",
+    // Why: hintChars (string) は Config 型に存在しないため markers (string[]) に修正
+    markers: "asdfghjkl".split(""),
     motionCount: 3,
     motionTimeout: 2000,
   };
@@ -48,7 +49,7 @@ describe("Phase1 Aggregation: config bridge", () => {
     const result = await dispatcher.getConfig();
 
     assertEquals(result.motionCount, 5);
-    assertEquals(result.hintChars, "asdfghjkl");
+    assertEquals(result.markers, "asdfghjkl".split(""));
   });
 
   it("validateConfig returns valid=true for valid config", async () => {

@@ -13,9 +13,9 @@
 import { assertEquals, assertObjectMatch } from "@std/assert";
 import type { Config } from "../denops/hellshake-yano/config.ts";
 import {
-  validateConfig,         // 既存関数（リダイレクト対象）
+  DEFAULT_CONFIG,
+  validateConfig, // 既存関数（リダイレクト対象）
   validateConfig as validateConfigFunction, // 統合バリデーション関数
-  DEFAULT_CONFIG
 } from "../denops/hellshake-yano/config.ts";
 
 Deno.test("validateConfigFunction - 基本機能テスト (Red Phase)", () => {
@@ -139,9 +139,11 @@ Deno.test("validateConfigFunction - hintPosition バリデーション", () => {
   // 異常系: 無効な値
   const result = validateConfigFunction({ hintPosition: "invalid" as any });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.includes("hintPosition must be one of: start, end, overlay, both"), true);
+  assertEquals(
+    result.errors.includes("hintPosition must be one of: start, end, overlay, both"),
+    true,
+  );
 });
-
 
 Deno.test("validateConfigFunction - wordDetectionStrategy バリデーション", () => {
   // 正常系
@@ -155,7 +157,10 @@ Deno.test("validateConfigFunction - wordDetectionStrategy バリデーション"
   // 異常系: 無効な値
   const result = validateConfigFunction({ wordDetectionStrategy: "invalid" as any });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.includes("wordDetectionStrategy must be one of: regex, tinysegmenter, hybrid"), true);
+  assertEquals(
+    result.errors.includes("wordDetectionStrategy must be one of: regex, tinysegmenter, hybrid"),
+    true,
+  );
 });
 
 Deno.test("validateConfigFunction - markers配列バリデーション", () => {
@@ -187,7 +192,7 @@ Deno.test("validateConfigFunction - 複数エラーの処理", () => {
     motionTimeout: 0,
     maxHints: -5,
     hintPosition: "invalid" as any,
-    markers: []
+    markers: [],
   });
 
   assertEquals(result.valid, false);
@@ -195,7 +200,10 @@ Deno.test("validateConfigFunction - 複数エラーの処理", () => {
   assertEquals(result.errors.includes("motionCount must be a positive integer"), true);
   assertEquals(result.errors.includes("motionTimeout must be at least 100ms"), true);
   assertEquals(result.errors.includes("maxHints must be a positive integer"), true);
-  assertEquals(result.errors.includes("hintPosition must be one of: start, end, overlay, both"), true);
+  assertEquals(
+    result.errors.includes("hintPosition must be one of: start, end, overlay, both"),
+    true,
+  );
   assertEquals(result.errors.includes("markers must not be empty"), true);
 });
 
@@ -244,9 +252,9 @@ Deno.test("validateConfigFunction - 境界値テスト", () => {
   // 最小正数
   let result = validateConfigFunction({
     motionCount: 1,
-    motionTimeout: 100,  // 100ms以上必要
+    motionTimeout: 100, // 100ms以上必要
     maxHints: 1,
-    debounceDelay: 0
+    debounceDelay: 0,
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -256,7 +264,7 @@ Deno.test("validateConfigFunction - 境界値テスト", () => {
     motionCount: 999999,
     motionTimeout: 999999,
     maxHints: 999999,
-    debounceDelay: 999999
+    debounceDelay: 999999,
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -267,10 +275,11 @@ Deno.test("既存validateConfig()のリダイレクト動作確認", () => {
   // 注意: このテストは既存関数の改修後にパスするはず
 
   // 一旦既存関数の動作をテスト（snake_case入力）
-  const result = validateConfig({motionCount: 3,
+  const result = validateConfig({
+    motionCount: 3,
     motionTimeout: 2000,
     maxHints: 336,
-    hintPosition: "start"
+    hintPosition: "start",
   });
 
   // 現在の既存関数の動作を確認
@@ -301,7 +310,11 @@ Deno.test("validateConfigFunction - エラーメッセージの一貫性", () =>
   // camelCase形式のエラーメッセージを確認
   const errorMessage = result.errors[0];
   assertEquals(errorMessage.includes("motionCount"), true, "Error message should use camelCase");
-  assertEquals(errorMessage.includes("motion_count"), false, "Error message should not use snake_case");
+  assertEquals(
+    errorMessage.includes("motion_count"),
+    false,
+    "Error message should not use snake_case",
+  );
 });
 
 // process2 sub2: 記号文字バリデーションテスト (TDD Red Phase)
@@ -309,109 +322,130 @@ Deno.test("validateConfigFunction - singleCharKeys 記号文字バリデーシ�
   // 正常系: 有効な記号のみ
   const validSymbols = [";", ":", "[", "]", "'", '"', ",", ".", "/", "\\", "-", "=", "`"];
   let result = validateConfigFunction({
-    singleCharKeys: ["A", "S", "D", ...validSymbols]
+    singleCharKeys: ["A", "S", "D", ...validSymbols],
   });
   assertEquals(result.valid, true, "Valid symbols should be accepted");
   assertEquals(result.errors.length, 0);
 
   // 正常系: アルファベットと数字のみ（既存の動作）
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", "C", "0", "1", "2"]
+    singleCharKeys: ["A", "B", "C", "0", "1", "2"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
 
   // 正常系: すべて記号
   result = validateConfigFunction({
-    singleCharKeys: [";", ":", "[", "]"]
+    singleCharKeys: [";", ":", "[", "]"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
 
   // 異常系: 無効な記号（スペース）
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", " "]
+    singleCharKeys: ["A", "B", " "],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("whitespace")), true,
-    "Space should be rejected as invalid symbol");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("whitespace")),
+    true,
+    "Space should be rejected as invalid symbol",
+  );
 
   // 異常系: 無効な記号（タブ文字）
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", "\t"]
+    singleCharKeys: ["A", "B", "\t"],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("whitespace")), true,
-    "Tab character should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("whitespace")),
+    true,
+    "Tab character should be rejected",
+  );
 
   // 異常系: 無効な記号（改行文字）
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", "\n"]
+    singleCharKeys: ["A", "B", "\n"],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("whitespace")), true,
-    "Newline should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("whitespace")),
+    true,
+    "Newline should be rejected",
+  );
 
   // 異常系: 複数文字
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", "AB"]
+    singleCharKeys: ["A", "B", "AB"],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("single character")), true,
-    "Multi-character strings should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("single character")),
+    true,
+    "Multi-character strings should be rejected",
+  );
 
   // 異常系: 空文字列
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", ""]
+    singleCharKeys: ["A", "B", ""],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("empty")), true,
-    "Empty string should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("empty")),
+    true,
+    "Empty string should be rejected",
+  );
 
   // 異常系: 特殊文字（制御文字）
   result = validateConfigFunction({
-    singleCharKeys: ["A", "B", "\x00"]
+    singleCharKeys: ["A", "B", "\x00"],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("control")), true,
-    "Control characters should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("control")),
+    true,
+    "Control characters should be rejected",
+  );
 });
 
 Deno.test("validateConfigFunction - singleCharKeys 記号重複チェック", () => {
   // 異常系: 記号の重複
   const result = validateConfigFunction({
-    singleCharKeys: ["A", ";", ";", "B"]
+    singleCharKeys: ["A", ";", ";", "B"],
   });
   assertEquals(result.valid, false);
-  assertEquals(result.errors.some(e => e.includes("singleCharKeys") && e.includes("unique")), true,
-    "Duplicate symbols should be rejected");
+  assertEquals(
+    result.errors.some((e) => e.includes("singleCharKeys") && e.includes("unique")),
+    true,
+    "Duplicate symbols should be rejected",
+  );
 });
 
 Deno.test("validateConfigFunction - singleCharKeys エッジケース", () => {
   // 正常系: 記号のみの設定
   let result = validateConfigFunction({
-    singleCharKeys: [";", ":", ",", "."]
+    singleCharKeys: [";", ":", ",", "."],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
 
   // 正常系: バックスラッシュ
   result = validateConfigFunction({
-    singleCharKeys: ["\\"]
+    singleCharKeys: ["\\"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
 
   // 正常系: バッククォート
   result = validateConfigFunction({
-    singleCharKeys: ["`"]
+    singleCharKeys: ["`"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
 
   // 正常系: クォートマーク
   result = validateConfigFunction({
-    singleCharKeys: ["'", '"']
+    singleCharKeys: ["'", '"'],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);

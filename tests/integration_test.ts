@@ -3,7 +3,10 @@ import {
   getWordDetectionManager,
   resetWordDetectionManager,
 } from "../denops/hellshake-yano/neovim/core/word.ts";
-import { detectWordsWithManager, type EnhancedWordConfig } from "../denops/hellshake-yano/neovim/core/word.ts";
+import {
+  detectWordsWithManager,
+  type EnhancedWordConfig,
+} from "../denops/hellshake-yano/neovim/core/word.ts";
 import { MockDenops } from "./helpers/mock.ts";
 
 // Mock Denops for testing
@@ -14,7 +17,11 @@ mockDenops.onCall("line", (arg: unknown) => {
   if (arg === "$") return 10;
   return 5;
 });
-mockDenops.setCallResponse("getbufline", ["これはテスト行です", "Hello world test", "混在したcontent"]);
+mockDenops.setCallResponse("getbufline", [
+  "これはテスト行です",
+  "Hello world test",
+  "混在したcontent",
+]);
 mockDenops.setCallResponse("bufnr", 1);
 mockDenops.setCallResponse("bufexists", 1);
 
@@ -235,7 +242,8 @@ Deno.test("Real editing scenarios - per-key min_length integration", async (t) =
   };
 
   await t.step("User types 'v' and gets hints with min_length=1", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1, // 精密移動
         "h": 2, // 通常移動
       },
@@ -299,7 +307,8 @@ Deno.test("Real editing scenarios - per-key min_length integration", async (t) =
       { key: "F", expectedMinLength: 3, description: "Character search - backward" },
     ];
 
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1,
         "w": 1,
         "b": 1,
@@ -343,7 +352,8 @@ Deno.test("Real editing scenarios - per-key min_length integration", async (t) =
 
 Deno.test("Threshold switching stress tests", async (t) => {
   await t.step("Rapidly switching between keys with different thresholds", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1, // 最小
         "h": 2, // 中間
         "f": 3, // 最大
@@ -369,7 +379,9 @@ Deno.test("Threshold switching stress tests", async (t) => {
       };
 
       const testDenops = new MockDenops();
-      testDenops.setCallResponse("getbufline", [`iteration${i} test content with various word lengths a ab abc abcd abcde`]);
+      testDenops.setCallResponse("getbufline", [
+        `iteration${i} test content with various word lengths a ab abc abcd abcde`,
+      ]);
       testDenops.setCallResponse("bufnr", 1);
       testDenops.setCallResponse("bufexists", 1);
       testDenops.onCall("line", (arg: unknown) => {
@@ -393,7 +405,8 @@ Deno.test("Threshold switching stress tests", async (t) => {
   });
 
   await t.step("Performance under heavy switching", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1,
         "h": 2,
         "j": 2,
@@ -424,7 +437,9 @@ Deno.test("Threshold switching stress tests", async (t) => {
       };
 
       const testDenops = new MockDenops();
-      testDenops.setCallResponse("getbufline", ["performance test content with multiple words of different lengths"]);
+      testDenops.setCallResponse("getbufline", [
+        "performance test content with multiple words of different lengths",
+      ]);
       testDenops.setCallResponse("bufnr", 1);
       testDenops.setCallResponse("bufexists", 1);
       testDenops.onCall("line", (arg: unknown) => {
@@ -454,7 +469,8 @@ Deno.test("Threshold switching stress tests", async (t) => {
   });
 
   await t.step("UI responsiveness during rapid switching", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1,
         "h": 3,
       },
@@ -521,7 +537,8 @@ Deno.test("Threshold switching stress tests", async (t) => {
 
 Deno.test("Visual mode integration tests", async (t) => {
   await t.step("Visual mode with per-key settings", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1, // ビジュアルモード（文字単位）
         "V": 1, // ビジュアルラインモード
         "h": 2, // 通常の文字移動
@@ -553,7 +570,10 @@ Deno.test("Visual mode integration tests", async (t) => {
       };
 
       const testDenops = new MockDenops();
-      testDenops.setCallResponse("getbufline", ["function test() { return a + b; }", "const x = 1, y = 2;"]);
+      testDenops.setCallResponse("getbufline", [
+        "function test() { return a + b; }",
+        "const x = 1, y = 2;",
+      ]);
       testDenops.setCallResponse("bufnr", 1);
       testDenops.setCallResponse("bufexists", 1);
       testDenops.onCall("line", (arg: unknown) => {
@@ -580,7 +600,8 @@ Deno.test("Visual mode integration tests", async (t) => {
   });
 
   await t.step("Visual line mode", async () => {
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "V": 1, // ビジュアルラインモード
         "j": 2, // 通常の行移動
         "k": 2, // 通常の行移動
@@ -628,7 +649,8 @@ Deno.test("Visual mode integration tests", async (t) => {
 
   await t.step("Visual block mode", async () => {
     // ビジュアルブロックモードは特別な処理が必要
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1, // 通常のビジュアルモード
         "V": 1, // ラインビジュアルモード
         "<C-v>": 1, // ブロックビジュアルモード（Ctrl+V）
@@ -687,7 +709,8 @@ Deno.test("Visual mode integration tests", async (t) => {
       },
     ];
 
-    const config = {perKeyMinLength: {
+    const config = {
+      perKeyMinLength: {
         "v": 1,
         "V": 1,
       },

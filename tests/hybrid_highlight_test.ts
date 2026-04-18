@@ -10,10 +10,10 @@
  */
 
 import type { Denops } from "https://deno.land/x/denops_std@v6.4.0/mod.ts";
-import { assertEquals, assertExists, assert } from "https://deno.land/std@0.201.0/assert/mod.ts";
+import { assert, assertEquals, assertExists } from "https://deno.land/std@0.201.0/assert/mod.ts";
 import { delay } from "https://deno.land/std@0.201.0/async/delay.ts";
 import type { HintMapping, Word } from "../denops/hellshake-yano/types.ts";
-import { getDefaultConfig, type Config } from "../denops/hellshake-yano/config.ts";
+import { type Config, getDefaultConfig } from "../denops/hellshake-yano/config.ts";
 import { MockDenops as BaseMockDenops } from "./helpers/mock.ts";
 
 // Mock Denops interface for testing hybrid highlight functionality
@@ -57,16 +57,17 @@ function createTestHints(count: number): HintMapping[] {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
   for (let i = 0; i < count; i++) {
-    const hintChar = chars[i % chars.length] + (i >= chars.length ? String(Math.floor(i / chars.length)) : "");
+    const hintChar = chars[i % chars.length] +
+      (i >= chars.length ? String(Math.floor(i / chars.length)) : "");
     hints.push({
       hint: hintChar,
       word: {
         text: `word${i}`,
         line: i + 1,
-        col: i * 5 + 1
+        col: i * 5 + 1,
       },
       hintCol: i * 5 + 1,
-      hintByteCol: i * 5 + 1
+      hintByteCol: i * 5 + 1,
     });
   }
 
@@ -89,7 +90,7 @@ Deno.test("highlightCandidateHintsHybrid - TDD Green Phase: Method exists and wo
       mockDenops,
       testHints,
       "A",
-      { mode: "normal" }
+      { mode: "normal" },
     );
     // エラーが発生しなければ成功
     assert(true, "highlightCandidateHintsHybrid method exists and executed successfully");
@@ -121,7 +122,7 @@ Deno.test("highlightCandidateHintsHybrid - First batch synchronous processing re
       mockDenops,
       testHints,
       inputChar,
-      { mode: "normal" }
+      { mode: "normal" },
     );
 
     const endTime = Date.now();
@@ -129,17 +130,19 @@ Deno.test("highlightCandidateHintsHybrid - First batch synchronous processing re
     const cmdHistory = mockDenops.getCmdHistory();
 
     // 最初の15個のヒントが同期的に処理されることを検証
-    const syncBatchCalls = callHistory.filter(call =>
+    const syncBatchCalls = callHistory.filter((call) =>
       call.method === "nvim_buf_set_extmark" &&
       call.timestamp < startTime + 50 // 50ms以内の呼び出しを同期とみなす
     );
 
-    assert(syncBatchCalls.length >= 15, `Expected at least 15 synchronous extmark calls, got ${syncBatchCalls.length}`);
+    assert(
+      syncBatchCalls.length >= 15,
+      `Expected at least 15 synchronous extmark calls, got ${syncBatchCalls.length}`,
+    );
 
     // redrawコマンドが最初のバッチ後に呼ばれることを検証
-    const redrawCalls = cmdHistory.filter(cmd => cmd.command === "redraw");
+    const redrawCalls = cmdHistory.filter((cmd) => cmd.command === "redraw");
     assert(redrawCalls.length >= 1, "Expected at least one redraw command after sync batch");
-
   } catch (error) {
     // Green Phase: 実装されているのでエラーが発生した場合は問題
     console.warn("Unexpected error in Green Phase:", error);
@@ -164,7 +167,7 @@ Deno.test("highlightCandidateHintsHybrid - AbortController cancellation function
       mockDenops,
       testHints,
       inputChar,
-      { mode: "normal", signal: abortController.signal }
+      { mode: "normal", signal: abortController.signal },
     );
 
     // 50ms後にキャンセル
@@ -174,11 +177,13 @@ Deno.test("highlightCandidateHintsHybrid - AbortController cancellation function
 
     // キャンセル後は処理が停止されることを検証
     const callHistory = mockDenops.getCallHistory();
-    const totalCalls = callHistory.filter(call => call.method === "nvim_buf_set_extmark").length;
+    const totalCalls = callHistory.filter((call) => call.method === "nvim_buf_set_extmark").length;
 
     // 全てのヒントが処理される前にキャンセルされることを確認
-    assert(totalCalls < testHints.length, `Expected cancellation to stop processing, but got ${totalCalls} calls for ${testHints.length} hints`);
-
+    assert(
+      totalCalls < testHints.length,
+      `Expected cancellation to stop processing, but got ${totalCalls} calls for ${testHints.length} hints`,
+    );
   } catch (error) {
     // Green Phase: 実装されているのでエラーが発生した場合は問題
     console.warn("Unexpected error in Green Phase:", error);
@@ -202,7 +207,7 @@ Deno.test("highlightCandidateHintsHybrid - Async processing of remaining hints",
       mockDenops,
       testHints,
       inputChar,
-      { mode: "normal" }
+      { mode: "normal" },
     );
 
     // 十分な時間を待って非同期処理が完了することを確認
@@ -211,13 +216,13 @@ Deno.test("highlightCandidateHintsHybrid - Async processing of remaining hints",
     const callHistory = mockDenops.getCallHistory();
 
     // 同期処理された最初のバッチ
-    const syncCalls = callHistory.filter(call =>
+    const syncCalls = callHistory.filter((call) =>
       call.method === "nvim_buf_set_extmark" &&
       call.timestamp < startTime + 100
     );
 
     // 非同期処理された残りのヒント
-    const asyncCalls = callHistory.filter(call =>
+    const asyncCalls = callHistory.filter((call) =>
       call.method === "nvim_buf_set_extmark" &&
       call.timestamp >= startTime + 100
     );
@@ -226,9 +231,8 @@ Deno.test("highlightCandidateHintsHybrid - Async processing of remaining hints",
     assert(asyncCalls.length >= 10, `Expected at least 10 async calls, got ${asyncCalls.length}`);
 
     // 全てのヒントが最終的に処理されることを確認
-    const totalCalls = callHistory.filter(call => call.method === "nvim_buf_set_extmark").length;
+    const totalCalls = callHistory.filter((call) => call.method === "nvim_buf_set_extmark").length;
     assertEquals(totalCalls, testHints.length, "All hints should be processed eventually");
-
   } catch (error) {
     // Green Phase: 実装されているのでエラーが発生した場合は問題
     console.warn("Unexpected error in Green Phase:", error);
@@ -252,15 +256,15 @@ Deno.test("highlightCandidateHintsHybrid - Immediate redraw after sync batch", a
       mockDenops,
       testHints,
       inputChar,
-      { mode: "normal" }
+      { mode: "normal" },
     );
 
     const cmdHistory = mockDenops.getCmdHistory();
     const callHistory = mockDenops.getCallHistory();
 
     // redrawコマンドのタイミングを検証
-    const redrawCalls = cmdHistory.filter(cmd => cmd.command === "redraw");
-    const syncExtmarkCalls = callHistory.filter(call =>
+    const redrawCalls = cmdHistory.filter((cmd) => cmd.command === "redraw");
+    const syncExtmarkCalls = callHistory.filter((call) =>
       call.method === "nvim_buf_set_extmark" &&
       call.timestamp < startTime + 50
     );
@@ -269,13 +273,12 @@ Deno.test("highlightCandidateHintsHybrid - Immediate redraw after sync batch", a
 
     // redrawが最初のバッチの直後に呼ばれることを確認
     if (redrawCalls.length > 0 && syncExtmarkCalls.length > 0) {
-      const lastSyncCall = Math.max(...syncExtmarkCalls.map(call => call.timestamp));
-      const firstRedraw = Math.min(...redrawCalls.map(cmd => cmd.timestamp));
+      const lastSyncCall = Math.max(...syncExtmarkCalls.map((call) => call.timestamp));
+      const firstRedraw = Math.min(...redrawCalls.map((cmd) => cmd.timestamp));
 
       assert(firstRedraw >= lastSyncCall, "Redraw should occur after sync batch completion");
       assert(firstRedraw - lastSyncCall < 20, "Redraw should occur immediately after sync batch");
     }
-
   } catch (error) {
     // Green Phase: 実装されているのでエラーが発生した場合は問題
     console.warn("Unexpected error in Green Phase:", error);

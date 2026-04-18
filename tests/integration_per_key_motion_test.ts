@@ -1,7 +1,7 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import type { Config } from "../denops/hellshake-yano/types.ts";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
 
 /**
@@ -241,7 +241,8 @@ describe("Integration: リセット処理の確認", () => {
   });
 
   it("タイムアウトで自動リセットされる（シミュレーション）", async () => {
-    const config = createFullConfig({motionTimeout: 100, // 100msに短縮
+    const config = createFullConfig({
+      motionTimeout: 100, // 100msに短縮
     });
     tracker = new MotionCountTracker(config);
 
@@ -375,7 +376,8 @@ describe("Integration: エッジケースと実際の使用パターン", () => 
     tracker.resetKey("v");
 
     // 設定を変更（実際にはconfigオブジェクトを作り直す）
-    config = createFullConfig({perKeyMotionCount: {
+    config = createFullConfig({
+      perKeyMotionCount: {
         "v": 3, // 3回に変更
       },
       defaultMotionCount: 2,

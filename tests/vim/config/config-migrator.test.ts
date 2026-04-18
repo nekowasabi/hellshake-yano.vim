@@ -16,8 +16,8 @@ import { test } from "../../testRunner.ts";
 import { assertEquals, assertExists } from "@std/assert";
 import {
   ConfigMigrator,
-  type MigrationStatus,
   type MigrationResult,
+  type MigrationStatus,
 } from "../../../denops/hellshake-yano/vim/config/config-migrator.ts";
 
 // Phase-B1 テストケース
@@ -100,9 +100,7 @@ test("ConfigMigrator: 設定の取得", async (denops) => {
 });
 
 // Phase-B4 テストケース（統合版用に適応）
-test("ConfigMigrator: migrate() - 旧設定のみ存在時のマイグレーション", async (
-  denops,
-) => {
+test("ConfigMigrator: migrate() - 旧設定のみ存在時のマイグレーション", async (denops) => {
   const migrator = new ConfigMigrator(denops);
 
   // 旧設定を作成
@@ -127,9 +125,7 @@ test("ConfigMigrator: migrate() - 旧設定のみ存在時のマイグレーシ�
   await denops.cmd("echo ''");
 });
 
-test("ConfigMigrator: migrate() - 両方の設定が存在する場合", async (
-  denops,
-) => {
+test("ConfigMigrator: migrate() - 両方の設定が存在する場合", async (denops) => {
   const migrator = new ConfigMigrator(denops);
 
   // 両方の設定を作成

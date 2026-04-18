@@ -304,26 +304,26 @@ describe("hintPatterns bug fixes (Bug #1, #2)", () => {
     );
   });
 
-  it("Bug #2: 複数行 join テキストで ^ が各行頭にマッチする ('gm' フラグ)", () => {
+  it("Bug #2: 行単位走査で ^ が各行頭にマッチする ('m' フラグ)", () => {
     const processor = new HintPatternProcessorCtor();
 
-    // 複数行バッファ想定の join テキスト
+    // 複数行バッファ想定の lines 配列
     const line1 = "- [ ] Alpha";
     const line2 = "- [ ] Bravo";
     const line3 = "  - [ ] Charlie";
-    const text = [line1, line2, line3].join("\n");
+    const lines = [line1, line2, line3];
 
-    // 各行の「A/B/C」位置（join 文字列内 0-based offset）を計算
-    const offsetA = line1.indexOf("A"); // "- [ ] " = 6
-    const offsetB = line1.length + 1 + line2.indexOf("B");
-    const offsetC = line1.length + 1 + line2.length + 1 + line3.indexOf("C");
+    // 各行の「A/B/C」位置（行内 1-based col）
+    // Why: 行単位走査に変更し、findWordAtPosition は (lnum, col) で検索する。
+    //   Word.col は 1-based 列位置。
+    const colA = line1.indexOf("A") + 1; // "- [ ] " = 6 → col=7
+    const colB = line2.indexOf("B") + 1;
+    const colC = line3.indexOf("C") + 1;
 
-    // findWordAtPosition は position を word.col と直接比較するので
-    // ここでは join テキスト内 0-based offset を col にセットする
     const words = [
-      { text: "Alpha", line: 1, col: offsetA },
-      { text: "Bravo", line: 2, col: offsetB },
-      { text: "Charlie", line: 3, col: offsetC },
+      { text: "Alpha", line: 1, col: colA },
+      { text: "Bravo", line: 2, col: colB },
+      { text: "Charlie", line: 3, col: colC },
     ];
 
     // captureGroup 相当の hintPosition 形式で各行先頭文字を指す
@@ -340,7 +340,7 @@ describe("hintPatterns bug fixes (Bug #1, #2)", () => {
     //   line3 (インデント有り) は ^ にマッチせず hintPriority が
     //   付与されないため Bug #2 の回帰を検出できる。
     // deno-lint-ignore no-explicit-any
-    const result = processor.applyHintPatterns(words as any, text, patterns as any);
+    const result = processor.applyHintPatterns(words as any, lines, patterns as any);
 
     const alpha = result.find((w: { text: string }) => w.text === "Alpha");
     const bravo = result.find((w: { text: string }) => w.text === "Bravo");

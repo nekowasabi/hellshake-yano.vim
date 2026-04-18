@@ -10,10 +10,10 @@
 
 import { assertEquals, assertInstanceOf } from "https://deno.land/std@0.212.0/assert/mod.ts";
 import {
-  WordDetectionManager,
+  HybridWordDetector,
   RegexWordDetector,
   TinySegmenterWordDetector,
-  HybridWordDetector
+  WordDetectionManager,
 } from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { DetectionContext } from "../denops/hellshake-yano/types.ts";
 
@@ -31,9 +31,21 @@ Deno.test("WordDetectionManager - initialize method registers three actual detec
 
   // Check detector names
   const detectorNames = Array.from(detectors.keys());
-  assertEquals(detectorNames.includes("RegexWordDetector"), true, "Should include RegexWordDetector");
-  assertEquals(detectorNames.includes("TinySegmenterWordDetector"), true, "Should include TinySegmenterWordDetector");
-  assertEquals(detectorNames.includes("HybridWordDetector"), true, "Should include HybridWordDetector");
+  assertEquals(
+    detectorNames.includes("RegexWordDetector"),
+    true,
+    "Should include RegexWordDetector",
+  );
+  assertEquals(
+    detectorNames.includes("TinySegmenterWordDetector"),
+    true,
+    "Should include TinySegmenterWordDetector",
+  );
+  assertEquals(
+    detectorNames.includes("HybridWordDetector"),
+    true,
+    "Should include HybridWordDetector",
+  );
 });
 
 Deno.test("WordDetectionManager - TinySegmenterWordDetector is properly registered", async () => {
@@ -44,8 +56,16 @@ Deno.test("WordDetectionManager - TinySegmenterWordDetector is properly register
   const detectors = (manager as any).detectors;
   const tinySegmenterDetector = detectors.get("TinySegmenterWordDetector");
 
-  assertEquals(tinySegmenterDetector !== undefined, true, "TinySegmenterWordDetector should be registered");
-  assertInstanceOf(tinySegmenterDetector, TinySegmenterWordDetector, "Should be an instance of TinySegmenterWordDetector");
+  assertEquals(
+    tinySegmenterDetector !== undefined,
+    true,
+    "TinySegmenterWordDetector should be registered",
+  );
+  assertInstanceOf(
+    tinySegmenterDetector,
+    TinySegmenterWordDetector,
+    "Should be an instance of TinySegmenterWordDetector",
+  );
 });
 
 Deno.test("WordDetectionManager - HybridWordDetector is properly registered", async () => {
@@ -57,7 +77,11 @@ Deno.test("WordDetectionManager - HybridWordDetector is properly registered", as
   const hybridDetector = detectors.get("HybridWordDetector");
 
   assertEquals(hybridDetector !== undefined, true, "HybridWordDetector should be registered");
-  assertInstanceOf(hybridDetector, HybridWordDetector, "Should be an instance of HybridWordDetector");
+  assertInstanceOf(
+    hybridDetector,
+    HybridWordDetector,
+    "Should be an instance of HybridWordDetector",
+  );
 });
 
 Deno.test("WordDetectionManager - getDetectorForContext returns appropriate detector based on strategy", async () => {
@@ -67,24 +91,36 @@ Deno.test("WordDetectionManager - getDetectorForContext returns appropriate dete
 
   // Test regex strategy
   const regexContext: DetectionContext = {
-    strategy: "regex"
+    strategy: "regex",
   };
   const regexDetector = await manager.getDetectorForContext(regexContext);
-  assertEquals(regexDetector?.name, "RegexWordDetector", "Should return RegexWordDetector for regex strategy");
+  assertEquals(
+    regexDetector?.name,
+    "RegexWordDetector",
+    "Should return RegexWordDetector for regex strategy",
+  );
 
   // Test tinysegmenter strategy
   const segmenterContext: DetectionContext = {
-    strategy: "tinysegmenter"
+    strategy: "tinysegmenter",
   };
   const segmenterDetector = await manager.getDetectorForContext(segmenterContext);
-  assertEquals(segmenterDetector?.name, "TinySegmenterWordDetector", "Should return TinySegmenterWordDetector for tinysegmenter strategy");
+  assertEquals(
+    segmenterDetector?.name,
+    "TinySegmenterWordDetector",
+    "Should return TinySegmenterWordDetector for tinysegmenter strategy",
+  );
 
   // Test hybrid strategy
   const hybridContext: DetectionContext = {
-    strategy: "hybrid"
+    strategy: "hybrid",
   };
   const hybridDetector = await manager.getDetectorForContext(hybridContext);
-  assertEquals(hybridDetector?.name, "HybridWordDetector", "Should return HybridWordDetector for hybrid strategy");
+  assertEquals(
+    hybridDetector?.name,
+    "HybridWordDetector",
+    "Should return HybridWordDetector for hybrid strategy",
+  );
 });
 
 Deno.test("WordDetectionManager - getDetectorForContext returns highest priority detector for unknown strategy", async () => {
@@ -94,7 +130,7 @@ Deno.test("WordDetectionManager - getDetectorForContext returns highest priority
 
   // Test unknown strategy
   const unknownContext: DetectionContext = {
-    strategy: "unknown"
+    strategy: "unknown",
   };
   const detector = await manager.getDetectorForContext(unknownContext);
 
@@ -124,7 +160,7 @@ Deno.test("WordDetectionManager - getDetectorForContext returns highest priority
 
   // Test with context but no strategy
   const contextWithoutStrategy: DetectionContext = {
-    currentKey: "w"
+    currentKey: "w",
   };
   const detector = await manager.getDetectorForContext(contextWithoutStrategy);
 

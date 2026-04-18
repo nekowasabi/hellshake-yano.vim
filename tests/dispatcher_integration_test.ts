@@ -182,9 +182,7 @@ Deno.test("Dispatcher Integration: 全関数がasync関数であること", asyn
       const startMarker = layerName === "Vim"
         ? "async function initializeVimLayer("
         : "async function initializeNeovimLayer(";
-      const endMarker = layerName === "Vim"
-        ? "async function initializeNeovimLayer("
-        : null;
+      const endMarker = layerName === "Vim" ? "async function initializeNeovimLayer(" : null;
 
       const startIdx = source.indexOf(startMarker);
       const endIdx = endMarker

@@ -2,8 +2,8 @@ import { assertEquals, assertNotEquals } from "@std/assert";
 import { TinySegmenter } from "../denops/hellshake-yano/neovim/core/word.ts";
 import {
   RegexWordDetector,
-  WordDetectionManager,
   type WordDetectionConfig,
+  WordDetectionManager,
 } from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";
 
@@ -92,8 +92,8 @@ Deno.test("TinySegmenter Basic Functionality", async (t) => {
 
 Deno.test("Word Detector Integration Tests", async (t) => {
   await t.step("RegexWordDetector with Japanese", async () => {
-    const config: WordDetectionConfig = {useJapanese: true,
-      // useImprovedDetection: 統合済み（常に有効）
+    const config: WordDetectionConfig = {
+      useJapanese: true, // useImprovedDetection: 統合済み（常に有効）
     };
 
     const detector = new RegexWordDetector(config);
@@ -124,7 +124,8 @@ Deno.test("Word Detector Integration Tests", async (t) => {
   });
 
   await t.step("RegexWordDetector with hybrid configuration", async () => {
-    const config: WordDetectionConfig = {useJapanese: true,
+    const config: WordDetectionConfig = {
+      useJapanese: true,
       enableTinySegmenter: true,
       segmenterThreshold: 3,
     };
@@ -151,10 +152,10 @@ Deno.test("Word Detector Integration Tests", async (t) => {
   await t.step("RegexWordDetector with different configurations", async () => {
     const testText = "プログラミング言語のテストを実行します";
 
-    const regexDetector = new RegexWordDetector({useJapanese: true });
+    const regexDetector = new RegexWordDetector({ useJapanese: true });
     // TinySegmenterWordDetector and HybridWordDetector were removed in v2 consolidation
     const segmenterDetector = new RegexWordDetector({ enableTinySegmenter: true });
-    const hybridDetector = new RegexWordDetector({useJapanese: true });
+    const hybridDetector = new RegexWordDetector({ useJapanese: true });
 
     const regexWords = await regexDetector.detectWords(testText, 1);
     const segmenterWords = await segmenterDetector.detectWords(testText, 1);
@@ -356,7 +357,9 @@ function calculateTotal(items) {
 
     // Should detect both English and Japanese words
     const hasEnglish = words.some((w: string) => /[a-zA-Z]/.test(w));
-    const hasJapanese = words.some((w: string) => /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(w));
+    const hasJapanese = words.some((w: string) =>
+      /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(w)
+    );
 
     assertEquals(hasEnglish, true);
     assertEquals(hasJapanese, true);

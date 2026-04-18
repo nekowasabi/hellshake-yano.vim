@@ -1,14 +1,24 @@
-import { assertEquals, assertArrayIncludes, assertThrows } from "https://deno.land/std@0.212.0/assert/mod.ts";
 import {
-  TinySegmenterWordDetector,
-  RegexWordDetector,
+  assertArrayIncludes,
+  assertEquals,
+  assertThrows,
+} from "https://deno.land/std@0.212.0/assert/mod.ts";
+import {
   HybridWordDetector,
+  RegexWordDetector,
+  TinySegmenterWordDetector,
   WordDetectionManager,
+  type WordDetectionManagerConfig,
   type WordDetector,
-  type WordDetectionManagerConfig
 } from "../denops/hellshake-yano/neovim/core/word.ts";
-import { type DetectionContext, type Word, type WordDetectionResult, type SyntaxContext, type LineContext } from "../denops/hellshake-yano/types.ts";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import {
+  type DetectionContext,
+  type LineContext,
+  type SyntaxContext,
+  type Word,
+  type WordDetectionResult,
+} from "../denops/hellshake-yano/types.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 
 /**
  * TDD Red-Green-Refactor: 統合テスト
@@ -31,37 +41,39 @@ function createDefaultDetectionContext(): DetectionContext {
   return {
     fileType: "plaintext",
     config: {
-      japaneseMergeParticles: false  // Disable particle merging for tests expecting individual morphemes
+      japaneseMergeParticles: false, // Disable particle merging for tests expecting individual morphemes
     },
     syntaxContext: {
       inComment: false,
       inString: false,
       inFunction: false,
       inClass: false,
-      language: "plaintext"
+      language: "plaintext",
     },
     lineContext: {
       isComment: false,
       isDocString: false,
       isImport: false,
       indentLevel: 0,
-      lineType: "normal"
-    }
+      lineType: "normal",
+    },
   };
 }
 
 function extractWordTexts(words: Word[]): string[] {
-  return words.map(word => word.text).sort();
+  return words.map((word) => word.text).sort();
 }
 
 function extractWordTextsFromResult(result: WordDetectionResult): string[] {
-  return result.words.map(word => word.text).sort();
+  return result.words.map((word) => word.text).sort();
 }
 
 /**
  * テスト用のWordDetectionManagerを作成するヘルパー関数
  */
-async function createTestManager(config: WordDetectionManagerConfig = {}): Promise<WordDetectionManager> {
+async function createTestManager(
+  config: WordDetectionManagerConfig = {},
+): Promise<WordDetectionManager> {
   const manager = new WordDetectionManager(config);
   await manager.initialize();
   return manager;
@@ -70,9 +82,17 @@ async function createTestManager(config: WordDetectionManagerConfig = {}): Promi
 /**
  * 期待される単語がすべて検出されているかチェックするヘルパー関数
  */
-function assertWordsDetected(actualWords: string[], expectedWords: string[], testName: string): void {
+function assertWordsDetected(
+  actualWords: string[],
+  expectedWords: string[],
+  testName: string,
+): void {
   for (const expectedWord of expectedWords) {
-    assertArrayIncludes(actualWords, [expectedWord], `${testName}: "${expectedWord}"が検出されませんでした`);
+    assertArrayIncludes(
+      actualWords,
+      [expectedWord],
+      `${testName}: "${expectedWord}"が検出されませんでした`,
+    );
   }
 }
 
@@ -80,10 +100,22 @@ function assertWordsDetected(actualWords: string[], expectedWords: string[], tes
  * WordDetectionResultが期待される基本的な条件を満たしているかチェック
  */
 function assertValidDetectionResult(result: WordDetectionResult, testName: string): void {
-  assertEquals(typeof result === "object" && result !== null, true, `${testName}: 検出結果がオブジェクトではありません`);
+  assertEquals(
+    typeof result === "object" && result !== null,
+    true,
+    `${testName}: 検出結果がオブジェクトではありません`,
+  );
   assertEquals(Array.isArray(result.words), true, `${testName}: words配列が正しくありません`);
-  assertEquals(typeof result.success === "boolean", true, `${testName}: successフラグが正しくありません`);
-  assertEquals(typeof result.detector === "string", true, `${testName}: detector名が正しくありません`);
+  assertEquals(
+    typeof result.success === "boolean",
+    true,
+    `${testName}: successフラグが正しくありません`,
+  );
+  assertEquals(
+    typeof result.detector === "string",
+    true,
+    `${testName}: detector名が正しくありません`,
+  );
 }
 
 // ==================== 1. 純粋な日本語テキストの統合テスト ====================
@@ -99,7 +131,25 @@ Deno.test("TinySegmenterWordDetector - 純粋な日本語テキスト処理", as
 
   // TinySegmenterで実際に分割される結果（実装に基づく）
   // 実際の出力: ["。", "。", "が", "こと", "これ", "し", "する", "です", "の", "は", "ます", "を", "テスト", "分かち", "動作", "日本語", "書き", "正しく", "確認"]
-  const expectedWords = ["これ", "は", "テスト", "です", "日本語", "の", "分かち", "書き", "が", "正しく", "動作", "する", "こと", "を", "確認", "し", "ます"];
+  const expectedWords = [
+    "これ",
+    "は",
+    "テスト",
+    "です",
+    "日本語",
+    "の",
+    "分かち",
+    "書き",
+    "が",
+    "正しく",
+    "動作",
+    "する",
+    "こと",
+    "を",
+    "確認",
+    "し",
+    "ます",
+  ];
 
   // 各単語が検出されることを確認（TinySegmenterは「分かち書き」を「分かち」と「書き」に分割する）
   for (const expectedWord of expectedWords) {
@@ -134,7 +184,18 @@ Deno.test("RegexWordDetector - 純粋な英語テキスト処理", async () => {
   const result = await detector.detectWords(text, 0, context);
   const wordTexts = extractWordTexts(result);
 
-  const expectedWords = ["Hello", "world", "this", "is", "a", "test", "for", "English", "word", "detection"];
+  const expectedWords = [
+    "Hello",
+    "world",
+    "this",
+    "is",
+    "a",
+    "test",
+    "for",
+    "English",
+    "word",
+    "detection",
+  ];
 
   for (const expectedWord of expectedWords) {
     assertArrayIncludes(wordTexts, [expectedWord], `"${expectedWord}"が検出されませんでした`);
@@ -206,7 +267,11 @@ Deno.test("WordDetectionManager - strategy切り替え動作確認", async () =>
   // Strategy別の期待される結果を検証
   assertWordsDetected(regexWords, ["Hello", "test"], "regex strategy");
   assertWordsDetected(tinyWords, ["世界", "これ", "は", "です"], "tinysegmenter strategy");
-  assertWordsDetected(hybridWords, ["Hello", "test", "世界", "これ", "は", "です"], "hybrid strategy");
+  assertWordsDetected(
+    hybridWords,
+    ["Hello", "test", "世界", "これ", "は", "です"],
+    "hybrid strategy",
+  );
 });
 
 // ==================== 5. WordDetectionManagerとDetectorの統合動作テスト ====================
@@ -219,8 +284,12 @@ Deno.test("WordDetectionManager - Detector登録と選択", async () => {
   assertEquals(detectors.length > 0, true, "Detectorが登録されていません");
 
   // 各Detectorが適切に登録されていることを確認
-  const detectorNames = detectors.map(d => d.name);
-  const expectedDetectors = ["RegexWordDetector", "TinySegmenterWordDetector", "HybridWordDetector"];
+  const detectorNames = detectors.map((d) => d.name);
+  const expectedDetectors = [
+    "RegexWordDetector",
+    "TinySegmenterWordDetector",
+    "HybridWordDetector",
+  ];
   assertWordsDetected(detectorNames, expectedDetectors, "Detector登録確認");
 });
 
@@ -236,7 +305,11 @@ Deno.test("WordDetectionManager - getDetectorForContext動作確認", async () =
   const result = await manager.detectWords(text, 0, undefined, context);
 
   // 結果が返されることを確認（内部的にDetectorが選択されている）
-  assertEquals(typeof result === "object" && result !== null, true, "検出結果がオブジェクトではありません");
+  assertEquals(
+    typeof result === "object" && result !== null,
+    true,
+    "検出結果がオブジェクトではありません",
+  );
   assertEquals(Array.isArray(result.words), true, "words配列が正しくありません");
 });
 
@@ -265,11 +338,20 @@ function calculateTotal(items) {
   assertWordsDetected(wordTexts, expectedJapaneseWords, "日本語コメント");
 
   // TinySegmenterは「合計金額」を一つの単語として認識する場合がある
-  const hasExpectedWords = wordTexts.includes("合計金額") || (wordTexts.includes("合計") && wordTexts.includes("金額"));
+  const hasExpectedWords = wordTexts.includes("合計金額") ||
+    (wordTexts.includes("合計") && wordTexts.includes("金額"));
   assertEquals(hasExpectedWords, true, "合計・金額が検出されませんでした");
 
   // 英語の関数名・変数名
-  const expectedEnglishWords = ["TODO", "function", "calculateTotal", "items", "sum", "item", "price"];
+  const expectedEnglishWords = [
+    "TODO",
+    "function",
+    "calculateTotal",
+    "items",
+    "sum",
+    "item",
+    "price",
+  ];
   assertWordsDetected(wordTexts, expectedEnglishWords, "英語識別子");
 });
 
@@ -311,7 +393,26 @@ Deno.test("統合テスト - 純粋な日本語文章", async () => {
   const wordTexts = extractWordTextsFromResult(result);
 
   // TinySegmenterの実際の分割結果に基づく期待値
-  const expectedWords = ["昨日", "は", "友達", "と", "一緒", "に", "映画", "を", "見", "に", "行き", "まし", "た", "とて", "面白", "作品", "で", "た"];
+  const expectedWords = [
+    "昨日",
+    "は",
+    "友達",
+    "と",
+    "一緒",
+    "に",
+    "映画",
+    "を",
+    "見",
+    "に",
+    "行き",
+    "まし",
+    "た",
+    "とて",
+    "面白",
+    "作品",
+    "で",
+    "た",
+  ];
   assertWordsDetected(wordTexts, expectedWords, "純粋な日本語文章");
 });
 
@@ -325,7 +426,23 @@ Deno.test("統合テスト - 純粋な英語文章", async () => {
   assertValidDetectionResult(result, "純粋な英語文章処理");
   const wordTexts = extractWordTextsFromResult(result);
 
-  const expectedWords = ["The", "quick", "brown", "fox", "jumps", "over", "the", "lazy", "dog", "This", "is", "a", "sample", "English", "sentence"];
+  const expectedWords = [
+    "The",
+    "quick",
+    "brown",
+    "fox",
+    "jumps",
+    "over",
+    "the",
+    "lazy",
+    "dog",
+    "This",
+    "is",
+    "a",
+    "sample",
+    "English",
+    "sentence",
+  ];
   assertWordsDetected(wordTexts, expectedWords, "純粋な英語文章");
 });
 
@@ -342,7 +459,12 @@ Deno.test("統合テスト - 空文字列のハンドリング", async () => {
 Deno.test("統合テスト - 記号のみのテキスト", async () => {
   const manager = await createTestManager({ strategy: "hybrid" });
 
-  const result = await manager.detectWords("!@#$%^&*()", 0, undefined, createDefaultDetectionContext());
+  const result = await manager.detectWords(
+    "!@#$%^&*()",
+    0,
+    undefined,
+    createDefaultDetectionContext(),
+  );
   assertValidDetectionResult(result, "記号のみテキスト処理");
   // 実装によっては記号も検出される場合があるため、長さチェックを緩和
   assertEquals(result.words.length < 10, true, "記号のみのテキストで過度に単語が検出されました");
@@ -382,5 +504,7 @@ Deno.test("統合テスト - パフォーマンス測定", async () => {
   assertEquals(result.words.length > 0, true, "大きなテキストで単語が検出されませんでした");
 
   // パフォーマンスのログ出力（テスト失敗の原因にはしない）
-  console.log(`大きなテキスト処理時間: ${processingTime.toFixed(2)}ms, 検出単語数: ${result.words.length}`);
+  console.log(
+    `大きなテキスト処理時間: ${processingTime.toFixed(2)}ms, 検出単語数: ${result.words.length}`,
+  );
 });

@@ -16,7 +16,8 @@ Deno.test("ハイライト色設定: デフォルト値のテスト", () => {
 });
 
 Deno.test("ハイライト色設定: カスタム値の設定テスト", () => {
-  const customConfig: Partial<Config> = {highlightHintMarker: "Search",
+  const customConfig: Partial<Config> = {
+    highlightHintMarker: "Search",
     highlightHintMarkerCurrent: "IncSearch",
   };
 
@@ -99,7 +100,8 @@ Deno.test("ハイライト色設定: 有効なハイライトグループ名の�
 
   // 各有効なハイライトグループ名をテスト
   for (const group of validHighlightGroups) {
-    const config: Partial<Config> = {highlightHintMarker: group,
+    const config: Partial<Config> = {
+      highlightHintMarker: group,
       highlightHintMarkerCurrent: group,
     };
 
@@ -110,8 +112,7 @@ Deno.test("ハイライト色設定: 有効なハイライトグループ名の�
 
 Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   // highlightHintMarker が数値の場合
-  const invalidConfig1: any = {highlightHintMarker: 123,
-  };
+  const invalidConfig1: any = { highlightHintMarker: 123 };
 
   const validation1 = validateConfig(invalidConfig1);
   assertEquals(validation1.valid, false);
@@ -121,8 +122,7 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   );
 
   // highlightHintMarkerCurrent が配列の場合
-  const invalidConfig2: any = {highlightHintMarkerCurrent: ["Search", "IncSearch"],
-  };
+  const invalidConfig2: any = { highlightHintMarkerCurrent: ["Search", "IncSearch"] };
 
   const validation2 = validateConfig(invalidConfig2);
   assertEquals(validation2.valid, false);
@@ -132,8 +132,7 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
   );
 
   // highlightHintMarker が空文字列の場合
-  const invalidConfig3: Partial<Config> = {highlightHintMarker: "",
-  };
+  const invalidConfig3: Partial<Config> = { highlightHintMarker: "" };
 
   const validation3 = validateConfig(invalidConfig3);
   assertEquals(validation3.valid, false);
@@ -145,16 +144,15 @@ Deno.test("ハイライト色設定: 無効な型のテスト", () => {
 
 Deno.test("ハイライト色設定: null と undefined のテスト", () => {
   // null 値のテスト
-  const nullConfig: any = {highlightHintMarker: null,
-    highlightHintMarkerCurrent: null,
-  };
+  const nullConfig: any = { highlightHintMarker: null, highlightHintMarkerCurrent: null };
 
   const validation1 = validateConfig(nullConfig);
   assertEquals(validation1.valid, false);
   assertEquals(validation1.errors.length >= 2, true);
 
   // undefined 値のテスト（設定なしの場合は有効）
-  const undefinedConfig: Partial<Config> = {highlightHintMarker: undefined,
+  const undefinedConfig: Partial<Config> = {
+    highlightHintMarker: undefined,
     highlightHintMarkerCurrent: undefined,
   };
 
@@ -195,8 +193,7 @@ Deno.test("ハイライト色設定: 特殊文字を含む無効な名前のテ�
   ];
 
   for (const invalidName of invalidNames) {
-    const config: Partial<Config> = {highlightHintMarker: invalidName,
-    };
+    const config: Partial<Config> = { highlightHintMarker: invalidName };
 
     const validation = validateConfig(config);
     assertEquals(validation.valid, false, `${invalidName} should be invalid`);
@@ -231,7 +228,8 @@ Deno.test("ハイライト色設定: 有効な名前のパターンテスト", (
   ];
 
   for (const validName of validNames) {
-    const config: Partial<Config> = {highlightHintMarker: validName,
+    const config: Partial<Config> = {
+      highlightHintMarker: validName,
       highlightHintMarkerCurrent: validName,
     };
 
@@ -244,15 +242,12 @@ Deno.test("ハイライト色設定: 長すぎる名前のテスト", () => {
   // 100文字以上の名前（通常のVimハイライトグループ名としては長すぎる）
   const tooLongName = "a".repeat(101);
 
-  const config: Partial<Config> = {highlightHintMarker: tooLongName,
-  };
+  const config: Partial<Config> = { highlightHintMarker: tooLongName };
 
   const validation = validateConfig(config);
   assertEquals(validation.valid, false);
   assertEquals(
-    validation.errors.some((e) =>
-      e.includes("highlightHintMarker must be 100 characters or less")
-    ),
+    validation.errors.some((e) => e.includes("highlightHintMarker must be 100 characters or less")),
     true,
   );
 });
@@ -266,8 +261,7 @@ Deno.test("ハイライト色設定: 数字で始まる無効な名前のテス�
   ];
 
   for (const invalidName of invalidNames) {
-    const config: Partial<Config> = {highlightHintMarker: invalidName,
-    };
+    const config: Partial<Config> = { highlightHintMarker: invalidName };
 
     const validation = validateConfig(config);
     assertEquals(validation.valid, false, `${invalidName} should be invalid`);
@@ -290,7 +284,8 @@ Deno.test("ハイライト色設定: アンダースコアで始まる有効な�
   ];
 
   for (const validName of validNames) {
-    const config: Partial<Config> = {highlightHintMarker: validName,
+    const config: Partial<Config> = {
+      highlightHintMarker: validName,
       highlightHintMarkerCurrent: validName,
     };
 

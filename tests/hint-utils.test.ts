@@ -5,18 +5,15 @@
  * Fix double conversion issue in convertToDisplayColumn
  */
 
+import { assertEquals, assertThrows } from "https://deno.land/std@0.177.0/testing/asserts.ts";
 import {
-  assertEquals,
-  assertThrows,
-} from "https://deno.land/std@0.177.0/testing/asserts.ts";
-import {
+  areWordsAdjacent,
+  calculateHintPosition,
+  calculateWordGap,
   convertToDisplayColumn,
   getWordDisplayEndCol,
-  areWordsAdjacent,
   getWordDisplayStartCol,
-  calculateHintPosition,
   isPositionWithinWord,
-  calculateWordGap,
 } from "../denops/hellshake-yano/neovim/core/hint.ts";
 import { getByteLength } from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";

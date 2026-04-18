@@ -18,9 +18,7 @@ interface HintMapping {
 
 class HintSelector {
   private currentHints: HintMapping[] = [];
-  private config = {useNumbers: false,
-    highlightSelected: false,
-  };
+  private config = { useNumbers: false, highlightSelected: false };
 
   setHints(hints: HintMapping[]) {
     this.currentHints = hints;
@@ -106,14 +104,14 @@ describe("Hint Selection Fix Tests", () => {
       const selector = new HintSelector();
 
       // アルファベットのみモード
-      selector.setConfig({useNumbers: false });
+      selector.setConfig({ useNumbers: false });
       assertEquals(selector.validateInput("A"), true);
       assertEquals(selector.validateInput("Z"), true);
       assertEquals(selector.validateInput("0"), false);
       assertEquals(selector.validateInput("9"), false);
 
       // 数字も許可するモード
-      selector.setConfig({useNumbers: true });
+      selector.setConfig({ useNumbers: true });
       assertEquals(selector.validateInput("A"), true);
       assertEquals(selector.validateInput("Z"), true);
       assertEquals(selector.validateInput("0"), true);
@@ -249,7 +247,7 @@ describe("Hint Selection Fix Tests", () => {
   describe("Number Support in Hints", () => {
     it("should handle numeric hints when enabled", () => {
       const selector = new HintSelector();
-      selector.setConfig({useNumbers: true });
+      selector.setConfig({ useNumbers: true });
       selector.setHints([
         { hint: "0", word: { text: "zero", line: 1, col: 1 } },
         { hint: "1", word: { text: "one", line: 2, col: 1 } },
@@ -283,12 +281,12 @@ describe("Hint Selection Fix Tests", () => {
       const selector = new HintSelector();
 
       // 数字無効モード
-      selector.setConfig({useNumbers: false });
+      selector.setConfig({ useNumbers: false });
       assertEquals(selector.validateInput("0"), false);
       assertEquals(selector.validateInput("9"), false);
 
       // 数字有効モード
-      selector.setConfig({useNumbers: true });
+      selector.setConfig({ useNumbers: true });
       assertEquals(selector.validateInput("0"), true);
       assertEquals(selector.validateInput("9"), true);
     });

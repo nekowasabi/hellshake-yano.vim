@@ -6,10 +6,10 @@
  */
 
 import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/testing/asserts.ts";
-import { DEFAULT_CONFIG, type Config } from "../denops/hellshake-yano/config.ts";
+import { type Config, DEFAULT_CONFIG } from "../denops/hellshake-yano/config.ts";
 import {
   RegexWordDetector,
-  type WordDetectionConfig
+  type WordDetectionConfig,
 } from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";
 
@@ -17,24 +17,24 @@ import type { Word } from "../denops/hellshake-yano/types.ts";
 const mockConfig: Config = {
   ...DEFAULT_CONFIG,
   // Core settings
-  markers: ['A', 'S', 'D', 'F'],
+  markers: ["A", "S", "D", "F"],
 
   // Hint settings
   highlightSelected: true,
   debugCoordinates: false,
-  singleCharKeys: ['A', 'S'],
+  singleCharKeys: ["A", "S"],
 
   // Extended hint settings
-  multiCharKeys: ['D', 'F'],
+  multiCharKeys: ["D", "F"],
   useHintGroups: false,
-  highlightHintMarker: { fg: '#FF0000', bg: '#FFFFFF' },
+  highlightHintMarker: { fg: "#FF0000", bg: "#FFFFFF" },
 
   // Word detection settings
-  highlightHintMarkerCurrent: { fg: '#FFFF00', bg: '#FF0000' },
+  highlightHintMarkerCurrent: { fg: "#FFFF00", bg: "#FF0000" },
   suppressOnKeyRepeat: true,
   keyRepeatThreshold: 50,
   useJapanese: true,
-  wordDetectionStrategy: 'hybrid',
+  wordDetectionStrategy: "hybrid",
   enableTinySegmenter: true,
   segmenterThreshold: 4,
 
@@ -43,9 +43,9 @@ const mockConfig: Config = {
   japaneseMergeParticles: true,
   japaneseMergeThreshold: 2,
   perKeyMinLength: {
-    'f': 2,
-    't': 1,
-    'F': 3
+    "f": 2,
+    "t": 1,
+    "F": 3,
   },
   defaultMinWordLength: 3,
   defaultMotionCount: 3,
@@ -58,7 +58,7 @@ const mockConfig: Config = {
   motionCounterEnabled: true,
   motionCounterThreshold: 3,
   motionCounterTimeout: 2000,
-  showHintOnMotionThreshold: true
+  showHintOnMotionThreshold: true,
 };
 
 Deno.test("Red Phase: RegexWordDetector should use Config instead of Config", async () => {
@@ -66,29 +66,34 @@ Deno.test("Red Phase: RegexWordDetector should use Config instead of Config", as
   const config: WordDetectionConfig = {
     // These should map to Config properties (currently uses snake_case)
     useJapanese: mockConfig.useJapanese,
-    defaultMinWordLength: mockConfig.defaultMinWordLength
+    defaultMinWordLength: mockConfig.defaultMinWordLength,
   };
 
   const detector = new RegexWordDetector(config, mockConfig);
 
   // Test that detector can access Config properties
   const words = await detector.detectWords("test word", 1, {
-    currentKey: 'f',
+    currentKey: "f",
   });
 
   // Should be able to detect words with proper min length from Config
   assertExists(words);
 
   // This assertion will fail until detector.ts is updated to use Config
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['f'] || mockConfig.defaultMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["f"] || mockConfig.defaultMinWordLength;
   const validWords = words.filter((word: Word) => word.text.length >= effectiveMinLength);
-  assertEquals(words.length, validWords.length, "All detected words should respect Config min length");
+  assertEquals(
+    words.length,
+    validWords.length,
+    "All detected words should respect Config min length",
+  );
 });
 
 Deno.test("Red Phase: TinySegmenterWordDetector should use Config instead of Config", async () => {
-  const config: WordDetectionConfig = {useJapanese: mockConfig.useJapanese,
+  const config: WordDetectionConfig = {
+    useJapanese: mockConfig.useJapanese,
     enableTinySegmenter: mockConfig.enableTinySegmenter,
-    segmenterThreshold: mockConfig.segmenterThreshold
+    segmenterThreshold: mockConfig.segmenterThreshold,
   };
 
   // TinySegmenterWordDetector was removed in v2 consolidation, using RegexWordDetector instead
@@ -96,21 +101,22 @@ Deno.test("Red Phase: TinySegmenterWordDetector should use Config instead of Con
 
   // Test Japanese text detection with Config settings
   const words = await detector.detectWords("これはテストです", 1, {
-    currentKey: 't',
-    minWordLength: mockConfig.perKeyMinLength?.['t']
+    currentKey: "t",
+    minWordLength: mockConfig.perKeyMinLength?.["t"],
   });
 
   assertExists(words);
 
   // This will fail until TinySegmenterWordDetector uses Config properly
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['t'] || mockConfig.japaneseMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["t"] || mockConfig.japaneseMinWordLength;
   const validWords = words.filter((word: Word) => word.text.length >= effectiveMinLength);
   assertEquals(words.length, validWords.length, "Japanese words should respect Config min length");
 });
 
 Deno.test("Red Phase: HybridWordDetector should use Config instead of Config", async () => {
-  const config: WordDetectionConfig = {useJapanese: mockConfig.useJapanese,
-    strategy: mockConfig.wordDetectionStrategy
+  const config: WordDetectionConfig = {
+    useJapanese: mockConfig.useJapanese,
+    strategy: mockConfig.wordDetectionStrategy,
   };
 
   // HybridWordDetector was removed in v2 consolidation, using RegexWordDetector instead
@@ -118,14 +124,18 @@ Deno.test("Red Phase: HybridWordDetector should use Config instead of Config", a
 
   // Test hybrid detection with mixed content
   const words = await detector.detectWords("Hello こんにちは world", 1, {
-    currentKey: 'F',
-    minWordLength: mockConfig.perKeyMinLength?.['F']
+    currentKey: "F",
+    minWordLength: mockConfig.perKeyMinLength?.["F"],
   });
 
   assertExists(words);
 
   // This will fail until HybridWordDetector uses Config properly
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['F'] || mockConfig.defaultMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["F"] || mockConfig.defaultMinWordLength;
   const validWords = words.filter((word: Word) => word.text.length >= effectiveMinLength);
-  assertEquals(words.length, validWords.length, "Hybrid detection should respect Config min length");
+  assertEquals(
+    words.length,
+    validWords.length,
+    "Hybrid detection should respect Config min length",
+  );
 });

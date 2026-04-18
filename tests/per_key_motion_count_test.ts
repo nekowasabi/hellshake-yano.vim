@@ -9,7 +9,7 @@
 
 import { assertEquals, assertNotEquals } from "@std/assert";
 import type { Config } from "../denops/hellshake-yano/types.ts";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
 
 // Test helper to create minimal config with required fields
@@ -33,7 +33,8 @@ function createTestConfig(partial: Partial<Config>): Config {
 }
 
 Deno.test("perKeyMotionCount: basic functionality", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     perKeyMotionCount: {
       "v": 1,
       "w": 1,
@@ -57,7 +58,8 @@ Deno.test("perKeyMotionCount: basic functionality", () => {
 });
 
 Deno.test("perKeyMotionCount: fallback to defaultMotionCount", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     perKeyMotionCount: {
       "v": 1,
     },
@@ -71,7 +73,8 @@ Deno.test("perKeyMotionCount: fallback to defaultMotionCount", () => {
 });
 
 Deno.test("perKeyMotionCount: fallback to motionCount when defaultMotionCount is undefined", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     perKeyMotionCount: {
       "v": 1,
     },
@@ -84,7 +87,8 @@ Deno.test("perKeyMotionCount: fallback to motionCount when defaultMotionCount is
 });
 
 Deno.test("perKeyMotionCount: undefined perKeyMotionCount uses defaultMotionCount", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     // perKeyMotionCount is undefined
     defaultMotionCount: 2,
   });
@@ -95,8 +99,8 @@ Deno.test("perKeyMotionCount: undefined perKeyMotionCount uses defaultMotionCoun
 });
 
 Deno.test("perKeyMotionCount: both undefined uses motionCount", () => {
-  const config = createTestConfig({motionCount: 3,
-    // both perKeyMotionCount and defaultMotionCount are undefined
+  const config = createTestConfig({
+    motionCount: 3, // both perKeyMotionCount and defaultMotionCount are undefined
   });
 
   // Test fallback to motionCount for complete backward compatibility
@@ -105,7 +109,8 @@ Deno.test("perKeyMotionCount: both undefined uses motionCount", () => {
 });
 
 Deno.test("perKeyMotionCount: edge cases", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     perKeyMotionCount: {
       "v": 0, // zero value (should fallback as it's invalid)
       "w": -1, // negative value (should fallback)
@@ -119,7 +124,8 @@ Deno.test("perKeyMotionCount: edge cases", () => {
 });
 
 Deno.test("perKeyMotionCount: empty string key", () => {
-  const config = createTestConfig({motionCount: 3,
+  const config = createTestConfig({
+    motionCount: 3,
     perKeyMotionCount: {
       "": 1, // empty string key
     },
@@ -134,7 +140,8 @@ Deno.test("perKeyMotionCount: empty string key", () => {
 });
 
 Deno.test("perKeyMotionCount: priority test", () => {
-  const config = createTestConfig({motionCount: 5,
+  const config = createTestConfig({
+    motionCount: 5,
     perKeyMotionCount: {
       "v": 1,
     },
@@ -146,13 +153,10 @@ Deno.test("perKeyMotionCount: priority test", () => {
   assertEquals(Core.getMotionCountForKey("x", config), 2); // defaultMotionCount
 
   // Test without perKeyMotionCount
-  const configWithoutPerKey = createTestConfig({motionCount: 5,
-    defaultMotionCount: 2,
-  });
+  const configWithoutPerKey = createTestConfig({ motionCount: 5, defaultMotionCount: 2 });
   assertEquals(Core.getMotionCountForKey("v", configWithoutPerKey), 2); // defaultMotionCount
 
   // Test without both perKeyMotionCount and custom defaultMotionCount
-  const configMinimal = createTestConfig({motionCount: 5,
-  });
+  const configMinimal = createTestConfig({ motionCount: 5 });
   assertEquals(Core.getMotionCountForKey("v", configMinimal), 3); // DEFAULT_UNIFIED_CONFIGのdefaultMotionCount
 });

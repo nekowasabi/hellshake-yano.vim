@@ -6,7 +6,7 @@
  */
 
 import { assertEquals } from "jsr:@std/assert";
-import { VimMotion, MotionType } from "../../../denops/hellshake-yano/vim/features/motion.ts";
+import { MotionType, VimMotion } from "../../../denops/hellshake-yano/vim/features/motion.ts";
 
 Deno.test("VimMotion: モーション検出", async (t) => {
   await t.step("文字モーション検出", () => {

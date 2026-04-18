@@ -36,8 +36,18 @@ test({
     await core.highlightCandidateHintsHybrid(denops, mockHints as any, "A", { mode: "normal" });
 
     // ハイライトが設定されていることを確認
-    const extmarkNamespace = await denops.call("nvim_create_namespace", "hellshake_yano_hints") as number;
-    const extmarks = await denops.call("nvim_buf_get_extmarks", 0, extmarkNamespace, 0, -1, {}) as unknown[];
+    const extmarkNamespace = await denops.call(
+      "nvim_create_namespace",
+      "hellshake_yano_hints",
+    ) as number;
+    const extmarks = await denops.call(
+      "nvim_buf_get_extmarks",
+      0,
+      extmarkNamespace,
+      0,
+      -1,
+      {},
+    ) as unknown[];
     assertEquals(extmarks.length > 0, true, "Should have extmarks after highlighting");
   },
 });

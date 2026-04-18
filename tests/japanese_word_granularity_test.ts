@@ -13,31 +13,33 @@ import { TinySegmenterWordDetector } from "../denops/hellshake-yano/neovim/core/
 import type { DetectionContext } from "../denops/hellshake-yano/types.ts";
 
 Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
-
   // Test 1: japaneseMinWordLength application
-  await t.step("should filter out single-character particles when japaneseMinWordLength=2", async () => {
-    const detector = new TinySegmenterWordDetector();
-    const text = "私の名前は田中です";
-    const context: DetectionContext = {
-      minWordLength: 2,
-      config: {
-        japaneseMinWordLength: 2,
-        japaneseMergeParticles: true, // デフォルトはtrue
-      },
-    };
+  await t.step(
+    "should filter out single-character particles when japaneseMinWordLength=2",
+    async () => {
+      const detector = new TinySegmenterWordDetector();
+      const text = "私の名前は田中です";
+      const context: DetectionContext = {
+        minWordLength: 2,
+        config: {
+          japaneseMinWordLength: 2,
+          japaneseMergeParticles: true, // デフォルトはtrue
+        },
+      };
 
-    const words = await detector.detectWords(text, 1, context);
+      const words = await detector.detectWords(text, 1, context);
 
-    // 1文字の助詞（「の」「は」）が除外されているはず（統合されているはず）
-    const wordTexts = words.map(w => w.text);
-    assertEquals(wordTexts.includes("の"), false, "助詞「の」は単独で存在しないべき");
-    assertEquals(wordTexts.includes("は"), false, "助詞「は」は単独で存在しないべき");
+      // 1文字の助詞（「の」「は」）が除外されているはず（統合されているはず）
+      const wordTexts = words.map((w) => w.text);
+      assertEquals(wordTexts.includes("の"), false, "助詞「の」は単独で存在しないべき");
+      assertEquals(wordTexts.includes("は"), false, "助詞「は」は単独で存在しないべき");
 
-    // 形態素統合により「名詞+助詞」の形で含まれるべき
-    assertEquals(wordTexts.includes("私の"), true, "「私の」として統合されるべき");
-    assertEquals(wordTexts.includes("名前は"), true, "「名前は」として統合されるべき");
-    assertEquals(wordTexts.includes("田中です"), true, "「田中です」として統合されるべき");
-  });
+      // 形態素統合により「名詞+助詞」の形で含まれるべき
+      assertEquals(wordTexts.includes("私の"), true, "「私の」として統合されるべき");
+      assertEquals(wordTexts.includes("名前は"), true, "「名前は」として統合されるべき");
+      assertEquals(wordTexts.includes("田中です"), true, "「田中です」として統合されるべき");
+    },
+  );
 
   await t.step("should use japaneseMinWordLength from context.config when available", async () => {
     const detector = new TinySegmenterWordDetector();
@@ -52,7 +54,7 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // 3文字以上の単語が含まれるべき
     // 形態素統合により「これは」(3文字)、「テストです」(6文字)となる
@@ -76,7 +78,7 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // 一般的な助詞は単独で存在しないべき（統合されているはず）
     const particles = ["の", "を", "に", "は", "が", "へ", "と", "や", "で", "も"];
@@ -90,7 +92,11 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     assertEquals(wordTexts.includes("私の"), true, "「私の」は含まれるべき");
     assertEquals(wordTexts.includes("本を"), true, "「本を」は含まれるべき");
     assertEquals(wordTexts.includes("彼に"), true, "「彼に」は含まれるべき");
-    assertEquals(wordTexts.includes("渡し") || wordTexts.includes("渡した"), true, "「渡し」または「渡した」は含まれるべき");
+    assertEquals(
+      wordTexts.includes("渡し") || wordTexts.includes("渡した"),
+      true,
+      "「渡し」または「渡した」は含まれるべき",
+    );
   });
 
   await t.step("should filter two-character particles like 「から」「まで」", async () => {
@@ -105,7 +111,7 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // 2文字の助詞も単独で存在しないべき（統合されているはず）
     assertEquals(wordTexts.includes("から"), false, "助詞「から」は単独で存在しないべき");
@@ -129,7 +135,7 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // 名詞+助詞が統合されているべき
     assertEquals(wordTexts.includes("私の"), true, "「私の」として統合されるべき");
@@ -150,7 +156,7 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // 「これは」や「ペンです」のように統合されるべき
     assertEquals(wordTexts.includes("これは"), true, "「これは」として統合されるべき");
@@ -171,35 +177,54 @@ Deno.test("Japanese Word Granularity - Phase 1 RED Tests", async (t) => {
     };
 
     assertExists(context.config, "context.configが存在するべき");
-    assertEquals(context.config.japaneseMinWordLength, 2, "japaneseMinWordLengthが正しく設定されるべき");
+    assertEquals(
+      context.config.japaneseMinWordLength,
+      2,
+      "japaneseMinWordLengthが正しく設定されるべき",
+    );
 
     const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+    const wordTexts = words.map((w) => w.text);
 
     // japaneseMinWordLengthが適用され、1文字の助詞が除外されるべき
-    assertEquals(wordTexts.includes("の"), false, "japaneseMinWordLengthにより「の」は除外されるべき");
+    assertEquals(
+      wordTexts.includes("の"),
+      false,
+      "japaneseMinWordLengthにより「の」は除外されるべき",
+    );
   });
 
-  await t.step("should prioritize japaneseMinWordLength over minWordLength for Japanese text", async () => {
-    const detector = new TinySegmenterWordDetector();
-    const text = "私の本";
+  await t.step(
+    "should prioritize japaneseMinWordLength over minWordLength for Japanese text",
+    async () => {
+      const detector = new TinySegmenterWordDetector();
+      const text = "私の本";
 
-    // minWordLength=1だがjapaneseMinWordLength=2の場合
-    const context: DetectionContext = {
-      minWordLength: 1,
-      config: {
-        japaneseMinWordLength: 2,
-        japaneseMergeParticles: true,
-      },
-    };
+      // minWordLength=1だがjapaneseMinWordLength=2の場合
+      const context: DetectionContext = {
+        minWordLength: 1,
+        config: {
+          japaneseMinWordLength: 2,
+          japaneseMergeParticles: true,
+        },
+      };
 
-    const words = await detector.detectWords(text, 1, context);
-    const wordTexts = words.map(w => w.text);
+      const words = await detector.detectWords(text, 1, context);
+      const wordTexts = words.map((w) => w.text);
 
-    // japaneseMinWordLengthが優先され、2文字以上のみ含まれる
-    assertEquals(wordTexts.includes("の"), false, "japaneseMinWordLengthが優先され「の」は単独で存在しないべき");
-    assertEquals(wordTexts.includes("私の"), true, "「私の」(2文字)として統合されるべき");
-    // 「本」は1文字なのでjapaneseMinWordLength=2により除外される
-    assertEquals(wordTexts.includes("本"), false, "「本」は1文字なのでjapaneseMinWordLength=2により除外されるべき");
-  });
+      // japaneseMinWordLengthが優先され、2文字以上のみ含まれる
+      assertEquals(
+        wordTexts.includes("の"),
+        false,
+        "japaneseMinWordLengthが優先され「の」は単独で存在しないべき",
+      );
+      assertEquals(wordTexts.includes("私の"), true, "「私の」(2文字)として統合されるべき");
+      // 「本」は1文字なのでjapaneseMinWordLength=2により除外される
+      assertEquals(
+        wordTexts.includes("本"),
+        false,
+        "「本」は1文字なのでjapaneseMinWordLength=2により除外されるべき",
+      );
+    },
+  );
 });

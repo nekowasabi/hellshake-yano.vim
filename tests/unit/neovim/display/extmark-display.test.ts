@@ -84,7 +84,9 @@ Deno.test(
     assertEquals(
       batchDelays.length,
       0,
-      `バッチ間遅延として setTimeout が ${batchDelays.length} 回呼ばれました (delays: [${batchDelays.join(", ")}])。Promise.resolve() を使用してください。`,
+      `バッチ間遅延として setTimeout が ${batchDelays.length} 回呼ばれました (delays: [${
+        batchDelays.join(", ")
+      }])。Promise.resolve() を使用してください。`,
     );
   },
 );

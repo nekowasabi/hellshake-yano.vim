@@ -65,7 +65,9 @@ describe("main.ts - Environment Detection and Initialization", () => {
       await main(mockDenops);
       assertEquals(mockDenops.meta.host, "nvim");
     } catch (error) {
-      console.log(`Neovim initialization: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `Neovim initialization: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   });
 
@@ -77,7 +79,9 @@ describe("main.ts - Environment Detection and Initialization", () => {
       const dispatcher = mockDenops.dispatcher as Record<string, unknown>;
       assertEquals(typeof dispatcher, "object");
     } catch (error) {
-      console.log(`Dispatcher registration: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `Dispatcher registration: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   });
 

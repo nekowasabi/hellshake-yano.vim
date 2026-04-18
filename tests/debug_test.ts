@@ -12,7 +12,7 @@ const context1: DetectionContext = {
   },
 };
 const words1 = await detector.detectWords(text1, 1, context1);
-console.log("Result:", words1.map(w => w.text));
+console.log("Result:", words1.map((w) => w.text));
 console.log();
 
 console.log("Test 2: これはテストです");
@@ -23,7 +23,7 @@ const context2: DetectionContext = {
   },
 };
 const words2 = await detector.detectWords(text2, 1, context2);
-console.log("Result:", words2.map(w => w.text));
+console.log("Result:", words2.map((w) => w.text));
 console.log();
 
 console.log("Test 3: 東京から大阪まで行く");
@@ -35,4 +35,4 @@ const context3: DetectionContext = {
   },
 };
 const words3 = await detector.detectWords(text3, 1, context3);
-console.log("Result:", words3.map(w => w.text));
+console.log("Result:", words3.map((w) => w.text));

@@ -14,7 +14,8 @@ import {
 describe("Hint Assignment with Character Groups", () => {
   describe("Single Character Hints", () => {
     it("should use only specified keys for single-char hints", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
         multiCharKeys: ["Q", "W", "E", "R"],
         maxSingleCharHints: 9,
       };
@@ -31,7 +32,8 @@ describe("Hint Assignment with Character Groups", () => {
     });
 
     it("should limit single-char hints by maxSingleCharHints", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
         multiCharKeys: ["Q", "W"],
         maxSingleCharHints: 5, // 9個使えるが5個に制限
       };
@@ -50,9 +52,7 @@ describe("Hint Assignment with Character Groups", () => {
 
   describe("Multi Character Hints", () => {
     it("should generate multi-char hints from specified keys", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S"],
-        multiCharKeys: ["Q", "W", "E"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A", "S"], multiCharKeys: ["Q", "W", "E"] };
 
       const hints = generateHints(7, { groups: true, ...config });
 
@@ -72,7 +72,8 @@ describe("Hint Assignment with Character Groups", () => {
     });
 
     it("should handle number hints after alphabet exhaustion", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A"],
         multiCharKeys: ["Q", "W"], // 2文字で最大4通り
       };
 
@@ -95,7 +96,8 @@ describe("Hint Assignment with Character Groups", () => {
 
   describe("Configuration Validation", () => {
     it("should validate singleCharKeys are single characters", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "AB", "C"], // ABは無効
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "AB", "C"], // ABは無効
         multiCharKeys: ["Q"],
       };
 
@@ -107,7 +109,8 @@ describe("Hint Assignment with Character Groups", () => {
     });
 
     it("should detect overlapping keys between groups", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D"],
         multiCharKeys: ["A", "Q", "W"], // Aが重複
       };
 
@@ -119,7 +122,8 @@ describe("Hint Assignment with Character Groups", () => {
     });
 
     it("should accept valid configuration", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F"],
         multiCharKeys: ["Q", "W", "E", "R"],
         maxSingleCharHints: 4,
       };
@@ -142,8 +146,7 @@ describe("Hint Assignment with Character Groups", () => {
     });
 
     it("should use singleCharKeys for multi-char if multiCharKeys not specified", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A", "S", "D"] };
 
       const hints = generateHints(6, { groups: true, ...config });
 

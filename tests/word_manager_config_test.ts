@@ -6,11 +6,11 @@
  */
 
 import { assertEquals, assertExists } from "https://deno.land/std@0.224.0/testing/asserts.ts";
-import { DEFAULT_CONFIG, type Config } from "../denops/hellshake-yano/config.ts";
+import { type Config, DEFAULT_CONFIG } from "../denops/hellshake-yano/config.ts";
 import {
-  WordDetectionManager,
   getWordDetectionManager,
-  type WordDetectionManagerConfig
+  WordDetectionManager,
+  type WordDetectionManagerConfig,
 } from "../denops/hellshake-yano/neovim/core/word.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";
 
@@ -18,27 +18,27 @@ import type { Word } from "../denops/hellshake-yano/types.ts";
 const mockConfig: Config = {
   ...DEFAULT_CONFIG,
   // Core settings
-  markers: ['A', 'S', 'D', 'F'],
-  countedMotions: ['j', 'k'],
+  markers: ["A", "S", "D", "F"],
+  countedMotions: ["j", "k"],
 
   // Hint settings
   highlightSelected: true,
   debugCoordinates: false,
-  singleCharKeys: ['A', 'S'],
+  singleCharKeys: ["A", "S"],
   useHintGroups: false,
   maxHints: 100,
   debounceDelay: 50,
 
   // Extended hint settings
-  multiCharKeys: ['D', 'F'],
-  highlightHintMarker: { fg: '#FF0000', bg: '#FFFFFF' },
+  multiCharKeys: ["D", "F"],
+  highlightHintMarker: { fg: "#FF0000", bg: "#FFFFFF" },
 
   // Word detection settings
-  highlightHintMarkerCurrent: { fg: '#FFFF00', bg: '#FF0000' },
+  highlightHintMarkerCurrent: { fg: "#FFFF00", bg: "#FF0000" },
   suppressOnKeyRepeat: true,
   keyRepeatThreshold: 50,
   useJapanese: true,
-  wordDetectionStrategy: 'hybrid',
+  wordDetectionStrategy: "hybrid",
   enableTinySegmenter: true,
   segmenterThreshold: 4,
 
@@ -47,9 +47,9 @@ const mockConfig: Config = {
   japaneseMergeParticles: true,
   japaneseMergeThreshold: 2,
   perKeyMinLength: {
-    'f': 2,
-    't': 1,
-    'F': 3
+    "f": 2,
+    "t": 1,
+    "F": 3,
   },
   defaultMinWordLength: 3,
   defaultMotionCount: 3,
@@ -62,7 +62,7 @@ const mockConfig: Config = {
   motionCounterEnabled: true,
   motionCounterThreshold: 3,
   motionCounterTimeout: 2000,
-  showHintOnMotionThreshold: true
+  showHintOnMotionThreshold: true,
 };
 
 Deno.test("Red Phase: WordDetectionManager should use Config instead of Config", async () => {
@@ -72,7 +72,7 @@ Deno.test("Red Phase: WordDetectionManager should use Config instead of Config",
     useJapanese: mockConfig.useJapanese,
     defaultStrategy: mockConfig.wordDetectionStrategy,
     cacheEnabled: true,
-    cacheMaxSize: 500
+    cacheMaxSize: 500,
   };
 
   const manager = new WordDetectionManager(config, mockConfig);
@@ -80,8 +80,8 @@ Deno.test("Red Phase: WordDetectionManager should use Config instead of Config",
 
   // Test that manager can access Config properties
   const result = await manager.detectWords("test word", 1, undefined, {
-    currentKey: 'f',
-    minWordLength: mockConfig.perKeyMinLength?.['f']
+    currentKey: "f",
+    minWordLength: mockConfig.perKeyMinLength?.["f"],
   });
 
   // Should be able to detect words with proper min length from Config
@@ -89,15 +89,20 @@ Deno.test("Red Phase: WordDetectionManager should use Config instead of Config",
   assertExists(result.words);
 
   // This assertion will fail until manager.ts is updated to use Config
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['f'] || mockConfig.defaultMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["f"] || mockConfig.defaultMinWordLength;
   const validWords = result.words.filter((word: Word) => word.text.length >= effectiveMinLength);
-  assertEquals(result.words.length, validWords.length, "All detected words should respect Config min length");
+  assertEquals(
+    result.words.length,
+    validWords.length,
+    "All detected words should respect Config min length",
+  );
 });
 
 Deno.test("Red Phase: getWordDetectionManager should use Config instead of Config", async () => {
-  const config: WordDetectionManagerConfig = {useJapanese: mockConfig.useJapanese,
+  const config: WordDetectionManagerConfig = {
+    useJapanese: mockConfig.useJapanese,
     defaultStrategy: mockConfig.wordDetectionStrategy,
-    enableTinySegmenter: mockConfig.enableTinySegmenter
+    enableTinySegmenter: mockConfig.enableTinySegmenter,
   };
 
   // This should work with Config
@@ -106,23 +111,28 @@ Deno.test("Red Phase: getWordDetectionManager should use Config instead of Confi
 
   // Test Japanese text detection with Config settings
   const result = await manager.detectWords("これはテストです", 1, undefined, {
-    currentKey: 't',
-    minWordLength: mockConfig.perKeyMinLength?.['t']
+    currentKey: "t",
+    minWordLength: mockConfig.perKeyMinLength?.["t"],
   });
 
   assertExists(result);
   assertExists(result.words);
 
   // This will fail until manager.ts uses Config properly
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['t'] || mockConfig.japaneseMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["t"] || mockConfig.japaneseMinWordLength;
   const validWords = result.words.filter((word: Word) => word.text.length >= effectiveMinLength);
-  assertEquals(result.words.length, validWords.length, "Japanese words should respect Config min length");
+  assertEquals(
+    result.words.length,
+    validWords.length,
+    "Japanese words should respect Config min length",
+  );
 });
 
 Deno.test("Red Phase: WordDetectionManager should handle hybrid detection with Config", async () => {
-  const config: WordDetectionManagerConfig = {useJapanese: mockConfig.useJapanese,
-    defaultStrategy: 'hybrid', // Force hybrid strategy
-    enableTinySegmenter: mockConfig.enableTinySegmenter
+  const config: WordDetectionManagerConfig = {
+    useJapanese: mockConfig.useJapanese,
+    defaultStrategy: "hybrid", // Force hybrid strategy
+    enableTinySegmenter: mockConfig.enableTinySegmenter,
   };
 
   const manager = new WordDetectionManager(config, mockConfig);
@@ -130,15 +140,19 @@ Deno.test("Red Phase: WordDetectionManager should handle hybrid detection with C
 
   // Test hybrid detection with mixed content
   const result = await manager.detectWords("Hello こんにちは world", 1, undefined, {
-    currentKey: 'F',
-    minWordLength: mockConfig.perKeyMinLength?.['F']
+    currentKey: "F",
+    minWordLength: mockConfig.perKeyMinLength?.["F"],
   });
 
   assertExists(result);
   assertExists(result.words);
 
   // This will fail until manager.ts uses Config properly
-  const effectiveMinLength = mockConfig.perKeyMinLength?.['F'] || mockConfig.defaultMinWordLength;
+  const effectiveMinLength = mockConfig.perKeyMinLength?.["F"] || mockConfig.defaultMinWordLength;
   const validWords = result.words.filter((word: Word) => word.text.length >= effectiveMinLength);
-  assertEquals(result.words.length, validWords.length, "Hybrid detection should respect Config min length");
+  assertEquals(
+    result.words.length,
+    validWords.length,
+    "Hybrid detection should respect Config min length",
+  );
 });

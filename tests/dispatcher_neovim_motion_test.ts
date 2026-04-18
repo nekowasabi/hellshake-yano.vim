@@ -10,8 +10,8 @@
 
 import { assertEquals, assertExists } from "@std/assert";
 import {
-  VimMotionDetector,
   type KeyRepeatConfig,
+  VimMotionDetector,
 } from "../denops/hellshake-yano/vim/features/motion.ts";
 
 // ---------------------------------------------------------------------------

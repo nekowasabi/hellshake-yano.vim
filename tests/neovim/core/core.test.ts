@@ -30,7 +30,9 @@ test("Dictionary System: 初期化失敗時にエラーログを出力", async (
 
   try {
     // 不正な辞書パスを設定して初期化を試みる
-    await denops.cmd("let g:hellshake_yano_dictionary_path = '/nonexistent/path/to/dictionary.json'");
+    await denops.cmd(
+      "let g:hellshake_yano_dictionary_path = '/nonexistent/path/to/dictionary.json'",
+    );
 
     // 初期化（エラーは内部で処理される）
     await initializeDictionarySystem(denops);

@@ -13,14 +13,12 @@
 
 import { assertEquals } from "@std/assert";
 import {
+  type Config,
   DEFAULT_CONFIG,
   validateConfig,
   validateUnifiedConfig,
-  type Config,
 } from "../denops/hellshake-yano/config.ts";
-import {
-  assignHintsToWords,
-} from "../denops/hellshake-yano/neovim/core/hint.ts";
+import { assignHintsToWords } from "../denops/hellshake-yano/neovim/core/hint.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";
 
 // ========================================
@@ -70,24 +68,24 @@ Deno.test("validateConfig - bothMinWordLengthの異常系テスト", () => {
   let result = validateConfig({ bothMinWordLength: 0 } as any);
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("bothMinWordLength must be a positive integer")),
-    true
+    result.errors.some((e) => e.includes("bothMinWordLength must be a positive integer")),
+    true,
   );
 
   // 負の値は無効
   result = validateConfig({ bothMinWordLength: -1 } as any);
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("bothMinWordLength must be a positive integer")),
-    true
+    result.errors.some((e) => e.includes("bothMinWordLength must be a positive integer")),
+    true,
   );
 
   // 小数は無効
   result = validateConfig({ bothMinWordLength: 5.5 } as any);
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("bothMinWordLength must be a positive integer")),
-    true
+    result.errors.some((e) => e.includes("bothMinWordLength must be a positive integer")),
+    true,
   );
 });
 
@@ -100,8 +98,8 @@ Deno.test("validateUnifiedConfig - bothMinWordLengthの検証", () => {
   result = validateUnifiedConfig({ bothMinWordLength: 0 } as any);
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("bothMinWordLength must be a positive integer")),
-    true
+    result.errors.some((e) => e.includes("bothMinWordLength must be a positive integer")),
+    true,
   );
 });
 
@@ -125,8 +123,8 @@ Deno.test("hintPosition: 'both' がサポートされていること", () => {
   result = validateConfig({ hintPosition: "invalid" as any });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("hintPosition must be one of: start, end, overlay, both")),
-    true
+    result.errors.some((e) => e.includes("hintPosition must be one of: start, end, overlay, both")),
+    true,
   );
 });
 
@@ -136,8 +134,8 @@ Deno.test("hintPosition: 'both' がサポートされていること", () => {
 
 Deno.test("assignHintsToWords - bothMinWordLength未設定時は全単語に両端ヒント", () => {
   const words: Word[] = [
-    { text: "ab", line: 1, col: 1 },     // 2文字
-    { text: "abc", line: 1, col: 5 },    // 3文字
+    { text: "ab", line: 1, col: 1 }, // 2文字
+    { text: "abc", line: 1, col: 5 }, // 3文字
     { text: "abcde", line: 1, col: 10 }, // 5文字
     { text: "abcdefg", line: 1, col: 20 }, // 7文字
   ];
@@ -151,7 +149,7 @@ Deno.test("assignHintsToWords - bothMinWordLength未設定時は全単語に両�
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: undefined },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // bothMinWordLength未設定時は全単語に2つずつヒントが割り当てられる
@@ -164,8 +162,8 @@ Deno.test("assignHintsToWords - bothMinWordLength未設定時は全単語に両�
 
 Deno.test("assignHintsToWords - bothMinWordLength設定時は閾値未満の単語は片側ヒント", () => {
   const words: Word[] = [
-    { text: "ab", line: 1, col: 1 },     // 2文字 < 5
-    { text: "abc", line: 1, col: 5 },    // 3文字 < 5
+    { text: "ab", line: 1, col: 1 }, // 2文字 < 5
+    { text: "abc", line: 1, col: 5 }, // 3文字 < 5
     { text: "abcde", line: 1, col: 10 }, // 5文字 = 5
     { text: "abcdefg", line: 1, col: 20 }, // 7文字 > 5
   ];
@@ -179,7 +177,7 @@ Deno.test("assignHintsToWords - bothMinWordLength設定時は閾値未満の単�
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: 5 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // 2文字の単語: 片側ヒントのみ (1個)
@@ -199,8 +197,8 @@ Deno.test("assignHintsToWords - bothMinWordLength設定時は閾値未満の単�
 
 Deno.test("assignHintsToWords - bothMinWordLength=1で全単語が両端ヒント", () => {
   const words: Word[] = [
-    { text: "a", line: 1, col: 1 },      // 1文字
-    { text: "ab", line: 1, col: 5 },     // 2文字
+    { text: "a", line: 1, col: 1 }, // 1文字
+    { text: "ab", line: 1, col: 5 }, // 2文字
   ];
 
   const hints = ["A", "B", "C", "D"];
@@ -212,7 +210,7 @@ Deno.test("assignHintsToWords - bothMinWordLength=1で全単語が両端ヒン�
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: 1 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // 全単語が閾値以上なので、全て両端ヒント
@@ -221,8 +219,8 @@ Deno.test("assignHintsToWords - bothMinWordLength=1で全単語が両端ヒン�
 
 Deno.test("assignHintsToWords - bothMinWordLength=100で全単語が片側ヒント", () => {
   const words: Word[] = [
-    { text: "abc", line: 1, col: 1 },    // 3文字
-    { text: "abcde", line: 1, col: 5 },  // 5文字
+    { text: "abc", line: 1, col: 1 }, // 3文字
+    { text: "abcde", line: 1, col: 5 }, // 5文字
   ];
 
   const hints = ["A", "B", "C", "D"];
@@ -234,7 +232,7 @@ Deno.test("assignHintsToWords - bothMinWordLength=100で全単語が片側ヒン
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: 100 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // 全単語が閾値未満なので、全て片側ヒント（先頭側にフォールバック）
@@ -256,7 +254,7 @@ Deno.test("assignHintsToWords - hintPosition='start'ではbothMinWordLengthは�
     99,
     "normal",
     { hintPosition: "start", bothMinWordLength: 5 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // hintPosition='start'なので各単語に1つのヒントのみ
@@ -280,7 +278,7 @@ Deno.test("後方互換性 - bothMinWordLength未設定でも動作すること"
     99,
     "normal",
     { hintPosition: "both" },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // 従来通り両端ヒントが割り当てられる
@@ -294,7 +292,7 @@ Deno.test("後方互換性 - bothMinWordLength未設定でも動作すること"
     99,
     "normal",
     { hintPosition: "start" },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   assertEquals(mappings2.length, 1);
@@ -315,7 +313,7 @@ Deno.test("キャッシュキーにbothMinWordLengthが含まれること（統�
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: 3 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   const mappings2 = assignHintsToWords(
@@ -325,7 +323,7 @@ Deno.test("キャッシュキーにbothMinWordLengthが含まれること（統�
     99,
     "normal",
     { hintPosition: "both", bothMinWordLength: 5 },
-    { skipOverlapDetection: true }
+    { skipOverlapDetection: true },
   );
 
   // bothMinWordLength=3の場合、"test"(4文字)は両端ヒント

@@ -13,7 +13,8 @@ import { generateHints, type HintKeyConfig } from "../denops/hellshake-yano/neov
 describe("Hint Generation Without Number Fallback", () => {
   describe("Strict single/multi char keys separation", () => {
     it("should NOT generate number hints when hints exceed multi_char combinations", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G"], // 5個
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G"], // 5個
         multiCharKeys: ["B", "C", "E"], // 3×3=9個の2文字組み合わせ
       };
 
@@ -43,7 +44,8 @@ describe("Hint Generation Without Number Fallback", () => {
 
     it("should work with the actual user configuration", () => {
       // ユーザーの実際の設定
-      const config: HintKeyConfig = {singleCharKeys: "ASDFGNM0123456789".split(""), // 17個
+      const config: HintKeyConfig = {
+        singleCharKeys: "ASDFGNM0123456789".split(""), // 17個
         multiCharKeys: "BCEIOPQRTUVWXYZ".split(""), // 15×15=225個
       };
 
@@ -62,9 +64,7 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should handle small hint requests correctly", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D"],
-        multiCharKeys: ["B", "C"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A", "S", "D"], multiCharKeys: ["B", "C"] };
 
       // 3個のヒントのみ要求
       const hints = generateHints(3, { groups: true, ...config });
@@ -74,7 +74,8 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should generate multi-char hints when single-char is exhausted", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S"], // 2個
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S"], // 2個
         multiCharKeys: ["B", "C"], // 2×2=4個
       };
 
@@ -90,7 +91,8 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should respect maxSingleCharHints setting", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D", "F", "G"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D", "F", "G"],
         multiCharKeys: ["B", "C"],
         maxSingleCharHints: 2, // 1文字ヒントを2個に制限
       };
@@ -108,7 +110,8 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should NOT generate 3-character hints anymore", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A"], // 1個
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A"], // 1個
         multiCharKeys: ["B", "C"], // 2×2=4個
       };
 
@@ -123,7 +126,8 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should handle empty multiCharKeys", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A", "S", "D"],
+      const config: HintKeyConfig = {
+        singleCharKeys: ["A", "S", "D"],
         multiCharKeys: [], // 空
       };
 
@@ -135,7 +139,8 @@ describe("Hint Generation Without Number Fallback", () => {
     });
 
     it("should handle empty singleCharKeys", () => {
-      const config: HintKeyConfig = {singleCharKeys: [], // 空
+      const config: HintKeyConfig = {
+        singleCharKeys: [], // 空
         multiCharKeys: ["B", "C"],
       };
 
@@ -149,25 +154,22 @@ describe("Hint Generation Without Number Fallback", () => {
 
   describe("Edge cases", () => {
     it("should handle zero word count", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A"],
-        multiCharKeys: ["B"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A"], multiCharKeys: ["B"] };
 
       const hints = generateHints(0, { groups: true, ...config });
       assertEquals(hints.length, 0);
     });
 
     it("should handle negative word count", () => {
-      const config: HintKeyConfig = {singleCharKeys: ["A"],
-        multiCharKeys: ["B"],
-      };
+      const config: HintKeyConfig = { singleCharKeys: ["A"], multiCharKeys: ["B"] };
 
       const hints = generateHints(-1, { groups: true, ...config });
       assertEquals(hints.length, 0);
     });
 
     it("should handle both keys empty with markers fallback", () => {
-      const config: HintKeyConfig = {singleCharKeys: [],
+      const config: HintKeyConfig = {
+        singleCharKeys: [],
         multiCharKeys: [],
         markers: ["X", "Y", "Z"],
       };

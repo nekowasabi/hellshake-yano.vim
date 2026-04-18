@@ -24,7 +24,7 @@ const SAMPLE_TEXT_LINES = [
 
 test("Process50-Sub6: 1文字単語の検出（'a', 'I'等）", async () => {
   const testLine = "I have a cat and a dog.";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true}); // 改善版フラグを有効
+  const words = extractWords(testLine, 1, { useImprovedDetection: true }); // 改善版フラグを有効
 
   const wordTexts = words.map((w: Word) => w.text);
 
@@ -38,7 +38,7 @@ test("Process50-Sub6: 1文字単語の検出（'a', 'I'等）", async () => {
 
 test("Process50-Sub6: 数字のみの単語検出（'2025', '09', '13'等）", async () => {
   const testLine = "- **日付**: 2025-09-13";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true});
+  const words = extractWords(testLine, 1, { useImprovedDetection: true });
 
   const wordTexts = words.map((w: Word) => w.text);
 
@@ -52,7 +52,7 @@ test("Process50-Sub6: 数字のみの単語検出（'2025', '09', '13'等）", a
 
 test("Process50-Sub6: kebab-case分割検出（'hit-a-hint', 'Process50-sub1'等）", async () => {
   const testLine = "Process50-sub1, sub2, sub3, sub4, sub5実装完了";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true});
+  const words = extractWords(testLine, 1, { useImprovedDetection: true });
 
   const wordTexts = words.map((w: Word) => w.text);
 
@@ -70,7 +70,7 @@ test("Process50-Sub6: kebab-case分割検出（'hit-a-hint', 'Process50-sub1'等
 
 test("Process50-Sub6: hit-a-hintの分割検出", async () => {
   const testLine = "denopsベースのhit-a-hintプラグイン";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true});
+  const words = extractWords(testLine, 1, { useImprovedDetection: true });
 
   const wordTexts = words.map((w: Word) => w.text);
 
@@ -84,7 +84,7 @@ test("Process50-Sub6: hit-a-hintの分割検出", async () => {
 
 test("Process50-Sub6: 数字を含む単語検出（'Process8', 'Process9', 'Process10'等）", async () => {
   const testLine = "(Process8, Process9, Process10, Process50-sub1)";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true});
+  const words = extractWords(testLine, 1, { useImprovedDetection: true });
 
   const wordTexts = words.map((w: Word) => w.text);
 
@@ -109,7 +109,7 @@ test("Process50-Sub6: 実際のサンプルテキスト全体での検出", asyn
   // 各行から単語を抽出
   const allWords: Word[] = [];
   SAMPLE_TEXT_LINES.forEach((line, index) => {
-    const lineWords = extractWords(line, index + 1, {useImprovedDetection: true}); // 改善版フラグを有効
+    const lineWords = extractWords(line, index + 1, { useImprovedDetection: true }); // 改善版フラグを有効
     allWords.push(...lineWords);
   });
 
@@ -200,7 +200,7 @@ test("Process50-Sub6: 実際のサンプルテキスト全体での検出", asyn
 
 test("Process50-Sub6: snake_case分割の改善確認", async () => {
   const testLine = "snake_case_word and another_variable_name";
-  const words = extractWords(testLine, 1, {useImprovedDetection: true});
+  const words = extractWords(testLine, 1, { useImprovedDetection: true });
 
   const wordTexts = words.map((w: Word) => w.text);
 

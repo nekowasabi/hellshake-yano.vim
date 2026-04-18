@@ -1,11 +1,11 @@
 import { assertEquals, assertExists, assertThrows } from "jsr:@std/assert";
 import type { Config } from "../denops/hellshake-yano/types.ts";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
 import { HintManager } from "../denops/hellshake-yano/neovim/core/hint.ts";
 
 Deno.test("Config interface - should have perKeyMinLength property", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -27,7 +27,7 @@ const config: Config = {
 });
 
 Deno.test("Config interface - should support optional perKeyMinLength", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 2,
   };
@@ -37,7 +37,7 @@ const config: Config = {
 });
 
 Deno.test("Config interface - should have currentKeyContext for internal use", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 2,
     currentKeyContext: "v", // 内部使用のためのキーコンテキスト,
@@ -47,7 +47,7 @@ const config: Config = {
 });
 
 Deno.test("getMinLengthForKey - should return per-key setting when available", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -64,7 +64,7 @@ const config: Config = {
 });
 
 Deno.test("Config validation - should handle legacy minWordLength", () => {
-const legacyConfig: Config = {
+  const legacyConfig: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 3,
     perKeyMinLength: undefined,
@@ -80,7 +80,7 @@ const legacyConfig: Config = {
 // ========================================
 
 Deno.test("Per-key configuration - comprehensive settings", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1, // ビジュアルモード（精密移動）
@@ -136,7 +136,7 @@ const config: Config = {
 });
 
 Deno.test("Per-key configuration - edge cases and validation", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "zero": 0, // ゼロ値
@@ -155,7 +155,7 @@ const config: Config = {
   assertEquals(Core.getMinLengthForKey(config, "empty"), 2); // defaultMinWordLengthにフォールバック
 
   // 特殊文字キー
-const specialConfig: Config = {
+  const specialConfig: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       " ": 1, // スペース
@@ -179,7 +179,7 @@ const specialConfig: Config = {
 
 Deno.test("Fallback behavior - complete fallback chain", () => {
   // パターン1: perKeyMinLength → defaultMinWordLength → minWordLength
-const config1: Config = {
+  const config1: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: { "v": 1 },
     defaultMinWordLength: 3,
@@ -189,7 +189,7 @@ const config1: Config = {
   assertEquals(Core.getMinLengthForKey(config1, "h"), 3); // defaultMinWordLengthを使用
 
   // パターン2: defaultMinWordLength → minWordLength
-const config2: Config = {
+  const config2: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 4,
   };
@@ -197,14 +197,14 @@ const config2: Config = {
   assertEquals(Core.getMinLengthForKey(config2, "any"), 4); // defaultMinWordLengthを使用
 
   // パターン3: DEFAULT_UNIFIED_CONFIGのデフォルト値
-const config3: Config = {
+  const config3: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
   };
 
   assertEquals(Core.getMinLengthForKey(config3, "any"), 3); // DEFAULT_UNIFIED_CONFIGのdefaultMinWordLength
 
   // パターン4: minWordLengthのみ（レガシー）
-const config4: Config = {
+  const config4: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: undefined as any,
     minWordLength: 7,
@@ -215,7 +215,7 @@ const config4: Config = {
 
 Deno.test("Fallback behavior - missing configurations", () => {
   // perKeyMinLengthが空のオブジェクト
-const config1: Config = {
+  const config1: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 3,
   };
@@ -223,7 +223,7 @@ const config1: Config = {
   assertEquals(Core.getMinLengthForKey(config1, "v"), 3); // defaultMinWordLengthを使用
 
   // 部分的な設定
-const config2: Config = {
+  const config2: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -235,7 +235,7 @@ const config2: Config = {
   assertEquals(Core.getMinLengthForKey(config2, "h"), 3); // DEFAULT_UNIFIED_CONFIGのdefaultMinWordLengthにフォールバック
 
   // undefined値の扱い
-const config3: Config = {
+  const config3: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": undefined as any, // 明示的にundefined
@@ -251,7 +251,7 @@ const config3: Config = {
 // ========================================
 
 Deno.test("Key switching recalculation - HintManager integration", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -288,7 +288,7 @@ const config: Config = {
 });
 
 Deno.test("Key switching recalculation - cache behavior verification", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -326,7 +326,7 @@ const config: Config = {
 });
 
 Deno.test("Key switching recalculation - rapid switching stress test", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -375,7 +375,7 @@ Deno.test("Performance test - large configuration handling", () => {
     perKeyMinLength[`key${i}`] = i % 10 + 1; // 1-10の範囲
   }
 
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength,
     defaultMinWordLength: 2,
@@ -405,7 +405,7 @@ const config: Config = {
 });
 
 Deno.test("Performance test - key switching with large word lists", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -443,7 +443,7 @@ const config: Config = {
 });
 
 Deno.test("Performance test - memory usage patterns", () => {
-const config: Config = {
+  const config: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,
@@ -491,7 +491,7 @@ const config: Config = {
 // ========================================
 
 Deno.test("Backward compatibility - legacy minWordLength only", () => {
-const legacyConfig: Config = {
+  const legacyConfig: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 4,
   };
@@ -507,7 +507,7 @@ const legacyConfig: Config = {
 });
 
 Deno.test("Backward compatibility - mixed old and new configurations", () => {
-const mixedConfig: Config = {
+  const mixedConfig: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1, // 新形式
@@ -531,7 +531,7 @@ const mixedConfig: Config = {
 
 Deno.test("Backward compatibility - migration scenarios", () => {
   // シナリオ1: 旧設定から新設定への段階的移行
-const migrationStep1: Config = {
+  const migrationStep1: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     defaultMinWordLength: 3,
   };
@@ -540,7 +540,7 @@ const migrationStep1: Config = {
   assertEquals(manager1.getMinLengthForKey("any"), 3); // defaultMinWordLengthを使用
 
   // シナリオ2: 部分的なキー別設定の追加
-const migrationStep2: Config = {
+  const migrationStep2: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1, // 精密移動のみ新設定
@@ -552,7 +552,7 @@ const migrationStep2: Config = {
   assertEquals(manager2.getMinLengthForKey("h"), 3); // デフォルト
 
   // シナリオ3: 完全移行（minWordLength削除）
-const migrationStep3: Config = {
+  const migrationStep3: Config = {
     ...DEFAULT_UNIFIED_CONFIG,
     perKeyMinLength: {
       "v": 1,

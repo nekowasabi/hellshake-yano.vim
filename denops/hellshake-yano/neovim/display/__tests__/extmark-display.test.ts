@@ -14,12 +14,12 @@
  */
 
 import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
-import { describe, it, beforeEach } from "jsr:@std/testing@^1.0.0/bdd";
+import { beforeEach, describe, it } from "jsr:@std/testing@^1.0.0/bdd";
 import {
-  getSingleBufferExtmarkState,
-  clearSingleBufferExtmarkState,
   clearHintDisplayTracked,
+  clearSingleBufferExtmarkState,
   getMultiBufferExtmarkState,
+  getSingleBufferExtmarkState,
 } from "../extmark-display.ts";
 
 /**
@@ -97,7 +97,7 @@ describe("Integration Structure Verification", () => {
     assertEquals(
       singleState === null || typeof singleState === "number",
       true,
-      "Single buffer state should be number or null"
+      "Single buffer state should be number or null",
     );
 
     // Multi buffer state is a Set (tracks buffer numbers only)
@@ -115,4 +115,3 @@ describe("Integration Structure Verification", () => {
     assertEquals(error, null, "clearSingleBufferExtmarkState should not throw");
   });
 });
-

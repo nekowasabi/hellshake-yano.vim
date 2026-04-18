@@ -51,14 +51,14 @@ async function waitForUserInputWithRaceCondition(
   denops: Partial<Denops>,
   hints: Array<{ hint: string; word: { text: string; line: number; col: number } }>,
   config: { highlightSelected: boolean; useHintGroups: boolean; multiCharKeys?: string[] },
-  highlightProcessor: MockHighlightProcessor
+  highlightProcessor: MockHighlightProcessor,
 ): Promise<void> {
   // First character input
   const firstChar = await denops.call!("getchar") as number;
   const inputChar = String.fromCharCode(firstChar).toUpperCase();
 
   // Find matching hints
-  const currentHints = hints.filter(h => h.hint.startsWith(inputChar));
+  const currentHints = hints.filter((h) => h.hint.startsWith(inputChar));
 
   if (currentHints.length === 0) {
     throw new Error("No matching hints found");
@@ -81,7 +81,7 @@ async function waitForUserInputWithRaceCondition(
   const secondInputChar = String.fromCharCode(secondChar).toUpperCase();
   const fullHint = inputChar + secondInputChar;
 
-  const target = hints.find(h => h.hint === fullHint);
+  const target = hints.find((h) => h.hint === fullHint);
   if (target) {
     await denops.call!("cursor", target.word.line, target.word.col);
   }
@@ -92,14 +92,14 @@ async function waitForUserInputImproved(
   denops: Partial<Denops>,
   hints: Array<{ hint: string; word: { text: string; line: number; col: number } }>,
   config: { highlightSelected: boolean; useHintGroups: boolean; multiCharKeys?: string[] },
-  highlightProcessor: MockHighlightProcessor
+  highlightProcessor: MockHighlightProcessor,
 ): Promise<void> {
   // First character input
   const firstChar = await denops.call!("getchar") as number;
   const inputChar = String.fromCharCode(firstChar).toUpperCase();
 
   // Find matching hints
-  const currentHints = hints.filter(h => h.hint.startsWith(inputChar));
+  const currentHints = hints.filter((h) => h.hint.startsWith(inputChar));
 
   if (currentHints.length === 0) {
     throw new Error("No matching hints found");
@@ -128,7 +128,7 @@ async function waitForUserInputImproved(
   const secondInputChar = String.fromCharCode(secondChar).toUpperCase();
   const fullHint = inputChar + secondInputChar;
 
-  const target = hints.find(h => h.hint === fullHint);
+  const target = hints.find((h) => h.hint === fullHint);
   if (target) {
     await denops.call!("cursor", target.word.line, target.word.col);
   }
@@ -142,101 +142,114 @@ async function waitForUserInputImproved(
 }
 
 Deno.test("Second character input race condition tests", async (t) => {
+  await t.step(
+    "RED: Should fail due to getchar() delay caused by highlight processing",
+    async () => {
+      const mockDenops = new MockDenops();
+      const highlightProcessor = new MockHighlightProcessor();
 
-  await t.step("RED: Should fail due to getchar() delay caused by highlight processing", async () => {
-    const mockDenops = new MockDenops();
-    const highlightProcessor = new MockHighlightProcessor();
+      const testHints = [
+        { hint: "AA", word: { text: "hello", line: 10, col: 5 } },
+        { hint: "AB", word: { text: "world", line: 15, col: 10 } },
+      ];
 
-    const testHints = [
-      { hint: "AA", word: { text: "hello", line: 10, col: 5 } },
-      { hint: "AB", word: { text: "world", line: 15, col: 10 } },
-    ];
+      const config = {
+        highlightSelected: true,
+        useHintGroups: true,
+        multiCharKeys: ["A"],
+      };
 
-    const config = {
-      highlightSelected: true,
-      useHintGroups: true,
-      multiCharKeys: ["A"]
-    };
+      // Mock first character 'A' (65)
+      let getcharCallCount = 0;
+      mockDenops.onCall("getchar", () => {
+        getcharCallCount++;
+        if (getcharCallCount === 1) {
+          return 65; // 'A'
+        } else if (getcharCallCount === 2) {
+          // This should be called immediately after first char,
+          // but current implementation waits for highlight
+          return 65; // 'A' for "AA"
+        }
+        return 65;
+      });
 
-    // Mock first character 'A' (65)
-    let getcharCallCount = 0;
-    mockDenops.onCall("getchar", () => {
-      getcharCallCount++;
-      if (getcharCallCount === 1) {
-        return 65; // 'A'
-      } else if (getcharCallCount === 2) {
-        // This should be called immediately after first char,
-        // but current implementation waits for highlight
-        return 65; // 'A' for "AA"
-      }
-      return 65;
-    });
+      // Track timing of getchar calls
+      const getcharTimings: number[] = [];
+      mockDenops.onCall("getchar", () => {
+        getcharTimings.push(Date.now());
+        return getcharCallCount === 1 ? 65 : 65;
+      });
 
-    // Track timing of getchar calls
-    const getcharTimings: number[] = [];
-    mockDenops.onCall("getchar", () => {
-      getcharTimings.push(Date.now());
-      return getcharCallCount === 1 ? 65 : 65;
-    });
+      const startTime = Date.now();
 
-    const startTime = Date.now();
+      // This should demonstrate the race condition problem
+      await waitForUserInputWithRaceCondition(mockDenops, testHints, config, highlightProcessor);
 
-    // This should demonstrate the race condition problem
-    await waitForUserInputWithRaceCondition(mockDenops, testHints, config, highlightProcessor);
+      const endTime = Date.now();
+      const totalTime = endTime - startTime;
 
-    const endTime = Date.now();
-    const totalTime = endTime - startTime;
+      // Test FAILS: The total time should be less than 50ms for responsive input,
+      // but with race condition it takes 100ms+ due to highlight processing
+      // This test is designed to fail and show the problem
+      assertEquals(
+        totalTime < 50,
+        false,
+        "Current implementation has race condition - getchar() is delayed by highlight processing",
+      );
 
-    // Test FAILS: The total time should be less than 50ms for responsive input,
-    // but with race condition it takes 100ms+ due to highlight processing
-    // This test is designed to fail and show the problem
-    assertEquals(totalTime < 50, false, "Current implementation has race condition - getchar() is delayed by highlight processing");
+      // Cleanup
+      highlightProcessor.cleanup();
+    },
+  );
 
-    // Cleanup
-    highlightProcessor.cleanup();
-  });
+  await t.step(
+    "RED: Should fail - getchar() not called immediately for 2nd character",
+    async () => {
+      const mockDenops = new MockDenops();
+      const highlightProcessor = new MockHighlightProcessor();
 
-  await t.step("RED: Should fail - getchar() not called immediately for 2nd character", async () => {
-    const mockDenops = new MockDenops();
-    const highlightProcessor = new MockHighlightProcessor();
+      const testHints = [
+        { hint: "BB", word: { text: "test", line: 20, col: 1 } },
+      ];
 
-    const testHints = [
-      { hint: "BB", word: { text: "test", line: 20, col: 1 } },
-    ];
+      const config = {
+        highlightSelected: true,
+        useHintGroups: true,
+        multiCharKeys: ["B"],
+      };
 
-    const config = {
-      highlightSelected: true,
-      useHintGroups: true,
-      multiCharKeys: ["B"]
-    };
+      let firstGetcharTime = 0;
+      let secondGetcharTime = 0;
+      let getcharCallCount = 0;
 
-    let firstGetcharTime = 0;
-    let secondGetcharTime = 0;
-    let getcharCallCount = 0;
+      mockDenops.onCall("getchar", () => {
+        getcharCallCount++;
+        if (getcharCallCount === 1) {
+          firstGetcharTime = Date.now();
+          return 66; // First 'B'
+        } else {
+          secondGetcharTime = Date.now();
+          return 66; // Second 'B'
+        }
+      });
 
-    mockDenops.onCall("getchar", () => {
-      getcharCallCount++;
-      if (getcharCallCount === 1) {
-        firstGetcharTime = Date.now();
-        return 66; // First 'B'
-      } else {
-        secondGetcharTime = Date.now();
-        return 66; // Second 'B'
-      }
-    });
+      await waitForUserInputWithRaceCondition(mockDenops, testHints, config, highlightProcessor);
 
-    await waitForUserInputWithRaceCondition(mockDenops, testHints, config, highlightProcessor);
+      // Test FAILS: Second getchar should be called immediately after first getchar,
+      // but with race condition it's delayed by highlight processing (100ms)
+      const timeDiff = secondGetcharTime - firstGetcharTime;
+      // In the BAD implementation, timeDiff should be >= 100ms due to await on highlight
+      // This assertion expects the race condition to exist (RED phase)
+      assertEquals(
+        timeDiff >= 90,
+        true,
+        "Race condition exists: second getchar() is delayed by highlight processing",
+      );
 
-    // Test FAILS: Second getchar should be called immediately after first getchar,
-    // but with race condition it's delayed by highlight processing (100ms)
-    const timeDiff = secondGetcharTime - firstGetcharTime;
-    // In the BAD implementation, timeDiff should be >= 100ms due to await on highlight
-    // This assertion expects the race condition to exist (RED phase)
-    assertEquals(timeDiff >= 90, true, "Race condition exists: second getchar() is delayed by highlight processing");
-
-    // Cleanup
-    highlightProcessor.cleanup();
-  });
+      // Cleanup
+      highlightProcessor.cleanup();
+    },
+  );
 
   await t.step("GREEN: Should pass - improved function works correctly", async () => {
     const mockDenops = new MockDenops();
@@ -249,7 +262,7 @@ Deno.test("Second character input race condition tests", async (t) => {
     const config = {
       highlightSelected: true,
       useHintGroups: true,
-      multiCharKeys: ["C"]
+      multiCharKeys: ["C"],
     };
 
     // Mock first and second character inputs
@@ -293,7 +306,7 @@ Deno.test("Second character input race condition tests", async (t) => {
     const config = {
       highlightSelected: true,
       useHintGroups: true,
-      multiCharKeys: ["D"]
+      multiCharKeys: ["D"],
     };
 
     let firstGetcharTime = 0;
@@ -302,7 +315,7 @@ Deno.test("Second character input race condition tests", async (t) => {
 
     // Override highlight processing to track timing
     const originalStart = highlightProcessor.startHighlightAsync;
-    highlightProcessor.startHighlightAsync = async function() {
+    highlightProcessor.startHighlightAsync = async function () {
       highlightStartTime = Date.now();
       return await originalStart.call(this);
     };
@@ -329,55 +342,62 @@ Deno.test("Second character input race condition tests", async (t) => {
     assertEquals(getcharGap < 50, true, "Second getchar should be called immediately");
     // If highlight processing is slow, second getchar should not wait for it
     if (highlightStartTime > 0) {
-      assertEquals(highlightGap < 20, true, "Second getchar should not wait for highlight processing");
+      assertEquals(
+        highlightGap < 20,
+        true,
+        "Second getchar should not wait for highlight processing",
+      );
     }
 
     // Cleanup
     highlightProcessor.cleanup();
   });
 
-  await t.step("GREEN: Should pass - proper error handling for highlight processing failures", async () => {
-    const mockDenops = new MockDenops();
-    const highlightProcessor = new MockHighlightProcessor();
+  await t.step(
+    "GREEN: Should pass - proper error handling for highlight processing failures",
+    async () => {
+      const mockDenops = new MockDenops();
+      const highlightProcessor = new MockHighlightProcessor();
 
-    const testHints = [
-      { hint: "EE", word: { text: "error_test", line: 25, col: 15 } },
-    ];
+      const testHints = [
+        { hint: "EE", word: { text: "error_test", line: 25, col: 15 } },
+      ];
 
-    const config = {
-      highlightSelected: true,
-      useHintGroups: true,
-      multiCharKeys: ["E"]
-    };
+      const config = {
+        highlightSelected: true,
+        useHintGroups: true,
+        multiCharKeys: ["E"],
+      };
 
-    let getcharCallCount = 0;
-    mockDenops.onCall("getchar", () => {
-      getcharCallCount++;
-      return 69; // 'E'
-    });
+      let getcharCallCount = 0;
+      mockDenops.onCall("getchar", () => {
+        getcharCallCount++;
+        return 69; // 'E'
+      });
 
-    // Track cursor calls
-    let cursorCalled = false;
-    mockDenops.onCall("cursor", (line: number, col: number) => {
-      cursorCalled = true;
-    });
+      // Track cursor calls
+      let cursorCalled = false;
+      mockDenops.onCall("cursor", (line: number, col: number) => {
+        cursorCalled = true;
+      });
 
-    // Make highlight processing fail
-    highlightProcessor.startHighlightAsync = async () => {
-      throw new Error("Highlight processing failed");
-    };
+      // Make highlight processing fail
+      highlightProcessor.startHighlightAsync = async () => {
+        throw new Error("Highlight processing failed");
+      };
 
-    // Improved implementation should handle highlight errors gracefully
-    // and not affect input processing
-    await waitForUserInputImproved(mockDenops, testHints, config, highlightProcessor);
+      // Improved implementation should handle highlight errors gracefully
+      // and not affect input processing
+      await waitForUserInputImproved(mockDenops, testHints, config, highlightProcessor);
 
-    // Verify that input processing completed successfully despite highlight error
-    assertEquals(cursorCalled, true, "Input processing should complete despite highlight errors");
-    assertEquals(getcharCallCount, 2, "Both characters should be processed");
+      // Verify that input processing completed successfully despite highlight error
+      assertEquals(cursorCalled, true, "Input processing should complete despite highlight errors");
+      assertEquals(getcharCallCount, 2, "Both characters should be processed");
 
-    // Cleanup
-    highlightProcessor.cleanup();
-  });
+      // Cleanup
+      highlightProcessor.cleanup();
+    },
+  );
 
   await t.step("RED: Should fail - original function has no error handling", async () => {
     const mockDenops = new MockDenops();
@@ -390,7 +410,7 @@ Deno.test("Second character input race condition tests", async (t) => {
     const config = {
       highlightSelected: true,
       useHintGroups: true,
-      multiCharKeys: ["F"]
+      multiCharKeys: ["F"],
     };
 
     mockDenops.setCallResponse("getchar", 70); // 'F'
@@ -405,7 +425,7 @@ Deno.test("Second character input race condition tests", async (t) => {
     await assertRejects(
       () => waitForUserInputWithRaceCondition(mockDenops, testHints, config, highlightProcessor),
       Error,
-      "Highlight processing failed"
+      "Highlight processing failed",
     );
 
     // Cleanup

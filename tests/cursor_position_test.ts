@@ -31,16 +31,16 @@ describe("Process1: Cursor Position Retrieval and Passing", () => {
       assertEquals(hintMappings.length, 2);
 
       // カーソルに最も近い単語は "first"(line=1) になる
-      const firstWordHint = hintMappings.find(h => h.word.text === "first");
+      const firstWordHint = hintMappings.find((h) => h.word.text === "first");
       assertEquals(firstWordHint?.hint, "a");
     });
 
     it("should calculate distance from cursor correctly", () => {
       // カーソルから異なる距離にある単語
       const words: Word[] = [
-        { text: "far", line: 10, col: 1, byteCol: 1 },      // 遠い
-        { text: "near", line: 2, col: 5, byteCol: 5 },      // 近い
-        { text: "medium", line: 5, col: 10, byteCol: 10 },  // 中間
+        { text: "far", line: 10, col: 1, byteCol: 1 }, // 遠い
+        { text: "near", line: 2, col: 5, byteCol: 5 }, // 近い
+        { text: "medium", line: 5, col: 10, byteCol: 10 }, // 中間
       ];
 
       const hints = ["a", "b", "c"];
@@ -50,15 +50,15 @@ describe("Process1: Cursor Position Retrieval and Passing", () => {
       const hintMappings = assignHintsToWords(words, hints, cursorLine, cursorCol, "normal");
 
       // カーソルに最も近い"near"が"a"を取得
-      const nearHint = hintMappings.find(h => h.word.text === "near");
+      const nearHint = hintMappings.find((h) => h.word.text === "near");
       assertEquals(nearHint?.hint, "a");
 
       // 中間距離の"medium"が"b"を取得
-      const mediumHint = hintMappings.find(h => h.word.text === "medium");
+      const mediumHint = hintMappings.find((h) => h.word.text === "medium");
       assertEquals(mediumHint?.hint, "b");
 
       // 最も遠い"far"が"c"を取得
-      const farHint = hintMappings.find(h => h.word.text === "far");
+      const farHint = hintMappings.find((h) => h.word.text === "far");
       assertEquals(farHint?.hint, "c");
     });
   });
@@ -69,8 +69,8 @@ describe("Process1: Cursor Position Retrieval and Passing", () => {
       // 実装を修正した後にパスするべき
 
       const words: Word[] = [
-        { text: "word1", line: 1, col: 1, byteCol: 1 },  // カーソル(1,1)に最も近い
-        { text: "word2", line: 5, col: 5, byteCol: 5 },  // カーソル(5,5)に最も近い
+        { text: "word1", line: 1, col: 1, byteCol: 1 }, // カーソル(1,1)に最も近い
+        { text: "word2", line: 5, col: 5, byteCol: 5 }, // カーソル(5,5)に最も近い
       ];
 
       const hints = ["a", "b"];
@@ -78,19 +78,19 @@ describe("Process1: Cursor Position Retrieval and Passing", () => {
       // Case 1: カーソルが(1,1)の場合
       // NOTE: word1はカーソル位置の単語として除外される
       let hintMappings = assignHintsToWords(words, hints, 1, 1, "normal");
-      let word1Hint = hintMappings.find(h => h.word.text === "word1");
+      let word1Hint = hintMappings.find((h) => h.word.text === "word1");
       assertEquals(word1Hint, undefined, "word1 is excluded when cursor is at (1,1)");
       // word1が除外されるため、word2が"a"を取得
-      let word2Hint = hintMappings.find(h => h.word.text === "word2");
+      let word2Hint = hintMappings.find((h) => h.word.text === "word2");
       assertEquals(word2Hint?.hint, "a", "word2 should get 'a' when word1 is excluded");
 
       // Case 2: カーソルが(5,5)の場合
       // NOTE: word2はカーソル位置の単語として除外される
       hintMappings = assignHintsToWords(words, hints, 5, 5, "normal");
-      word2Hint = hintMappings.find(h => h.word.text === "word2");
+      word2Hint = hintMappings.find((h) => h.word.text === "word2");
       assertEquals(word2Hint, undefined, "word2 is excluded when cursor is at (5,5)");
       // word2が除外されるため、word1が"a"を取得
-      word1Hint = hintMappings.find(h => h.word.text === "word1");
+      word1Hint = hintMappings.find((h) => h.word.text === "word1");
       assertEquals(word1Hint?.hint, "a", "word1 should get 'a' when word2 is excluded");
 
       // この振る舞いが期待通りであることを確認
@@ -118,15 +118,15 @@ describe("Process1: Cursor Position Retrieval and Passing", () => {
       const hintMappings = assignHintsToWords(words, hints, cursorLine, cursorCol, "normal");
 
       // NOTE: beta（カーソル位置にある単語）は除外される
-      const betaHint = hintMappings.find(h => h.word.text === "beta");
+      const betaHint = hintMappings.find((h) => h.word.text === "beta");
       assertEquals(betaHint, undefined, "beta is excluded when cursor is at (3,5)");
 
       // betaが除外されるため、alphaが最も近い単語として"a"を取得
-      const alphaHint = hintMappings.find(h => h.word.text === "alpha");
+      const alphaHint = hintMappings.find((h) => h.word.text === "alpha");
       assertEquals(alphaHint?.hint, "a");
 
       // gammaが2番目のヒント"b"を取得する
-      const gammaHint = hintMappings.find(h => h.word.text === "gamma");
+      const gammaHint = hintMappings.find((h) => h.word.text === "gamma");
       assertEquals(gammaHint?.hint, "b");
     });
   });

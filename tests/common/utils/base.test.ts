@@ -6,13 +6,13 @@
 
 import { assertEquals, assertExists } from "jsr:@std/assert";
 import {
-  getStateCopy,
   getSingletonInstance,
+  getStateCopy,
   initializeState,
-  withFallback,
-  validateRangeCompat,
-  validateNonEmptyCompat,
   validateInListCompat,
+  validateNonEmptyCompat,
+  validateRangeCompat,
+  withFallback,
 } from "../../../denops/hellshake-yano/common/utils/base.ts";
 
 // ========== Singleton パターン ==========

@@ -20,7 +20,12 @@ import type { Denops } from "@denops/std";
 // ---------------------------------------------------------------------------
 class MockDenops implements Partial<Denops> {
   readonly name = "hellshake-yano";
-  readonly meta = { host: "nvim" as const, version: "0.0.0", platform: "linux" as const, mode: "release" as const };
+  readonly meta = {
+    host: "nvim" as const,
+    version: "0.0.0",
+    platform: "linux" as const,
+    mode: "release" as const,
+  };
   private callResults: Map<string, unknown> = new Map();
 
   setCallResult(fn: string, result: unknown): void {

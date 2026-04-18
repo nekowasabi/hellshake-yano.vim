@@ -9,7 +9,7 @@ import { filterWordsByDirection, HintManager } from "../denops/hellshake-yano/ne
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
 import type { Config, HintMapping, Word } from "../denops/hellshake-yano/types.ts";
 import type { Denops } from "@denops/std";
-import { DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
+import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../denops/hellshake-yano/config.ts";
 
 describe("HintManager Tests", () => {
   let config: Config;

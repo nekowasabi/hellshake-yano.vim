@@ -5,7 +5,10 @@
 
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { calculateHintPosition, type HintPosition } from "../denops/hellshake-yano/neovim/core/hint.ts";
+import {
+  calculateHintPosition,
+  type HintPosition,
+} from "../denops/hellshake-yano/neovim/core/hint.ts";
 import type { Word } from "../denops/hellshake-yano/types.ts";
 
 describe("Hint Positioning - Word Start Display", () => {

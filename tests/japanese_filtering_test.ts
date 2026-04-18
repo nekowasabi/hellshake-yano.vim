@@ -7,7 +7,11 @@
 
 import { assertEquals } from "@std/assert";
 import { beforeEach, describe, it } from "@std/testing/bdd";
-import { detectWordsWithConfig, extractWords, resetWordDetectionManager } from "../denops/hellshake-yano/neovim/core/word.ts";
+import {
+  detectWordsWithConfig,
+  extractWords,
+  resetWordDetectionManager,
+} from "../denops/hellshake-yano/neovim/core/word.ts";
 
 describe("Japanese Filtering Tests", () => {
   describe("extractWords with Japanese exclusion", () => {
@@ -98,7 +102,7 @@ describe("Japanese Filtering Tests", () => {
       assertEquals(texts.includes("test"), true);
       // 日本語も含まれる（TinySegmenterによる分割結果）
       // 注: 分割結果は実装依存のため、少なくとも日本語文字が検出されることを確認
-      const hasJapanese = texts.some(t => /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(t));
+      const hasJapanese = texts.some((t) => /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(t));
       assertEquals(hasJapanese, true);
     });
 

@@ -22,7 +22,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 記号文字の正常系", () 
   // アルファベットと記号の混在
   let result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D", ";", ":", "["],
-    multiCharKeys: ["Q", "W", "E"]
+    multiCharKeys: ["Q", "W", "E"],
   });
   assertEquals(result.valid, true, "Valid symbols with letters should be accepted");
   assertEquals(result.errors.length, 0);
@@ -30,7 +30,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 記号文字の正常系", () 
   // 記号のみ
   result = validateHintKeyConfig({
     singleCharKeys: [";", ":", "[", "]"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, true, "Only symbols should be accepted");
   assertEquals(result.errors.length, 0);
@@ -38,7 +38,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 記号文字の正常系", () 
   // すべての有効な記号
   result = validateHintKeyConfig({
     singleCharKeys: validSymbols,
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, true, "All valid symbols should be accepted");
   assertEquals(result.errors.length, 0);
@@ -48,63 +48,69 @@ Deno.test("validateHintKeyConfig - singleCharKeys 無効な記号の異常系", 
   // スペース
   let result = validateHintKeyConfig({
     singleCharKeys: ["A", "B", " "],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("whitespace") || e.includes("スペース")),
+    result.errors.some((e) => e.includes("whitespace") || e.includes("スペース")),
     true,
-    "Space should be rejected with specific error message"
+    "Space should be rejected with specific error message",
   );
 
   // タブ文字
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "\t"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("whitespace") || e.includes("ホワイトスペース")),
+    result.errors.some((e) => e.includes("whitespace") || e.includes("ホワイトスペース")),
     true,
-    "Tab should be rejected"
+    "Tab should be rejected",
   );
 
   // 改行文字
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "\n"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("whitespace") || e.includes("ホワイトスペース")),
+    result.errors.some((e) => e.includes("whitespace") || e.includes("ホワイトスペース")),
     true,
-    "Newline should be rejected"
+    "Newline should be rejected",
   );
 
   // 制御文字
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "\x00"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("control") || e.includes("制御文字")),
+    result.errors.some((e) => e.includes("control") || e.includes("制御文字")),
     true,
-    "Control character should be rejected"
+    "Control character should be rejected",
   );
 });
 
 Deno.test("validateHintKeyConfig - singleCharKeys 無効な記号の具体的なエラーメッセージ", () => {
   // エラーメッセージに無効な文字が含まれることを確認
+  // Why: @ は VALID_SYMBOL_SET に含まれるため有効。# のみが無効文字。
   const result = validateHintKeyConfig({
     singleCharKeys: ["A", "B", "@", "#"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("@") && e.includes("#")),
+    result.errors.some((e) => e.includes("#")),
     true,
-    "Error message should list invalid characters"
+    "Error message should list invalid character #",
+  );
+  assertEquals(
+    result.errors.some((e) => e.includes("@")),
+    false,
+    "@ is now a valid symbol and should NOT appear in errors",
   );
 });
 
@@ -112,7 +118,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 特殊な記号のエッジケ
   // バックスラッシュ
   let result = validateHintKeyConfig({
     singleCharKeys: ["\\"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -120,7 +126,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 特殊な記号のエッジケ
   // バッククォート
   result = validateHintKeyConfig({
     singleCharKeys: ["`"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -128,7 +134,7 @@ Deno.test("validateHintKeyConfig - singleCharKeys 特殊な記号のエッジケ
   // シングルクォートとダブルクォート
   result = validateHintKeyConfig({
     singleCharKeys: ["'", '"'],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -141,7 +147,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 正常系", () => {
   let result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D"],
     multiCharKeys: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -150,7 +156,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 正常系", () => {
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D"],
     multiCharKeys: ["Q", "W", "E"],
-    numericOnlyMultiChar: false
+    numericOnlyMultiChar: false,
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -158,7 +164,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 正常系", () => {
   // numericOnlyMultiCharが未定義で、multiCharKeysが数字のみ（警告のみ）
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D"],
-    multiCharKeys: ["0", "1", "2"]
+    multiCharKeys: ["0", "1", "2"],
   });
   // 警告はあっても良いが、validはtrue
   assertEquals(result.valid, true);
@@ -169,23 +175,23 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 異常系: フラグと�
   let result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D"],
     multiCharKeys: ["0", "1", "Q"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e =>
+    result.errors.some((e) =>
       (e.includes("numericOnlyMultiChar") && e.includes("digit")) ||
       (e.includes("数字専用") && e.includes("数字以外"))
     ),
     true,
-    "Should error when numericOnlyMultiChar is true but non-digits exist"
+    "Should error when numericOnlyMultiChar is true but non-digits exist",
   );
 
   // numericOnlyMultiCharがfalseだが、multiCharKeysがすべて数字（警告レベル）
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "S", "D"],
     multiCharKeys: ["0", "1", "2", "3"],
-    numericOnlyMultiChar: false
+    numericOnlyMultiChar: false,
   });
   // これは警告として扱うが、valid自体はtrue
   assertEquals(result.valid, true);
@@ -198,7 +204,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 数字判定の境界値
   let result = validateHintKeyConfig({
     singleCharKeys: ["A"],
     multiCharKeys: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, true);
   assertEquals(result.errors.length, 0);
@@ -207,7 +213,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 数字判定の境界値
   result = validateHintKeyConfig({
     singleCharKeys: ["A"],
     multiCharKeys: ["0", "1", "Q"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, false);
 
@@ -215,7 +221,7 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar 数字判定の境界値
   result = validateHintKeyConfig({
     singleCharKeys: ["A"],
     multiCharKeys: ["0", "1", ";"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, false);
 });
@@ -225,13 +231,13 @@ Deno.test("validateHintKeyConfig - numericOnlyMultiChar エラーメッセージ
   const result = validateHintKeyConfig({
     singleCharKeys: ["A"],
     multiCharKeys: ["0", "1", "Q", "W"],
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("Q") && e.includes("W")),
+    result.errors.some((e) => e.includes("Q") && e.includes("W")),
     true,
-    "Error message should list non-digit characters"
+    "Error message should list non-digit characters",
   );
 });
 
@@ -241,7 +247,7 @@ Deno.test("validateHintKeyConfig - 複数のバリデーションエラー", () 
   const result = validateHintKeyConfig({
     singleCharKeys: ["A", "B", " ", "@"], // スペースと無効な記号
     multiCharKeys: ["0", "1", "Q"], // numericOnlyMultiCharと矛盾
-    numericOnlyMultiChar: true
+    numericOnlyMultiChar: true,
   });
 
   assertEquals(result.valid, false);
@@ -249,14 +255,14 @@ Deno.test("validateHintKeyConfig - 複数のバリデーションエラー", () 
 
   // 記号のエラー
   assertEquals(
-    result.errors.some(e => e.includes("singleCharKeys") || e.includes("無効")),
-    true
+    result.errors.some((e) => e.includes("singleCharKeys") || e.includes("無効")),
+    true,
   );
 
   // 数字専用モードのエラー
   assertEquals(
-    result.errors.some(e => e.includes("numericOnlyMultiChar") || e.includes("数字専用")),
-    true
+    result.errors.some((e) => e.includes("numericOnlyMultiChar") || e.includes("数字専用")),
+    true,
   );
 });
 
@@ -266,35 +272,35 @@ Deno.test("validateHintKeyConfig - 既存のバリデーションが正常に動
   // 2文字以上のsingleCharKeys
   let result = validateHintKeyConfig({
     singleCharKeys: ["A", "BB"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("Invalid single char keys")),
-    true
+    result.errors.some((e) => e.includes("Invalid single char keys")),
+    true,
   );
 
   // 重複チェック
   result = validateHintKeyConfig({
     singleCharKeys: ["A", "Q"],
-    multiCharKeys: ["Q"]
+    multiCharKeys: ["Q"],
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("Keys cannot be in both groups")),
-    true
+    result.errors.some((e) => e.includes("Keys cannot be in both groups")),
+    true,
   );
 
   // maxSingleCharHints 負の値
   result = validateHintKeyConfig({
     singleCharKeys: ["A"],
     multiCharKeys: ["Q"],
-    maxSingleCharHints: -1
+    maxSingleCharHints: -1,
   });
   assertEquals(result.valid, false);
   assertEquals(
-    result.errors.some(e => e.includes("max_single_char_hints must be non-negative")),
-    true
+    result.errors.some((e) => e.includes("max_single_char_hints must be non-negative")),
+    true,
   );
 });
 
@@ -304,7 +310,7 @@ Deno.test("validateHintKeyConfig - パフォーマンステスト", () => {
   const config: HintKeyConfig = {
     singleCharKeys: ["A", "S", "D", "F", "G", "H", "J", "K", "L", ";"],
     multiCharKeys: ["Q", "W", "E", "R"],
-    maxSingleCharHints: 10
+    maxSingleCharHints: 10,
   };
 
   const start = performance.now();

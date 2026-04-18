@@ -51,7 +51,8 @@ Deno.test({
     const hints = ["A"];
 
     // Normal modeでの計算
-    const normalResult = assignHintsToWords(words, hints, 0, 0, "normal", {hintPosition: "start",
+    const normalResult = assignHintsToWords(words, hints, 0, 0, "normal", {
+      hintPosition: "start",
     });
 
     // Visual modeでの計算（異なる設定）

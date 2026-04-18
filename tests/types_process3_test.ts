@@ -26,7 +26,11 @@ Deno.test("types.ts should not export UnifiedConfig after process3", async () =>
 
   // コメント内のUnifiedConfigへの言及も削除されていることを確認
   const hasUnifiedConfigInComment = fileContent.includes("UnifiedConfig →");
-  assertEquals(hasUnifiedConfigInComment, false, "UnifiedConfig references in comments should be removed");
+  assertEquals(
+    hasUnifiedConfigInComment,
+    false,
+    "UnifiedConfig references in comments should be removed",
+  );
 });
 
 // Configインポートの確認テスト
@@ -52,13 +56,13 @@ Deno.test("types.ts exports should remain consistent", async () => {
     "isHintMapping",
     "isConfig",
     "isHintPosition",
-    "isDetectionStrategy"
+    "isDetectionStrategy",
   ];
 
   for (const guardName of expectedTypeGuards) {
     assertExists(
       (typesModule as any)[guardName],
-      `types.ts should export type guard ${guardName}`
+      `types.ts should export type guard ${guardName}`,
     );
   }
 });

@@ -12,9 +12,13 @@
  * 6. プロパティの確認
  */
 
-import { assertEquals, assertExists, assertInstanceOf } from "https://deno.land/std@0.212.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertExists,
+  assertInstanceOf,
+} from "https://deno.land/std@0.212.0/assert/mod.ts";
 import { TinySegmenterWordDetector } from "../denops/hellshake-yano/neovim/core/word.ts";
-import type { Word, DetectionContext } from "../denops/hellshake-yano/types.ts";
+import type { DetectionContext, Word } from "../denops/hellshake-yano/types.ts";
 
 Deno.test("TinySegmenterWordDetector - プロパティの確認", () => {
   const detector = new TinySegmenterWordDetector();
@@ -48,8 +52,8 @@ Deno.test("TinySegmenterWordDetector - detectWords - 日本語文章の単語検
   const startLine = 1;
   const context = {
     config: {
-      japaneseMergeParticles: false  // Don't merge particles for this test
-    }
+      japaneseMergeParticles: false, // Don't merge particles for this test
+    },
   };
 
   const words = await detector.detectWords(text, startLine, context);
@@ -81,8 +85,8 @@ Deno.test("TinySegmenterWordDetector - detectWords - 日本語と英数字の混
   const startLine = 1;
   const context = {
     config: {
-      japaneseMergeParticles: false  // Don't merge particles for this test
-    }
+      japaneseMergeParticles: false, // Don't merge particles for this test
+    },
   };
 
   const words = await detector.detectWords(text, startLine, context);
@@ -91,7 +95,7 @@ Deno.test("TinySegmenterWordDetector - detectWords - 日本語と英数字の混
   assertEquals(words.length > 0, true);
 
   // 少なくとも「私」、「は」、「JavaScript」、「を」、「学習」、「中」が含まれることを確認
-  const wordTexts = words.map(w => w.text);
+  const wordTexts = words.map((w) => w.text);
   assertEquals(wordTexts.includes("私"), true);
   assertEquals(wordTexts.includes("は"), true);
   assertEquals(wordTexts.includes("JavaScript"), true);
@@ -120,15 +124,15 @@ Deno.test("TinySegmenterWordDetector - detectWords - 複数行の処理（行番
   assertEquals(words.length > 0, true);
 
   // 最初の行の単語
-  const firstLineWords = words.filter(w => w.line === 5);
+  const firstLineWords = words.filter((w) => w.line === 5);
   assertEquals(firstLineWords.length > 0, true);
 
   // 2行目の単語
-  const secondLineWords = words.filter(w => w.line === 6);
+  const secondLineWords = words.filter((w) => w.line === 6);
   assertEquals(secondLineWords.length > 0, true);
 
   // 「世界」という単語が2行目に含まれることを確認
-  const sekai = secondLineWords.find(w => w.text === "世界");
+  const sekai = secondLineWords.find((w) => w.text === "世界");
   assertExists(sekai);
   assertEquals(sekai.line, 6);
   assertEquals(sekai.col, 1); // 2行目の最初
@@ -141,7 +145,7 @@ Deno.test("TinySegmenterWordDetector - detectWords - コンテキストパラメ
   const context: DetectionContext = {
     currentKey: "f",
     minWordLength: 2,
-    metadata: { test: true }
+    metadata: { test: true },
   };
 
   const words = await detector.detectWords(text, startLine, context);
@@ -151,7 +155,7 @@ Deno.test("TinySegmenterWordDetector - detectWords - コンテキストパラメ
   assertEquals(words.length > 0, true);
 
   // 最小文字数フィルタリングが適用されることを確認（長さ1の文字は除外）
-  const shortWords = words.filter(w => w.text.length < 2);
+  const shortWords = words.filter((w) => w.text.length < 2);
   assertEquals(shortWords.length, 0);
 });
 

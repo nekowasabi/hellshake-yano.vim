@@ -5,7 +5,10 @@
 
 import { assertEquals, assertExists } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import { getDefaultConfig, validateConfig } from "../denops/hellshake-yano/main.ts";
-import { getDefaultConfig as getDefaultConfigFromConfig, validateConfig as validateConfigFromConfig } from "../denops/hellshake-yano/config.ts";
+import {
+  getDefaultConfig as getDefaultConfigFromConfig,
+  validateConfig as validateConfigFromConfig,
+} from "../denops/hellshake-yano/config.ts";
 import { Core } from "../denops/hellshake-yano/neovim/core/core.ts";
 
 Deno.test("getDefaultConfig() should delegate to config.ts", () => {
@@ -28,17 +31,15 @@ Deno.test("getDefaultConfig() should delegate to config.ts", () => {
 
 Deno.test("validateConfig() should delegate to config.ts", () => {
   // 有効な設定
-  const validConfig = {motionCount: 3,
-    hintPosition: "start" as const,
-    enabled: true,
-  };
+  const validConfig = { motionCount: 3, hintPosition: "start" as const, enabled: true };
 
   const validResult = validateConfig(validConfig);
   assertEquals(validResult.valid, true);
   assertEquals(validResult.errors.length, 0);
 
   // 無効な設定
-  const invalidConfig = {motionCount: -1, // 負の値は無効
+  const invalidConfig = {
+    motionCount: -1, // 負の値は無効
   };
 
   const invalidResult = validateConfig(invalidConfig);
@@ -114,7 +115,11 @@ Deno.test("countedMotions should be strongly typed", () => {
 
   // 全ての要素が文字列であることを確認（型安全性テスト）
   config.countedMotions.forEach((key: string, index: number) => {
-    assertEquals(typeof key, "string", `countedMotions[${index}] should be string, got ${typeof key}`);
+    assertEquals(
+      typeof key,
+      "string",
+      `countedMotions[${index}] should be string, got ${typeof key}`,
+    );
     assertEquals(key.length > 0, true, `countedMotions[${index}] should not be empty`);
   });
 });
@@ -142,7 +147,8 @@ Deno.test("main.ts type safety - filter function should be strongly typed", () =
   // after refactoring from 'any' to proper type guard in main.ts line 510
 
   // Create a mock config with countedMotions that includes invalid types
-  const mockConfig = {countedMotions: ["f", "F", 123, null, "t", "T", "", undefined] as unknown[],
+  const mockConfig = {
+    countedMotions: ["f", "F", 123, null, "t", "T", "", undefined] as unknown[],
   };
 
   // The filter function now uses a type guard instead of 'any'

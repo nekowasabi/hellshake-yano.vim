@@ -432,20 +432,22 @@ test("Performance: Integrated performance test", async (denops: Denops) => {
  */
 test("Process10 Performance: Large hints async highlighting", async (denops: Denops) => {
   // 150個のヒントを生成
-  const largeHints: Array<{ line: number; col: number; text: string; hintByteCol: number; hintCol: number }> = [];
+  const largeHints: Array<
+    { line: number; col: number; text: string; hintByteCol: number; hintCol: number }
+  > = [];
   for (let i = 0; i < 150; i++) {
     largeHints.push({
       line: i + 1,
       col: (i % 10) + 1,
       text: `word${i}`,
       hintByteCol: 1,
-      hintCol: 1
+      hintCol: 1,
     });
   }
 
   // テスト用バッファを設定
   await denops.cmd("enew!");
-  const testLines = largeHints.map(h => h.text);
+  const testLines = largeHints.map((h) => h.text);
   await denops.call("setline", 1, testLines);
 
   const result = await runBenchmark(
@@ -541,7 +543,11 @@ test("Process10 Performance: Async vs Sync comparison", async (denops: Denops) =
 
   console.log(`同期版: ${syncResult.avgTimePerIteration.toFixed(2)}ms`);
   console.log(`非同期版: ${asyncResult.avgTimePerIteration.toFixed(2)}ms`);
-  console.log(`改善率: ${((1 - asyncResult.avgTimePerIteration / syncResult.avgTimePerIteration) * 100).toFixed(1)}%`);
+  console.log(
+    `改善率: ${
+      ((1 - asyncResult.avgTimePerIteration / syncResult.avgTimePerIteration) * 100).toFixed(1)
+    }%`,
+  );
 
   // 非同期版は10ms以内に返ることを確認（絶対値での検証）
   // タイミング依存の比較ではなく、応答性の絶対基準で判定
@@ -580,7 +586,7 @@ test("Process10 Performance: Memory usage with large hints", async (denops: Deno
     });
 
     // メモリスナップショット
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     memorySnapshots.push(getMemoryUsage());
 
     // GCを促進
