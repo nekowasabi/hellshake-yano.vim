@@ -3,6 +3,8 @@ import { exists } from "https://deno.land/std@0.212.0/fs/exists.ts";
 import { resolve } from "https://deno.land/std@0.212.0/path/resolve.ts";
 import { parse as parseYaml } from "https://deno.land/std@0.212.0/yaml/parse.ts";
 import { CacheType, GlobalCache } from "../../cache.ts";
+// [DEBUG-METRIC] Point B/C 用: 既存 logger インフラ再利用（新規 logger 作成禁止方針）
+import { getDebugMode, logMessage } from "../../common/utils/logger.ts";
 import type { Config } from "../../types.ts";
 import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../../config.ts";
 import { resolveConfigType } from "../../common/utils/config.ts";
@@ -1083,6 +1085,11 @@ export class DictionaryLoader {
    */
   async loadUserDictionary(config?: DictionaryLoaderConfig): Promise<UserDictionary> {
     const resolvedConfig = { ...this.config, ...config };
+    if (getDebugMode()) {
+      try {
+        logMessage("DEBUG", "HINT-DEBUG", `[PointA0/loadEnter] dictionaryPath=${resolvedConfig.dictionaryPath ?? "(undefined)"} searchPathsCount=${this.searchPaths.length}`);
+      } catch { /* ignore log error */ }
+    }
     for (const searchPath of this.searchPaths) {
       try {
         const resolvedPath = this.resolvePath(searchPath);
@@ -1096,9 +1103,23 @@ export class DictionaryLoader {
 
     if (resolvedConfig.dictionaryPath) {
       try {
-        const content = await Deno.readTextFile(resolvedConfig.dictionaryPath);
-        return await this.parseDictionaryContent(content, resolvedConfig.dictionaryPath);
-      } catch {
+        // Why: resolvePath を経由して ~ を展開する。dictionaryPath 経路だけ展開を忘れていた非対称バグの修正。
+        const resolvedDictPath = this.resolvePath(resolvedConfig.dictionaryPath);
+        if (getDebugMode()) {
+          try { logMessage("DEBUG", "HINT-DEBUG", `[PointA1/dictPathTry] path=${resolvedDictPath}`); } catch {}
+        }
+        const content = await Deno.readTextFile(resolvedDictPath);
+        if (getDebugMode()) {
+          try { logMessage("DEBUG", "HINT-DEBUG", `[PointA1b/fileRead] contentLen=${content.length} head=${JSON.stringify(content.slice(0, 60))}`); } catch {}
+        }
+        return await this.parseDictionaryContent(content, resolvedDictPath);
+      } catch (err) {
+        if (getDebugMode()) {
+          try {
+            const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+            logMessage("ERROR", "HINT-DEBUG", `[PointA1/dictPathCatch] path=${resolvedConfig.dictionaryPath} error=${msg}`);
+          } catch {}
+        }
       }
     }
     return this.createEmptyDictionary();
@@ -1133,7 +1154,21 @@ export class DictionaryLoader {
   /**
    */
   private parseYamlDictionary(content: string): UserDictionary {
+    if (getDebugMode()) {
+      try { logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlEnter] contentLen=${content.length}`); } catch {}
+    }
     const data = parseYaml(content) as unknown;
+    if (getDebugMode()) {
+      try {
+        const t = typeof data;
+        const keys = (t === 'object' && data !== null) ? Object.keys(data as Record<string, unknown>) : [];
+        const hintArr = (t === 'object' && data !== null) ? (data as Record<string, unknown>).hintPatterns : undefined;
+        const hintInfo = Array.isArray(hintArr) ? `array(len=${hintArr.length})` : `notArray(${typeof hintArr})`;
+        logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlParsed] type=${t} keys=${JSON.stringify(keys)} hintPatterns=${hintInfo}`);
+      } catch (e) {
+        logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlParsed] log failure: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
     return this.convertToUserDictionary(data);
   }
   /**
@@ -1191,12 +1226,36 @@ export class DictionaryLoader {
     if (dataObj.hintPatterns && Array.isArray(dataObj.hintPatterns)) {
       dictionary.hintPatterns = dataObj.hintPatterns
         .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-        .map((pattern: Record<string, unknown>) => ({
-          pattern: typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern) : pattern.pattern as RegExp,
-          hintPosition: pattern.hintPosition as HintPositionRule,
-          priority: typeof pattern.priority === 'number' ? pattern.priority : 0,
-          description: typeof pattern.description === 'string' ? pattern.description : undefined,
-        }));
+        .map((pattern: Record<string, unknown>) => {
+          // Why: hintPosition 未指定で captureGroup のみ指定ではなく、hintPosition 優先＋captureGroup fallback を採用。理由: YAML サンプルは captureGroup 数値形式で記述されているが従来は読み捨てていた。既存の hintPosition: "capture:N" ユーザーとの後方互換を保ちつつ、数値指定時のみ "capture:${n}" 文字列に変換する。
+          const resolvedHintPosition: HintPositionRule =
+            typeof pattern.hintPosition === 'string'
+              ? pattern.hintPosition as HintPositionRule
+              : typeof pattern.captureGroup === 'number'
+                ? (`capture:${pattern.captureGroup}` as HintPositionRule)
+                : (undefined as unknown as HintPositionRule);
+          return {
+            pattern: typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern) : pattern.pattern as RegExp,
+            hintPosition: resolvedHintPosition,
+            priority: typeof pattern.priority === 'number' ? pattern.priority : 0,
+            description: typeof pattern.description === 'string' ? pattern.description : undefined,
+          };
+        });
+      // [DEBUG-METRIC] Point B: convertToUserDictionary の hintPatterns 変換完了直後
+      // Why: YAML/JSON から RegExp/hintPosition/priority への変換結果が正しいかを検証するため。
+      //      この地点より下流（applyHintPatterns）で参照される最終形を dump する必要がある。
+      if (getDebugMode()) {
+        try {
+          const dump = dictionary.hintPatterns.map((p) => ({
+            pattern: String(p.pattern),
+            hintPosition: p.hintPosition,
+            priority: p.priority,
+          }));
+          logMessage("DEBUG", "HINT-DEBUG", `[PointB/convert] count=${dump.length} patterns=${JSON.stringify(dump)}`);
+        } catch (e) {
+          logMessage("DEBUG", "HINT-DEBUG", `[PointB/convert] log failure: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
     if (dataObj.metadata && typeof dataObj.metadata === 'object' && dataObj.metadata !== null) {
       dictionary.metadata = dataObj.metadata as UserDictionary['metadata'];
@@ -1227,7 +1286,8 @@ export class DictionaryLoader {
   /**
    */
   private getFileExtension(filepath: string): string {
-    return filepath.toLowerCase().split('.').pop() || '';
+    const ext = filepath.toLowerCase().split('.').pop();
+    return ext ? `.${ext}` : '';
   }
 }
 /**
@@ -1330,19 +1390,69 @@ export class HintPatternProcessor {
     const enhancedWords: WordWithPriority[] = [...words];
     const sortedPatterns = patterns.sort((a, b) => b.priority - a.priority);
 
+    // [DEBUG-METRIC] Point C-entry: applyHintPatterns 入口
+    // Why: ヒント生成の実地点で、入力 text 実体・行数・パターン数が期待通り渡っているかを検証するため。
+    //      ログ文のみ debugMode ガードで囲み、マッチ処理本体の挙動は一切変更しない。
+    if (getDebugMode()) {
+      try {
+        const textHead = text.slice(0, 200).replace(/\n/g, "\\n");
+        const lineCount = text.split("\n").length;
+        logMessage("DEBUG", "HINT-DEBUG", `[PointC/entry] textHead=${JSON.stringify(textHead)} lineCount=${lineCount} patternCount=${sortedPatterns.length} wordCount=${words.length}`);
+      } catch (e) {
+        logMessage("DEBUG", "HINT-DEBUG", `[PointC/entry] log failure: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    let priorityAssignCount = 0;
     for (const pattern of sortedPatterns) {
-      const regex = typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern, 'g') : pattern.pattern;
+      // Why: 'g' フラグ単体ではなく 'gm' を採用。理由: 複数行 join テキストに対して ^ / $ を各行頭/行末にマッチさせるため。既に RegExp インスタンスで渡された場合は呼び出し側が管理しているフラグを尊重し上書きしない。
+      const regex = typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern, 'gm') : pattern.pattern;
       let match;
 
+      // [DEBUG-METRIC] Point C-loop: パターン単位の統計を収集するローカル変数
+      // Why: 各パターンについて matchCount/wordFoundCount を集計し、
+      //      「マッチしてるが findWordAtPosition で wordを見つけられていない」状態を識別するため。
+      let matchCount = 0;
+      let wordFoundCount = 0;
+      const sampleMatches: Array<Record<string, unknown>> = [];
+
       while ((match = regex.exec(text)) !== null) {
+        matchCount++;
         const hintTarget = this.extractHintTarget(match, pattern.hintPosition);
+        let wordFound = false;
         if (hintTarget) {
           const targetWord = this.findWordAtPosition(enhancedWords, hintTarget.position);
           if (targetWord) {
             targetWord.hintPriority = pattern.priority;
+            wordFound = true;
+            wordFoundCount++;
+            priorityAssignCount++;
           }
         }
+        if (getDebugMode() && sampleMatches.length < 5) {
+          const captureIndex = typeof pattern.hintPosition === "string" && pattern.hintPosition.startsWith("capture:")
+            ? parseInt(pattern.hintPosition.split(":")[1], 10)
+            : undefined;
+          sampleMatches.push({
+            matchText: (match[0] || "").slice(0, 40),
+            captureText: captureIndex !== undefined ? (match[captureIndex] || "").slice(0, 20) : "(no-capture)",
+            position: hintTarget?.position ?? -1,
+            wordFound,
+          });
+        }
       }
+
+      if (getDebugMode()) {
+        try {
+          logMessage("DEBUG", "HINT-DEBUG", `[PointC/pattern] pattern=${String(pattern.pattern)} flags=${regex.flags} matchCount=${matchCount} wordFoundCount=${wordFoundCount} samples=${JSON.stringify(sampleMatches)}`);
+        } catch (e) {
+          logMessage("DEBUG", "HINT-DEBUG", `[PointC/pattern] log failure: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
+    if (getDebugMode()) {
+      logMessage("DEBUG", "HINT-DEBUG", `[PointC/exit] totalPriorityAssigned=${priorityAssignCount}`);
     }
     return this.sortByHintPriority(enhancedWords);
   }
