@@ -119,9 +119,7 @@ export class VimVisual {
       return words;
     }
 
-    return words.filter((word) =>
-      word.line >= range.startLine && word.line <= range.endLine
-    );
+    return words.filter((word) => word.line >= range.startLine && word.line <= range.endLine);
   }
 
   /**

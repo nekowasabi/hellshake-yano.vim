@@ -12,10 +12,7 @@
  */
 
 import type { Denops } from "@denops/std";
-import type {
-  DisplayAdapter,
-  HintItem,
-} from "../../common/interfaces/display-adapter.ts";
+import type { DisplayAdapter, HintItem } from "../../common/interfaces/display-adapter.ts";
 
 /** デフォルトのhintハイライトグループ */
 const DEFAULT_HINT_GROUP = "HellshakeYanoMarker";

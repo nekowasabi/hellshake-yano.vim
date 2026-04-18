@@ -149,7 +149,9 @@ export class EnvironmentDetector {
 
         // フォールバック: v:versionから推定
         const major = Math.floor(versionNum / NEOVIM_VERSION_MAJOR_MULTIPLIER);
-        const minor = Math.floor((versionNum % NEOVIM_VERSION_MAJOR_MULTIPLIER) / NEOVIM_VERSION_MINOR_MULTIPLIER);
+        const minor = Math.floor(
+          (versionNum % NEOVIM_VERSION_MAJOR_MULTIPLIER) / NEOVIM_VERSION_MINOR_MULTIPLIER,
+        );
         const patch = versionNum % NEOVIM_VERSION_MINOR_MULTIPLIER;
         return `${major}.${minor}.${patch}`;
       },

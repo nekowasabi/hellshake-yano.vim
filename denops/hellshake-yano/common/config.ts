@@ -42,4 +42,3 @@ export { DEFAULT_CONFIG };
 export function createMinimalConfig(partial: Partial<Config> = {}): Config {
   return { ...DEFAULT_CONFIG, ...partial };
 }
-
