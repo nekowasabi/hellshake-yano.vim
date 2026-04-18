@@ -1,32 +1,29 @@
-# Process 2: displayHighlightPartialMatches + displayGetPopupCount 追加
+# Process 2: applyHintPatterns パイプライン接続
 
 ## Overview
-Neovim層 dispatcher に displayHighlightPartialMatches と displayGetPopupCount を追加する。
-displayHighlightPartialMatches は入力中のヒント絞り込み表示、displayGetPopupCount は現在表示中のヒント数を返す。
+`HintPatternProcessor.applyHintPatterns` は `word.ts:1386` に実装されているが、本番コードからの呼び出しが 0 件（PointD prioritizedCount=0 が証拠）。辞書 `hintPatterns` の captureGroup / hintPosition が実行時に反映されない構造的欠陥。`showHintsInternal` (core.ts:925-1017) のヒント決定前段階に接続し、辞書ルールを実機能として成立させる。
 
 ## Affected Files
-- `denops/hellshake-yano/main.ts` (Neovim層 dispatcher: Process 1 追加分の後に追加)
-- Vim層参照: `main.ts:430-437` (displayHighlightPartialMatches), `main.ts:438-445` (displayGetPopupCount)
+- `denops/hellshake-yano/neovim/core/core.ts:925-1017` — showHintsInternal 本体、assignHintsToWords 呼び出し前にパイプ追加
+- `denops/hellshake-yano/neovim/core/word.ts:1386` — HintPatternProcessor.applyHintPatterns シグネチャ確認
+- `denops/hellshake-yano/neovim/core/hint.ts:237` — assignHintsToWords の dictionary 引数追加検討（または事前変換）
 
 ## Implementation Notes
-- VimScript側呼び出し元:
-  - `autoload/hellshake_yano_vim/display.vim:474` — displayHighlightPartialMatches (denops#request)
-  - displayGetPopupCount — VimScript側からの直接呼び出し未確認（テスト/デバッグ用）
-- displayHighlightPartialMatches: Neovim層では highlightCandidateHintsHybrid または highlightCandidateHintsAsyncInternal を使用
-  - Vim層: VimPopupDisplay.highlightPartialMatches(matches) — matchesに含まれないヒントを非表示
-  - Neovim層: extmark の virt_text を更新して一致するヒントのみ強調
-- displayGetPopupCount: currentHints.length で代替可能
-- 優先度: displayHighlightPartialMatches=中、displayGetPopupCount=低
+- 設計選択: 「assignHintsToWords にパターン処理を内包」ではなく「呼び出し側で pre-process」を採用。Why: 既存 assignHintsToWords のシグネチャ変更を避け、62+ 呼び出し元への影響を遮断
+- core.ts:999-1003 の PointE2 ログ直前で `HintPatternProcessor.applyHintPatterns(words, bufferText, config.dictionary.hintPatterns)` を呼び出し、戻り値で words を置換
+- 辞書未指定 / hintPatterns 空の場合は no-op で通過（早期リターン）
+- PointD ログを `prioritizedCount=${prioritized.length}` として出力し効果を観測可能にする
+- Why コメント必須: `// Why: HintPatternProcessor は従来 dead code だった。captureGroup / hintPosition を実機能化するため showHintsInternal から直接呼び出す`
 
 ---
 
 ## Red Phase: テスト作成と失敗確認
 
-- [x] ブリーフィング確認
-- [x] テストケースを作成（実装前に失敗確認）
-  - displayHighlightPartialMatches が dispatcher に登録されていることを確認
-  - displayGetPopupCount が正しいカウントを返すことを確認
-- [x] テストを実行して失敗することを確認
+- [ ] ブリーフィング確認
+- [ ] `tests/regression_dictionary_test.ts` を新規作成（または既存追記）
+  - `- [ ] task1` 行に checkbox パターン (priority 100, captureGroup 1) 適用時、先頭文字 `t` の位置にヒント
+  - PointD ログで prioritizedCount>0 となること
+- [ ] テストを実行して失敗することを確認
 
 ✅ **Phase Complete**
 
@@ -34,11 +31,12 @@ displayHighlightPartialMatches は入力中のヒント絞り込み表示、disp
 
 ## Green Phase: 最小実装と成功確認
 
-- [x] ブリーフィング確認
-- [x] main.ts の initializeNeovimLayer 内 dispatcher に displayHighlightPartialMatches を追加
-- [x] main.ts の initializeNeovimLayer 内 dispatcher に displayGetPopupCount を追加
-- [x] Whyコメントを付与
-- [x] テストを実行して成功することを確認
+- [ ] ブリーフィング確認
+- [ ] core.ts:999 付近で `HintPatternProcessor.applyHintPatterns(words, bufferText, config.dictionary?.hintPatterns ?? [])` を呼び出し
+- [ ] 戻り値を後続 assignHintsToWords に引き渡す
+- [ ] PointD ログを prioritizedCount で更新
+- [ ] Why コメント追加
+- [ ] テストを実行して成功することを確認
 
 ✅ **Phase Complete**
 
@@ -46,8 +44,9 @@ displayHighlightPartialMatches は入力中のヒント絞り込み表示、disp
 
 ## Refactor Phase: 品質改善
 
-- [x] コードの品質を改善
-- [x] テストが継続して成功することを確認
+- [ ] 辞書未指定時の短絡ロジックを `applyHintPatterns` 側の責務に寄せ、呼び出し側を無条件化
+- [ ] priority 併用時の安定ソートを word.ts:1386 周辺で明示
+- [ ] テストが継続して成功することを確認
 
 ✅ **Phase Complete**
 
@@ -55,4 +54,4 @@ displayHighlightPartialMatches は入力中のヒント絞り込み表示、disp
 
 ## Dependencies
 - Requires: -
-- Blocks: Process 10 (統合テスト)
+- Blocks: 3
