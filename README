@@ -1,0 +1,6 @@
+/x --use-dag --debug --strict --worktree --tmux --preset research --multi-llm --min-cycles 2
+METHODOLOGY: Red-Green-Refactor
+TASK: @PLAN.md @plan/process-01.md から @plan/process-03.mdまで最後まで実装してください。
+@PLAN.mdにDAGの項目がある場合、並列実行可能な場合は並列実行をsubagentに委譲してください。
+--micro-execが指定されている場合は、subagentの実行単位をACTの段階で細分化し、1つのファイルをworktreeを使って暗に並列実装できる単位まで細分化して実装してください。
+コードの実装時は、nco subagentを使用して、tmuxでペイン分割し、デバッグ文やテストの結果を出力させたものを監視させ、hookで各エージェントに最新状況を注入できるようにしてください

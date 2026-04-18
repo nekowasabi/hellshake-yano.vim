@@ -1,55 +1,47 @@
-# Process 11: checkbox captureGroup + prioritizedCount テスト
+# Process 11: Process 2 TextChanged invalidation テスト
 
 ## Overview
-Process 2 で接続した applyHintPatterns が辞書 `hintPatterns` の captureGroup / hintPosition / priority を正しく反映することを検証する。ユーザーの期待仕様（`- [ ] task` の先頭文字 `t` にヒント）を契約化する。
+Process 2（TextChanged/TextChangedI/BufLeave autocmd による配列キャッシュ invalidation）の動作検証。dispatcher 登録と debounce 動作を確認する。
 
 ## Affected Files
-- `tests/regression_dictionary_test.ts` — 新規
-- `~/.config/hellshake-yano/dictionary.yaml` — ユーザー辞書（参考）
-- `denops/hellshake-yano/neovim/core/word.ts:1386` — applyHintPatterns assertion 対象
+- テスト新規: `denops/hellshake-yano/neovim/core/__tests__/cache-invalidation_test.ts`
+- 影響コード: `denops/hellshake-yano/neovim/core/core.ts` の Core.invalidateBufferCache メソッド
+- 参考: `plugin/hellshake-yano.vim` / `denops/hellshake-yano/main.ts` の既存 autocmd 配置
 
 ## Implementation Notes
-- テスト辞書を fixture で定義:
-  - name: checkbox, pattern: `^\s*-\s*\[\s\]\s+(.)`, hintPosition: "capture:1", priority: 100
-  - name: checked_checkbox, pattern: `^\s*-\s*\[x\]\s+(.)`, hintPosition: "capture:1", priority: 90
-- assertion:
-  - `- [ ] task` 行で生成される word の byteCol が先頭文字 `t` の位置
-  - PointD ログで prioritizedCount >= 1
-  - `- [x] done` 行で checked_checkbox が優先適用（priority 90）
-  - priority 衝突時は priority 大が勝つ安定ソート
-- Why コメント必須: `// Why: HintPatternProcessor を dead code から実機能化した契約を永続化`
+1. テストケース
+   - **Case A**: TextChanged 通知（denops#notify）→ Core.invalidateBufferCache 呼び出し → キャッシュ削除
+   - **Case B**: 別 bufnr からの invalidate 通知 → 現在キャッシュの bufnr が異なれば無視
+   - **Case C**: debounce 動作（連続 5 回 TextChanged 発火でも invalidate callback は ~1 回）
+   - **Case D**: BufLeave で invalidate 呼び出し確認
+   - **Case E**: dispatcher エンドポイント登録確認（invalidateBufferCache が callable）
+2. fake timer を使用した debounce テスト
+3. denops.notify mock で autocmd → dispatcher フロー検証
 
 ---
 
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] `tests/regression_dictionary_test.ts` に 4 ケース追加
-- [ ] Process 2 適用前では prioritizedCount=0 で失敗することを確認
+## Red Phase
+- [ ] 上記 5 ケースでテスト失敗確認
+- [ ] `deno test denops/hellshake-yano/neovim/core/__tests__/cache-invalidation_test.ts`
 
 ✅ **Phase Complete**
 
 ---
 
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] Process 2 の修正適用状態でテスト実行、全パス
-- [ ] prioritizedCount>0 を assertion で固定
+## Green Phase
+- [ ] Process 2 実装完了後に成功確認
 
 ✅ **Phase Complete**
 
 ---
 
-## Refactor Phase: 品質改善
-
-- [ ] fixture 辞書を `tests/fixtures/dictionary_checkbox.yaml` に分離し再利用可能化
-- [ ] テストが継続して成功することを確認
+## Refactor Phase
+- [ ] debounce タイマーのテスト安定化（fake timer 使用）
 
 ✅ **Phase Complete**
 
 ---
 
 ## Dependencies
-- Requires: 3
-- Blocks: 100
+- Requires: Process 2
+- Blocks: -

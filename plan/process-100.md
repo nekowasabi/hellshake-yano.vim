@@ -1,59 +1,46 @@
-# Process 100: 全体回帰 + lint + typecheck
+# Process 100: deno test / fmt / check 通過確認
 
 ## Overview
-Process 1/2/3/10/11/12 の変更が既存テスト（62+ ファイル）を破壊しないことを確認し、Phase 1 全体の品質ゲートを通過させる。deno check / deno test / deno lint を一括実行する。
+Process 1〜4 および 10〜13, 50 の全改修後に、プロジェクト規約の静的解析・テストスイート全通過を確認する。CI パス相当のローカル検証。
 
 ## Affected Files
-- `tests/**/*.ts` — 全テストファイル
-- `deno.json` — タスク定義確認
-- `denops/hellshake-yano/**/*.ts` — 全本体
+- `deno.jsonc` — tasks 定義確認
+- 全改修コード (core.ts, word.ts, dictionary.ts, main.ts 周辺)
+- 全テスト `denops/hellshake-yano/neovim/core/__tests__/`, `tests/`
 
 ## Implementation Notes
-- 実行順序:
-  1. `deno lint denops/ tests/`
-  2. `deno check denops/hellshake-yano/**/*.ts tests/**/*.ts`
-  3. `deno test --allow-all tests/` （並列度デフォルト）
-- 失敗時は該当 Process に戻って修正（P1/P2/P3 のいずれか）
-- 既存回帰テスト（下記）が全て緑であること:
-  - `tests/both_min_word_length_test.ts`
-  - `tests/regression_*_test.ts`
-  - `tests/hint_overlap_test.ts`
-  - `tests/cursor_position_test.ts`
-- 新規テスト（Process 10/11/12 で追加）も全て緑
-- Why コメント不要（検証フェーズのため）
+1. 実行コマンド（順次）:
+   - `deno fmt --check denops/ tests/` — フォーマット検査
+   - `deno check denops/hellshake-yano/main.ts` — 型検査（起点ファイル指定）
+   - `deno lint denops/ tests/` — lint（deno.jsonc の設定に従う）
+   - `deno task test` or `deno test --allow-read --allow-write --allow-env denops/ tests/` — 全テスト
+2. 失敗したら該当 Process に差し戻し（fmt/check は自動修正、test は実装修正）
+3. カバレッジ: `deno test --coverage=coverage/` → `deno coverage coverage/` で改修領域の行カバレッジが 80% 以上
 
 ---
 
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] 現状（Process 1/2/3 適用状態）で `deno test` を実行し、失敗箇所があれば一覧化
+## Red Phase
+- [ ] 改修直後の状態で必ず一度実行して現状把握
 
 ✅ **Phase Complete**
 
 ---
 
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] lint 修正（該当 Process に戻す）
-- [ ] typecheck 修正（主に Process 3 の cast 漏れ）
-- [ ] 失敗テスト修正（該当 Process に戻す）
-- [ ] 3 コマンド全て成功することを確認
+## Green Phase
+- [ ] fmt, check, lint, test を全て PASS させる
+- [ ] カバレッジ閾値を達成
 
 ✅ **Phase Complete**
 
 ---
 
-## Refactor Phase: 品質改善
-
-- [ ] deno.json に `task phase1-verify` を追加して再実行容易化
-- [ ] テストが継続して成功することを確認
+## Refactor Phase
+- [ ] `deno.jsonc` tasks に `task verify` を追加（fmt+check+lint+test のまとめ）
 
 ✅ **Phase Complete**
 
 ---
 
 ## Dependencies
-- Requires: 10, 11, 12
-- Blocks: 50, 200
+- Requires: Process 13
+- Blocks: Process 101

@@ -1,54 +1,49 @@
-# Process 12: branded types 型エラー検証
+# Process 12: Process 3 行単位走査テスト + Process 4 事前コンパイル検証
 
 ## Overview
-Process 3 で導入した ByteCol/CharCol/ZeroLine/OneLine branded types が意図どおり型レベルで単位混在を拒否することを検証する。deno-lint と tsc の noEmit モードで compile-error アサーションを実施。
+全パターン行単位走査 (`isMultilinePattern`) による分岐動作と、事前コンパイル済み RegExp の再利用を検証する統合テスト。
 
 ## Affected Files
-- `tests/types_branded_test.ts` — 新規、`// @ts-expect-error` ベースで違反パターンを列挙
-- `denops/hellshake-yano/types.ts:~284` — 検証対象の branded types
+- テスト新規: `denops/hellshake-yano/neovim/core/__tests__/pattern-scan_test.ts`
+- 影響コード: `denops/hellshake-yano/neovim/core/word.ts:1386-1458`, `:1490-1496`
 
 ## Implementation Notes
-- `// @ts-expect-error` を利用した compile-time negative test:
-  - `const b: ByteCol = 5;` → error (raw number 不可)
-  - `const c: CharCol = asByteCol(5);` → error (別ブランド不可)
-  - `const l: ZeroLine = asOneLine(1);` → error (別ブランド不可)
-- positive test:
-  - `const b: ByteCol = asByteCol(5);` → ok
-  - `const z: ZeroLine = oneLineToZeroLine(asOneLine(5));` → ok
-- `deno check tests/types_branded_test.ts` が成功（@ts-expect-error のおかげで 0 errors）
-- Why コメント必須: `// Why: col/line 単位混在を型で detect する契約をコンパイル時に固定`
+1. **行単位走査 (Process 3)**:
+   - **Case A**: `/^\s*-\s*\[\s\]\s+(.)/` パターンで行単位走査分岐
+   - **Case B**: `/\bclass\b/` パターンでも行単位走査（default）
+   - **Case C**: 複数行パターン `/foo[\s\S]*?bar/` は join ルート（フォールバック）
+   - **Case D, E**: 全ルートで同じマッチ結果（等価性保証）
+2. **事前コンパイル (Process 4)**:
+   - **Case F**: applyHintPatterns を 10 回呼んで `new RegExp` 呼び出し回数が 0（`DictionaryEntry.compiled` を参照）
+   - **Case G**: 辞書再読込後に compiled が再生成されること
+   - **Case H**: 不正パターンは compiled=undefined でスキップ
+3. `isMultilinePattern` のユニットテスト: `source.includes("\\n")`, `flags.includes("s")` など複数行判定パターン
 
 ---
 
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] `tests/types_branded_test.ts` に違反/正常の両ケースを記述
-- [ ] 違反ケースが tsc/deno エラーになることを確認（@ts-expect-error 無しで一度実行）
+## Red Phase
+- [ ] 8 ケース + isMultilinePattern 複数パターンで失敗確認
+- [ ] `deno test denops/hellshake-yano/neovim/core/__tests__/pattern-scan_test.ts`
 
 ✅ **Phase Complete**
 
 ---
 
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] @ts-expect-error を適切な行に配置
-- [ ] `deno check tests/types_branded_test.ts` が 0 errors で通ることを確認
+## Green Phase
+- [ ] Process 3 + 4 実装完了後に成功確認
 
 ✅ **Phase Complete**
 
 ---
 
-## Refactor Phase: 品質改善
-
-- [ ] Process 3 の一時 cast 箇所（`as unknown as ByteCol` 等）を列挙し、境界 API に集約する TODO を別 issue/Process へ
-- [ ] テストが継続して成功することを確認
+## Refactor Phase
+- [ ] 複数行判定ヘルパを共通化
+- [ ] 走査ロジック関数分割
 
 ✅ **Phase Complete**
 
 ---
 
 ## Dependencies
-- Requires: 3
-- Blocks: 100
+- Requires: Process 3, Process 4
+- Blocks: -

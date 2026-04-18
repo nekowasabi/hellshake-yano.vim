@@ -1,63 +1,47 @@
-# Process 200: docs/dictionary.md 更新
+# Process 200: README / CHANGELOG 更新
 
 ## Overview
-Process 2 で applyHintPatterns が本番接続され、辞書 `hintPatterns` の captureGroup / hintPosition / priority が実機能化された。ユーザー向けドキュメントを更新し、効果が保証される構文・実例・優先度ルールを明記する。
+辞書機能の高速化改修を README と CHANGELOG（なければ doc/CHANGES.md）に記録する。バッファキャッシュ + join 廃止による高速化、パフォーマンス改善率を明記。**挙動変更なし**（全行対象のまま）。
 
 ## Affected Files
-- `doc/dictionary.md` — ユーザー向けドキュメント（既存）
-- `README.md:374-474` — Dictionary セクション（同期更新）
-- `samples/dictionaries/dictionary.yaml` — サンプルの注釈強化
-- `~/.config/hellshake-yano/dictionary.yaml` — ユーザー設定例として参考掲載（コピー不要）
+- `README.md` — 「Dictionary」「Configuration」「Performance」セクション
+- `CHANGELOG.md` or `doc/CHANGES.md` — 新エントリ追記
+- `docs/performance/dict-perf-report.md`（Process 101 で作成済みへのリンク）
 
 ## Implementation Notes
-- 追記項目:
-  1. hintPatterns は showHintsInternal で呼び出される旨（Phase 1 で接続）
-  2. captureGroup: N は正規表現の N 番目キャプチャの先頭バイト位置にヒント配置
-  3. priority 数値が大きいほど優先。同値時は定義順
-  4. Phase 1 既知制約: skipOverlapDetection が常時 true のため、辞書非対象語の重複ヒントも抑制されない
-- checkbox の実例:
-  ```yaml
-  - name: checkbox
-    pattern: "^\\s*-\\s*\\[\\s\\]\\s+(.)"
-    hintPosition: "capture:1"
-    priority: 100
-  ```
-- Why コメント不要（docs のため）。ただし変更理由を doc 本文に明記
-- README.md との整合性: 両ファイルの Dictionary セクションを diff -u で比較
+1. README 追記項目:
+   - **Performance**: 44949 行バッファでのヒント表示所要 ~450ms → ~60ms（改修前比 86% 短縮、実測値を Process 101 から転記）
+   - **Mechanism**: changedtick 連動のバッファキャッシュ + join 廃止による行単位走査で透過的高速化
+   - **Behavior change**: なし（全行対象のまま可視領域外にもヒント振る）
+2. CHANGELOG: セマンティックバージョニング準拠で performance improvement として記載
+3. Breaking change はなし と明記
 
 ---
 
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] `tests/docs_link_check_test.ts`（存在すれば）で doc/dictionary.md のリンク整合を確認
-- [ ] 既存 docs ビルドが壊れないことを確認
+## Red Phase
+- [ ] 現状の README セクション構成を確認
 
 ✅ **Phase Complete**
 
 ---
 
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] doc/dictionary.md に applyHintPatterns 接続の記述追加
-- [ ] README.md:374-474 を同期更新
-- [ ] samples/dictionaries/dictionary.yaml にコメント強化
-- [ ] 表記ゆれ / リンク切れがないことを確認
+## Green Phase
+- [ ] README の Dictionary セクションに contextLines 説明追加
+- [ ] Performance セクションに改善率とベンチリンク
+- [ ] CHANGELOG エントリ追加
 
 ✅ **Phase Complete**
 
 ---
 
-## Refactor Phase: 品質改善
-
-- [ ] doc 構造を「辞書スキーマ / 実行時処理 / 制約」の 3 セクションに再編
-- [ ] 既存 sample との相互参照を追加
+## Refactor Phase
+- [ ] 他の言語版 README（あれば）の同期
+- [ ] TOC 更新
 
 ✅ **Phase Complete**
 
 ---
 
 ## Dependencies
-- Requires: 100
-- Blocks: 300
+- Requires: Process 101
+- Blocks: Process 300

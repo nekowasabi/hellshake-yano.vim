@@ -1,66 +1,58 @@
-# Process 3: ByteCol/CharCol/ZeroLine branded types
+# Process 3: 全パターン行単位走査（join 廃止）
 
 ## Overview
-col/line の単位（byte/char, 0-indexed/1-indexed）が型レベルで区別されておらず、extmark 呼び出し時の range out-of-bounds エラーの温床となっている。TypeScript の branded type でコンパイル時に単位混在を検出可能にする。
+`applyHintPatterns` (word.ts:1386-1458) 内で `lines.join("\n")` による全文字列化を廃止し、**全辞書パターンを行単位走査**に切り替える。数 MB の文字列生成を回避し、RegExp の内部解析コストも軽減。複数行パターン（`.source.includes("\\n")` 等）は例外的に従来の join ルートにフォールバック。
 
 ## Affected Files
-- `denops/hellshake-yano/types.ts:~284` — 型定義追加
-- `denops/hellshake-yano/neovim/core/word.ts:656` — byteCol 生成点を `asByteCol()` に置換
-- `denops/hellshake-yano/neovim/core/core.ts:1730` 周辺 — setHintExtmark 引数型を ByteCol に変更
-- `denops/hellshake-yano/neovim/display/extmark-display.ts` — col/line を受け渡す API 境界
+- `denops/hellshake-yano/neovim/core/word.ts:1386-1458` — applyHintPatterns 本体
+- `denops/hellshake-yano/neovim/core/word.ts:1402-1410` — pattern ループ
+- `denops/hellshake-yano/neovim/core/word.ts:1490-1496` — findWordAtPosition（行単位呼び出しに調整）
 
 ## Implementation Notes
-- 型定義:
-  ```typescript
-  export type ByteCol = number & { readonly __brand: "ByteCol" };   // 1-indexed byte
-  export type CharCol = number & { readonly __brand: "CharCol" };   // 0-indexed char
-  export type ZeroLine = number & { readonly __brand: "ZeroLine" }; // 0-indexed
-  export type OneLine = number & { readonly __brand: "OneLine" };   // 1-indexed
-  export const asByteCol = (n: number): ByteCol => n as ByteCol;
-  export const asCharCol = (n: number): CharCol => n as CharCol;
-  export const asZeroLine = (n: number): ZeroLine => n as ZeroLine;
-  export const asOneLine = (n: number): OneLine => n as OneLine;
-  ```
-- 境界ヘルパー: `oneLineToZeroLine(l: OneLine): ZeroLine` で明示変換
-- Why コメント必須: `// Why: col/line の単位混在は extmark 'out of range' の根本原因だった。branded type で型レベル検出`
-- 段階導入: まず Word の byteCol / line のみ branded 化し、呼び出し元は `as unknown as ByteCol` の一時 cast を許容（Process 12 で厳格化）
+1. 判定ヘルパ `isMultilinePattern(re: RegExp): boolean`:
+   - `re.source.includes("\\n")` or `re.flags.includes("s")` で複数行跨ぎの意図を検出
+   - 大部分の辞書は `^...$` or 単一行想定 → 行単位走査が default
+2. 行単位走査ルート:
+   ```ts
+   for (let i = 0; i < lines.length; i++) {
+     const line = lines[i];
+     let m: RegExpExecArray | null;
+     regex.lastIndex = 0;
+     while ((m = regex.exec(line)) !== null) {
+       const lnum = i + 1;  // 1-origin
+       const col = m.index + 1;
+       // findWordAtPosition(words, lnum, col) でヒント対象 word を特定
+       if (!regex.global) break;
+     }
+   }
+   ```
+3. 複数行パターン: 従来の `text = lines.join("\n")` 経路にフォールバック（稀なケースなので性能最適化しない）
+4. findWordAtPosition: 行配列が既に行インデックスでアクセス可能なため、join した text からの lnum 逆算が不要になりコードも簡潔化
+5. 辞書パターン数が 0 なら applyHintPatterns 自体を早期 return（既存挙動踏襲）
 
----
-
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] `tests/types_branded_test.ts` を新規作成
-  - `const c: CharCol = 5 as CharCol; const b: ByteCol = c;` が ts コンパイルエラーになることを assertThrows 相当で検証
-- [ ] テストを実行して失敗することを確認（現状は型が無いため無反応）
-
-✅ **Phase Complete**
-
----
-
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] types.ts に branded types と as* ヘルパーを追加
-- [ ] word.ts:656 の byteCol 生成を `asByteCol(byteIndex + 1)` に置換
-- [ ] core.ts:1730 周辺の setHintExtmark シグネチャを ByteCol/ZeroLine に変更
-- [ ] 呼び出し元の型エラーを修正（必要なら一時 cast）
-- [ ] テストを実行して成功することを確認
+## Red Phase
+- [ ] Process 12 のテストで以下を検証
+  - `/^\s*-\s*\[\s\]\s+(.)/` で行単位走査
+  - `/\bclass\b/` でも行単位走査（default ルート）
+  - 複数行パターン `/foo[\s\S]*?bar/` は join ルート
+  - 全ルートで同じマッチ結果（等価性保証）
 
 ✅ **Phase Complete**
 
----
-
-## Refactor Phase: 品質改善
-
-- [ ] 一時 cast 箇所を洗い出し、境界 API に集約
-- [ ] Word 型の列プロパティ命名を `charCol` / `byteCol` に統一（ambiguous な `col` を排除）
-- [ ] テストが継続して成功することを確認
+## Green Phase
+- [ ] `isMultilinePattern` ヘルパ追加
+- [ ] 行単位走査ループ実装
+- [ ] フォールバック路線実装
+- [ ] findWordAtPosition 調整
 
 ✅ **Phase Complete**
 
----
+## Refactor Phase
+- [ ] 走査ロジックの関数分割 (`scanByLines`, `scanByJoinedText`)
+- [ ] JSDoc + 例示
+
+✅ **Phase Complete**
 
 ## Dependencies
-- Requires: 1, 2
-- Blocks: 10, 11, 12
+- Requires: -
+- Blocks: Process 12, Process 13

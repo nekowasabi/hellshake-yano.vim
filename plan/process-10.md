@@ -1,51 +1,48 @@
-# Process 10: overlap 回帰テスト
+# Process 10: Process 1 ユニットテスト — getline 結果の配列キャッシュ化
 
 ## Overview
-Process 1 で修正した二重経路統一が将来再度デグレードしないよう、日本語連続語・方向切替・初回表示の 3 シナリオを網羅する回帰テストを追加する。
+Process 1（getline 結果を changedtick 連動で配列キャッシュ）に対するユニットテスト。denops mock を使ってキャッシュ判定ロジックを検証し、cache hit/miss を確認する。
 
 ## Affected Files
-- `tests/hint_overlap_test.ts` — 既存テスト追記
-- `tests/regression_initial_display_test.ts` — 新規（初回表示シナリオ）
-- `denops/hellshake-yano/neovim/display/extmark-display.ts:77-80,722-725` — assertion 対象
+- テスト新規: `denops/hellshake-yano/neovim/core/__tests__/buffer-cache_test.ts`
+- 影響コード: `denops/hellshake-yano/neovim/core/core.ts:1015-1025` （cachedBuffer プロパティ・キャッシュ参照ロジック）
+- 参考 mock: 既存 `__tests__/` 内の denops mock 実装を踏襲
 
 ## Implementation Notes
-- PointE1 のログを capture し dropped=0 を assertion に組み込む
-- 日本語連続語サンプル: `あいうえおかきくけこ` (priorityRules で誤削除しやすい)
-- 方向切替: 下方向ヒント表示 → 上方向ヒント表示 を連続実行し、2 回目の dropped=0 を保証
-- 初回表示: キャッシュ未構築状態から assignHintsToWords を呼ぶパスを経由
-- Why コメント必須: `// Why: dropped=123/133 の再発防止。二重経路統一の契約をテストで固定`
+1. テストケース
+   - **Case A**: 同一 bufnr + changedtick で 2 回 showHints → getline は 1 回のみ発火（2 回目は cache hit）
+   - **Case B**: changedtick が 1→2 に変化 → cache miss で getline 再発行
+   - **Case C**: bufnr が切り替わる → cache miss
+   - **Case D**: hintPatterns=[] のとき getline 呼び出し自体が発生しない（既存挙動）
+   - **Case E**: cached.lines が配列参照同値であること（copy 不要）
+2. denops.call の getline 呼び出し回数をカウント、期待値と一致することを検証
+3. Spy で denops.call（bufnr, getbufvar）の呼び出し履歴を記録して引数アサート
 
 ---
 
-## Red Phase: テスト作成と失敗確認
-
-- [ ] ブリーフィング確認
-- [ ] `tests/hint_overlap_test.ts` に 3 シナリオを追加
-- [ ] Process 1 適用前のコードでは失敗することを確認（参考: git stash で検証）
+## Red Phase
+- [ ] テストケース 5 件作成（上記 A〜E）
+- [ ] `deno test denops/hellshake-yano/neovim/core/__tests__/buffer-cache_test.ts` で全失敗確認
 
 ✅ **Phase Complete**
 
 ---
 
-## Green Phase: 最小実装と成功確認
-
-- [ ] ブリーフィング確認
-- [ ] Process 1 の修正適用状態でテストを実行し全パス
-- [ ] dropped=0 を assertion で固定
+## Green Phase
+- [ ] Process 1 の実装完了後、テストが成功することを確認
 
 ✅ **Phase Complete**
 
 ---
 
-## Refactor Phase: 品質改善
-
-- [ ] PointE1 ログ capture 用ヘルパー `captureDebugLog(level, tag)` を共通化
-- [ ] テストが継続して成功することを確認
+## Refactor Phase
+- [ ] mock 共通化 / テストフィクスチャ整理
+- [ ] カバレッジ確認
 
 ✅ **Phase Complete**
 
 ---
 
 ## Dependencies
-- Requires: 3
-- Blocks: 100
+- Requires: Process 1
+- Blocks: -
