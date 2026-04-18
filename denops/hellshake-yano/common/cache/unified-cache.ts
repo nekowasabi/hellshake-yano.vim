@@ -181,7 +181,10 @@ export class GlobalCache {
         description: "単語検出のキャッシュ",
       },
       [CacheType.LANGUAGE_RULES]: { size: 50, description: "言語ルールのキャッシュ" },
-      [CacheType.SYNTAX_CONTEXT]: { size: 200, description: "シンタックスコンテキストのキャッシュ" },
+      [CacheType.SYNTAX_CONTEXT]: {
+        size: 200,
+        description: "シンタックスコンテキストのキャッシュ",
+      },
       [CacheType.DICTIONARY]: { size: 2000, description: "辞書データのキャッシュ" },
       [CacheType.CHAR_WIDTH]: { size: 500, description: "文字幅計算のキャッシュ" },
       [CacheType.CHAR_TYPE]: { size: 1000, description: "文字種判定のキャッシュ" },

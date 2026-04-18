@@ -61,7 +61,7 @@ import { VimPopupDisplay } from "./vim/display/popup-display.ts";
 import { VimVisual } from "./vim/features/visual.ts";
 
 // Phase 3.1: Motion統合
-import { VimMotionDetector, type KeyRepeatConfig } from "./vim/features/motion.ts";
+import { type KeyRepeatConfig, VimMotionDetector } from "./vim/features/motion.ts";
 
 // 設定関連のエクスポート
 export { getDefaultConfig } from "./config.ts";
@@ -203,7 +203,7 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
     // Phase 3.1: Motion統合 - VimMotionDetector初期化
     const motionDetector = new VimMotionDetector(
       config.motionTimeout ?? 2000,
-      config.motionCount ?? 2
+      config.motionCount ?? 2,
     );
     // Why: setPerKeyMotionCount here instead of passing to constructor
     // — perKeyMotionCount/defaultMotionCount are optional extended config,
@@ -304,6 +304,13 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         clearCaches();
       },
 
+      // Process 2: invalidateBufferCache — TextChanged autocmd からキャッシュ無効化
+      // deno-lint-ignore require-await
+      async invalidateBufferCache(bufnr: unknown): Promise<void> {
+        const core = Core.getInstance(config);
+        core.invalidateBufferCache(typeof bufnr === "number" ? bufnr : undefined);
+      },
+
       // Dictionary管理
       async reloadDictionary(): Promise<void> {
         await reloadDictionary(denops);
@@ -401,7 +408,12 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         }
         try {
           // screenpos()で論理座標を画面座標に変換（Vim popup_create()は画面座標を期待）
-          const screen = await denops.call("screenpos", await denops.call("win_getid"), lnum, col) as { row: number; col: number };
+          const screen = await denops.call(
+            "screenpos",
+            await denops.call("win_getid"),
+            lnum,
+            col,
+          ) as { row: number; col: number };
           if (screen.row === 0 || screen.col === 0) {
             return -1; // 画面外
           }
@@ -412,13 +424,24 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
       },
 
       // displayShowHintWithWindow: 指定ウィンドウにヒント表示
-      async displayShowHintWithWindow(winid: unknown, lnum: unknown, col: unknown, hint: unknown): Promise<number> {
-        if (typeof winid !== "number" || typeof lnum !== "number" || typeof col !== "number" || typeof hint !== "string") {
+      async displayShowHintWithWindow(
+        winid: unknown,
+        lnum: unknown,
+        col: unknown,
+        hint: unknown,
+      ): Promise<number> {
+        if (
+          typeof winid !== "number" || typeof lnum !== "number" || typeof col !== "number" ||
+          typeof hint !== "string"
+        ) {
           return -1;
         }
         try {
           // screenpos()で論理座標を画面座標に変換
-          const screen = await denops.call("screenpos", winid, lnum, col) as { row: number; col: number };
+          const screen = await denops.call("screenpos", winid, lnum, col) as {
+            row: number;
+            col: number;
+          };
           if (screen.row === 0 || screen.col === 0) {
             return -1; // 画面外
           }
@@ -453,7 +476,7 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
       async motionDetect(
         motionKey: unknown,
         count: unknown,
-        keyRepeatConfig: unknown
+        keyRepeatConfig: unknown,
       ): Promise<{
         shouldShowHints: boolean;
         skipReason?: string;
@@ -478,8 +501,8 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
           const resetDelay = typeof cfg.resetDelay === "number"
             ? cfg.resetDelay
             : typeof cfg.reset_delay === "number"
-              ? cfg.reset_delay
-              : 300;
+            ? cfg.reset_delay
+            : 300;
           validConfig = {
             enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : true,
             threshold: typeof cfg.threshold === "number" ? cfg.threshold : 50,
@@ -955,6 +978,13 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         clearCaches();
       },
 
+      // Process 2: invalidateBufferCache — TextChanged autocmd からキャッシュ無効化
+      // deno-lint-ignore require-await
+      async invalidateBufferCache(bufnr: unknown): Promise<void> {
+        const core = Core.getInstance(config);
+        core.invalidateBufferCache(typeof bufnr === "number" ? bufnr : undefined);
+      },
+
       // deno-lint-ignore require-await
       async debug(): Promise<DebugInfo> {
         const core = Core.getInstance(config);
@@ -1301,8 +1331,8 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
           const resetDelay = typeof cfg.resetDelay === "number"
             ? cfg.resetDelay
             : typeof cfg.reset_delay === "number"
-              ? cfg.reset_delay
-              : 300;
+            ? cfg.reset_delay
+            : 300;
           validConfig = {
             enabled: typeof cfg.enabled === "boolean" ? cfg.enabled : true,
             threshold: typeof cfg.threshold === "number" ? cfg.threshold : 50,

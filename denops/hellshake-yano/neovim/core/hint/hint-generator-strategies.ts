@@ -19,7 +19,11 @@ export class SingleCharHintStrategy implements HintGenerationStrategy {
   }
   private getKeys(cfg?: HintKeyConfig): string[] {
     if (!cfg) return "ASDFGHJKLNM0123456789".split("");
-    const sck = Array.isArray(cfg.singleCharKeys) ? cfg.singleCharKeys : typeof cfg.singleCharKeys === 'string' ? (cfg.singleCharKeys as string).split('') : [];
+    const sck = Array.isArray(cfg.singleCharKeys)
+      ? cfg.singleCharKeys
+      : typeof cfg.singleCharKeys === "string"
+      ? (cfg.singleCharKeys as string).split("")
+      : [];
     return sck.length > 0 ? sck : "ASDFGHJKLNM0123456789".split("");
   }
 }
@@ -46,11 +50,15 @@ export class MultiCharHintStrategy implements HintGenerationStrategy {
   }
   private isNumericOnlyKeys(k: string[]): boolean {
     if (!Array.isArray(k) || k.length === 0) return false;
-    return k.every(key => key.length === 1 && key >= "0" && key <= "9");
+    return k.every((key) => key.length === 1 && key >= "0" && key <= "9");
   }
   private getKeys(cfg?: HintKeyConfig): string[] {
     if (!cfg) return "BCEIOPQRTUVWXYZ".split("");
-    const mck = Array.isArray(cfg.multiCharKeys) ? cfg.multiCharKeys : typeof cfg.multiCharKeys === 'string' ? (cfg.multiCharKeys as string).split('') : [];
+    const mck = Array.isArray(cfg.multiCharKeys)
+      ? cfg.multiCharKeys
+      : typeof cfg.multiCharKeys === "string"
+      ? (cfg.multiCharKeys as string).split("")
+      : [];
     return mck.length > 0 ? mck : "BCEIOPQRTUVWXYZ".split("");
   }
 }
@@ -66,7 +74,9 @@ export class NumericHintStrategy implements HintGenerationStrategy {
     if (h.length < mc) h.push("00");
     return h;
   }
-  canHandle(c: number, cfg?: HintKeyConfig): boolean { return c > 0 && cfg?.useNumericMultiCharHints === true; }
+  canHandle(c: number, cfg?: HintKeyConfig): boolean {
+    return c > 0 && cfg?.useNumericMultiCharHints === true;
+  }
 }
 export class HybridHintStrategy implements HintGenerationStrategy {
   readonly name = "Hybrid";
@@ -77,17 +87,30 @@ export class HybridHintStrategy implements HintGenerationStrategy {
   generate(c: number, cfg?: HintKeyConfig): string[] {
     const h: string[] = [];
     let r = c;
-    const hsck = cfg?.singleCharKeys && ((Array.isArray(cfg.singleCharKeys) && cfg.singleCharKeys.length > 0) || (typeof cfg.singleCharKeys === 'string' && (cfg.singleCharKeys as string).length > 0));
-    const hmck = cfg?.multiCharKeys && ((Array.isArray(cfg.multiCharKeys) && cfg.multiCharKeys.length > 0) || (typeof cfg.multiCharKeys === 'string' && (cfg.multiCharKeys as string).length > 0));
+    const hsck = cfg?.singleCharKeys &&
+      ((Array.isArray(cfg.singleCharKeys) && cfg.singleCharKeys.length > 0) ||
+        (typeof cfg.singleCharKeys === "string" && (cfg.singleCharKeys as string).length > 0));
+    const hmck = cfg?.multiCharKeys &&
+      ((Array.isArray(cfg.multiCharKeys) && cfg.multiCharKeys.length > 0) ||
+        (typeof cfg.multiCharKeys === "string" && (cfg.multiCharKeys as string).length > 0));
     if (!hsck && !hmck) {
-      const m = cfg?.markers ? (Array.isArray(cfg.markers) ? cfg.markers : (cfg.markers as string).split("")) : DEFAULT_HINT_MARKERS.split("");
+      const m = cfg?.markers
+        ? (Array.isArray(cfg.markers) ? cfg.markers : (cfg.markers as string).split(""))
+        : DEFAULT_HINT_MARKERS.split("");
       return this.generateFromMarkers(c, m);
     }
     if (hsck) {
-      const sck = Array.isArray(cfg?.singleCharKeys) ? cfg.singleCharKeys : typeof cfg?.singleCharKeys === 'string' ? (cfg.singleCharKeys as string).split('') : [];
+      const sck = Array.isArray(cfg?.singleCharKeys)
+        ? cfg.singleCharKeys
+        : typeof cfg?.singleCharKeys === "string"
+        ? (cfg.singleCharKeys as string).split("")
+        : [];
       const msc = cfg?.maxSingleCharHints ?? sck.length;
       const scc = Math.min(r, msc, sck.length);
-      if (scc > 0) { h.push(...this.singleCharStrategy.generate(scc, cfg)); r -= scc; }
+      if (scc > 0) {
+        h.push(...this.singleCharStrategy.generate(scc, cfg));
+        r -= scc;
+      }
     }
     if (r > 0 && hmck) {
       const mch = this.multiCharStrategy.generate(r, cfg);
@@ -111,16 +134,29 @@ export class HybridHintStrategy implements HintGenerationStrategy {
     }
     return h.slice(0, c);
   }
-  canHandle(c: number, cfg?: HintKeyConfig): boolean { return c > 0; }
+  canHandle(c: number, cfg?: HintKeyConfig): boolean {
+    return c > 0;
+  }
 }
 export class HintGeneratorFactory {
-  private static strategies: HintGenerationStrategy[] = [new HybridHintStrategy(), new SingleCharHintStrategy(), new MultiCharHintStrategy(), new NumericHintStrategy()];
+  private static strategies: HintGenerationStrategy[] = [
+    new HybridHintStrategy(),
+    new SingleCharHintStrategy(),
+    new MultiCharHintStrategy(),
+    new NumericHintStrategy(),
+  ];
   static generate(c: number, cfg?: HintKeyConfig): string[] {
-    if (cfg?.useNumericMultiCharHints && !cfg.singleCharKeys && !cfg.multiCharKeys) return new NumericHintStrategy().generate(c, cfg);
+    if (cfg?.useNumericMultiCharHints && !cfg.singleCharKeys && !cfg.multiCharKeys) {
+      return new NumericHintStrategy().generate(c, cfg);
+    }
     const ss = [...this.strategies].sort((a, b) => b.priority - a.priority);
-    for (const s of ss) { if (s.canHandle(c, cfg)) return s.generate(c, cfg); }
+    for (const s of ss) if (s.canHandle(c, cfg)) return s.generate(c, cfg);
     return new HybridHintStrategy().generate(c, cfg);
   }
-  static registerStrategy(s: HintGenerationStrategy): void { this.strategies.push(s); }
-  static getStrategies(): readonly HintGenerationStrategy[] { return this.strategies; }
+  static registerStrategy(s: HintGenerationStrategy): void {
+    this.strategies.push(s);
+  }
+  static getStrategies(): readonly HintGenerationStrategy[] {
+    return this.strategies;
+  }
 }

@@ -35,7 +35,8 @@ let propTypeRegistered = false;
 const TIMEOUT_DELAY: number = (() => {
   try {
     const isDeno = typeof Deno !== "undefined";
-    const isTest = isDeno && (Deno.env?.get?.("DENO_TEST") === "1" || Deno.args?.includes?.("test"));
+    const isTest = isDeno &&
+      (Deno.env?.get?.("DENO_TEST") === "1" || Deno.args?.includes?.("test"));
     const isCI = isDeno && Deno.env?.get?.("CI") === "true";
     if (isCI) return 30;
     if (isTest) return 20;
@@ -288,7 +289,9 @@ async function processMatchaddBatched(
               highlight: highlightGroup,
             });
             propTypeRegistered = true;
-          } catch { propTypeRegistered = true; /* already registered */ }
+          } catch {
+            propTypeRegistered = true; /* already registered */
+          }
         }
         if (propTypeRegistered) {
           await denops.call("prop_add", p.line, p.col, {
@@ -540,8 +543,9 @@ export async function clearHintsMultiBuffer(
     // Step 1: bufexists を一括チェック
     let existResults: number[];
     try {
-      existResults = await batchGet(denops, (helper) =>
-        buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>)
+      existResults = await batchGet(
+        denops,
+        (helper) => buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>),
       ) as number[];
     } catch (error) {
       console.error("[hellshake-yano] Failed to batch check bufexists:", error);
@@ -553,13 +557,15 @@ export async function clearHintsMultiBuffer(
     // Step 2: 存在するバッファだけ clear_namespace を一括実行
     const clearCalls = buffers
       .filter((_, i) => existResults[i])
-      .map((bufnr) => [
-        "nvim_buf_clear_namespace",
-        bufnr,
-        extmarkNamespace,
-        0,
-        -1,
-      ] as [string, ...unknown[]]);
+      .map((bufnr) =>
+        [
+          "nvim_buf_clear_namespace",
+          bufnr,
+          extmarkNamespace,
+          0,
+          -1,
+        ] as [string, ...unknown[]]
+      );
 
     if (clearCalls.length > 0) {
       try {
@@ -592,8 +598,9 @@ export async function clearHintsForBuffers(
   // 制約 C2: callAtomic は途中停止するため batchGet で存在確認してからフィルタする。
   let existResults: number[];
   try {
-    existResults = await batchGet(denops, (helper) =>
-      buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>)
+    existResults = await batchGet(
+      denops,
+      (helper) => buffers.map((bufnr) => helper.call("bufexists", bufnr) as Promise<number>),
     ) as number[];
   } catch (error) {
     console.error("[hellshake-yano] Failed to batch check bufexists:", error);
@@ -602,13 +609,15 @@ export async function clearHintsForBuffers(
 
   const clearCalls = buffers
     .filter((_, i) => existResults[i])
-    .map((bufnr) => [
-      "nvim_buf_clear_namespace",
-      bufnr,
-      extmarkNamespace,
-      0,
-      -1,
-    ] as [string, ...unknown[]]);
+    .map((bufnr) =>
+      [
+        "nvim_buf_clear_namespace",
+        bufnr,
+        extmarkNamespace,
+        0,
+        -1,
+      ] as [string, ...unknown[]]
+    );
 
   if (clearCalls.length > 0) {
     try {
@@ -702,10 +711,11 @@ export async function displayHintsAutoMultiBuffer(
   if (hasMultiBuffer && denops.meta.host === "nvim" && extmarkNamespace !== undefined) {
     // Use multi-buffer display
     // Why: batchGet instead of two sequential denops.call — reduces IPC round-trips from 2 to 1
-    const [cp, currentWinId] = await batchGet(denops, (helper) => [
-      helper.call("getpos", ".") as Promise<[number, number, number, number]>,
-      helper.call("win_getid") as Promise<number>,
-    ] as const);
+    const [cp, currentWinId] = await batchGet(denops, (helper) =>
+      [
+        helper.call("getpos", ".") as Promise<[number, number, number, number]>,
+        helper.call("win_getid") as Promise<number>,
+      ] as const);
     const cl = cp[1], cc = cp[2];
 
     let ah = hints;
@@ -714,7 +724,7 @@ export async function displayHintsAutoMultiBuffer(
     }
 
     // Apply distance penalty for non-current windows
-    const adjustedWords = words.map(w => ({
+    const adjustedWords = words.map((w) => ({
       ...w,
       line: w.winid !== currentWinId ? w.line + MULTI_WINDOW_LINE_OFFSET : w.line,
       originalLine: w.line,
@@ -727,12 +737,12 @@ export async function displayHintsAutoMultiBuffer(
     }, OVERLAP_SKIP_OPTS);
 
     // Restore original line values to prevent hint spacing issues
-    const restoredHints = nh.map(h => ({
+    const restoredHints = nh.map((h) => ({
       ...h,
       word: {
         ...h.word,
         line: h.word.originalLine ?? h.word.line,
-      }
+      },
     }));
 
     if (currentHints) {

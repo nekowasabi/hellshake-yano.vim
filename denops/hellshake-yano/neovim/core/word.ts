@@ -9,14 +9,17 @@ import type { Config } from "../../types.ts";
 import { DEFAULT_CONFIG as DEFAULT_UNIFIED_CONFIG } from "../../config.ts";
 import { resolveConfigType } from "../../common/utils/config.ts";
 import { batchGet } from "../../common/utils/batch.ts";
-import type {
-  DetectionContext,
-  Word,
-  WordDetectionResult,
-} from "../../types.ts";
+import type { DetectionContext, Word, WordDetectionResult } from "../../types.ts";
 import { asByteCol, asOneLine } from "../../types.ts";
-import type { WordDetectionConfig as ImportedWordDetectionConfig, WordDetector as ImportedWordDetector } from "./word/word-detector-strategies.ts";
-import { RegexWordDetector as ImportedRegexWordDetector, TinySegmenterWordDetector as ImportedTinySegmenterWordDetector, HybridWordDetector as ImportedHybridWordDetector } from "./word/word-detector-strategies.ts";
+import type {
+  WordDetectionConfig as ImportedWordDetectionConfig,
+  WordDetector as ImportedWordDetector,
+} from "./word/word-detector-strategies.ts";
+import {
+  HybridWordDetector as ImportedHybridWordDetector,
+  RegexWordDetector as ImportedRegexWordDetector,
+  TinySegmenterWordDetector as ImportedTinySegmenterWordDetector,
+} from "./word/word-detector-strategies.ts";
 export interface EnhancedWordConfig extends WordDetectionManagerConfig {
   strategy?: "regex" | "tinysegmenter" | "hybrid";
   perKeyMinLength?: Record<string, number>;
@@ -36,38 +39,34 @@ const wordDetectionCache = GlobalCache.getInstance().getCache<string, Word[]>(
   CacheType.WORD_DETECTION,
 );
 export {
-  CharType,
   type AdjacentAnalysis,
-  getCharType,
   analyzeString,
-  findBoundaries,
-  shouldMerge,
+  CharType,
   clearCharTypeCache,
-  isHiragana,
-  isKatakana,
-  isKanji,
-  isAlphanumeric,
-  isSymbol,
-  isSpace,
   containsJapanese,
+  findBoundaries,
+  getCharType,
   isAllJapanese,
+  isAlphanumeric,
+  isHiragana,
+  isKanji,
+  isKatakana,
+  isSpace,
+  isSymbol,
+  shouldMerge,
 } from "./word/word-char-utils.ts";
+export { type SegmentationResult, TinySegmenter, tinysegmenter } from "./word/word-segmenter.ts";
 export {
-  TinySegmenter,
-  tinysegmenter,
-  type SegmentationResult,
-} from "./word/word-segmenter.ts";
-export {
-  type WordDetector,
-  type WordDetectionConfig,
+  HybridWordDetector,
   RegexWordDetector,
   TinySegmenterWordDetector,
-  HybridWordDetector,
+  type WordDetectionConfig,
+  type WordDetector,
 } from "./word/word-detector-strategies.ts";
 export {
-  type KeyBasedWordCacheStats,
-  KeyBasedWordCache,
   globalWordCache,
+  KeyBasedWordCache,
+  type KeyBasedWordCacheStats,
 } from "./word/word-cache.ts";
 /**
  * foldされている行番号のSetを取得
@@ -88,7 +87,7 @@ async function getFoldedLines(
     // Single IPC round-trip: get all lines where foldclosed(v:val) == v:val
     // (i.e., lines that are the first line of a closed fold)
     const foldStarts = await denops.eval(
-      `filter(range(${topLine}, ${bottomLine}), 'foldclosed(v:val) == v:val')`
+      `filter(range(${topLine}, ${bottomLine}), 'foldclosed(v:val) == v:val')`,
     ) as number[];
 
     for (const foldStart of foldStarts) {
@@ -115,15 +114,11 @@ async function getFoldedLines(
   return foldedLines;
 }
 
-/**
- */
-/**
- */
-/**
- */
+/** */
+/** */
+/** */
 export function detectWords(denops: Denops, config?: Partial<Config>): Promise<Word[]>;
-/**
- */
+/** */
 export async function detectWords(
   denops: Denops,
   config?: Partial<Config>,
@@ -168,7 +163,7 @@ export async function detectWords(
 
   // foldされた行の単語を除外
   const foldedLines = await getFoldedLines(denops, topLine, bottomLine);
-  const visibleWords = filteredWords.filter(word => !foldedLines.has(word.line));
+  const visibleWords = filteredWords.filter((word) => !foldedLines.has(word.line));
 
   return visibleWords;
 }
@@ -213,12 +208,12 @@ export function createCacheKey(
   // 取得失敗時にフォールバックしても同一バッファ内でキーが安定する
   changedtick: number = 0,
 ): string {
-  const keyContext = config.currentKeyContext || 'default';
+  const keyContext = config.currentKeyContext || "default";
   const minLength = context?.minWordLength ??
-                   (config.perKeyMinLength?.[keyContext]) ??
-                   config.defaultMinWordLength ??
-                   config.minWordLength ??
-                   3;
+    (config.perKeyMinLength?.[keyContext]) ??
+    config.defaultMinWordLength ??
+    config.minWordLength ??
+    3;
 
   // Include Japanese-specific settings to ensure cache invalidation on config change
   // Note: property names are now properly camelCase
@@ -228,7 +223,9 @@ export function createCacheKey(
 
   // Why: `:tick${changedtick}` をキー末尾に追加 — b:changedtick はバッファ変更ごとに
   // インクリメントされるため、バッファ内容変更後の誤キャッシュヒットを防止できる
-  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${config.useJapanese ?? true}:jp${japaneseMinLength}:seg${segmenterThreshold}:merge${japaneseMergeThreshold}:tick${changedtick}`;
+  return `detectWords:${bufnr}:${topLine}-${bottomLine}:${keyContext}:${minLength}:${
+    config.useJapanese ?? true
+  }:jp${japaneseMinLength}:seg${segmenterThreshold}:merge${japaneseMergeThreshold}:tick${changedtick}`;
 }
 
 export async function detectWordsWithManager(
@@ -243,12 +240,13 @@ export async function detectWordsWithManager(
   // カレントバッファを意味する 0 を使用。collect の制約 C1 により await 不可。
   const [bufnr, topLine, bottomLine, changedtick] = await batchGet(
     denops,
-    (helper) => [
-      helper.call("bufnr", "%"),
-      helper.call("line", "w0"),
-      helper.call("line", "w$"),
-      helper.call("nvim_buf_get_changedtick", 0),
-    ] as const,
+    (helper) =>
+      [
+        helper.call("bufnr", "%"),
+        helper.call("line", "w0"),
+        helper.call("line", "w$"),
+        helper.call("nvim_buf_get_changedtick", 0),
+      ] as const,
   ) as [number, number, number, number];
 
   // キャッシュキーを生成
@@ -339,7 +337,7 @@ function deriveContextFromConfig(config: EnhancedWordConfig): DetectionContext |
   return derived;
 }
 /**
- * @returns 
+ * @returns
  */
 export async function detectWordsWithConfig(
   denops: Denops,
@@ -361,12 +359,11 @@ export async function detectWordsWithConfig(
 
   // foldされた行の単語を除外
   const foldedLines = await getFoldedLines(denops, topLine, bottomLine);
-  const visibleWords = result.words.filter(word => !foldedLines.has(word.line));
+  const visibleWords = result.words.filter((word) => !foldedLines.has(word.line));
 
   return visibleWords;
 }
-/**
- */
+/** */
 function splitJapaneseTextImproved(
   text: string,
   baseIndex: number,
@@ -413,7 +410,7 @@ function splitJapaneseTextImproved(
 }
 /**
  * @param char
- * @returns 
+ * @returns
  */
 function isWideCharacter(char: string): boolean {
   const code = char.charCodeAt(0);
@@ -444,7 +441,7 @@ function isWideCharacter(char: string): boolean {
 /**
  * @param charIndex
  * @param tabWidth
- * @returns 
+ * @returns
  */
 function getDisplayColumn(text: string, charIndex: number, tabWidth = 8): number {
   let displayCol = 0;
@@ -459,8 +456,7 @@ function getDisplayColumn(text: string, charIndex: number, tabWidth = 8): number
   }
   return displayCol;
 }
-/**
- */
+/** */
 export async function detectWordsInRange(
   denops: Denops,
   startLine: number,
@@ -474,7 +470,12 @@ export async function detectWordsInRange(
     const actualStartLine = Math.max(1, startLine);
 
     // Single IPC round-trip: fetch all lines at once instead of per-line getline calls
-    const allLines = await denops.call("getbufline", "%", actualStartLine, actualEndLine) as string[];
+    const allLines = await denops.call(
+      "getbufline",
+      "%",
+      actualStartLine,
+      actualEndLine,
+    ) as string[];
 
     for (let i = 0; i < allLines.length; i++) {
       if (words.length >= effectiveMaxWords) {
@@ -491,8 +492,7 @@ export async function detectWordsInRange(
     return [];
   }
 }
-/**
- */
+/** */
 export function clearWordDetectionCache(): void {
   wordDetectionCache.clear();
 }
@@ -515,7 +515,7 @@ export function clearAllWordCaches(): void {
 }
 
 /**
- * @returns 
+ * @returns
  */
 export function getWordDetectionCacheStats(): {
   /** キャッシュサイズ */
@@ -537,35 +537,33 @@ export function getWordDetectionCacheStats(): {
     maxWordsPerFile: MAX_WORDS_PER_FILE,
   };
 }
-/**
- */
-/**
- */
+/** */
+/** */
 export function convertWordConfigToEnhanced(config: Config): EnhancedWordConfig {
-  const useJapanese = 'useJapanese' in config ? config.useJapanese : false;
-  return {useJapanese: useJapanese ?? false,
+  const useJapanese = "useJapanese" in config ? config.useJapanese : false;
+  return {
+    useJapanese: useJapanese ?? false,
     strategy: "regex", // デフォルト戦略
     enableTinySegmenter: useJapanese === true,
   };
 }
-/**
- */
+/** */
 export function createPartialConfig(options: { useJapanese?: boolean }): Config {
   return {
     enabled: true,
-    markers: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'],
+    markers: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
     motionCount: 3,
     motionTimeout: 1000,
     hintPosition: "start",
     triggerOnHjkl: true,
-    countedMotions: ['h', 'j', 'k', 'l'],
+    countedMotions: ["h", "j", "k", "l"],
     maxHints: 50,
     debounceDelay: 100,
     useNumbers: false,
     highlightSelected: true,
     debugCoordinates: false,
-    singleCharKeys: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'],
-    multiCharKeys: ['a', 'b', 'c', 'd', 'e', 'f'],
+    singleCharKeys: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+    multiCharKeys: ["a", "b", "c", "d", "e", "f"],
     useHintGroups: false,
     highlightHintMarker: "HellshakeYanoMarker",
     highlightHintMarkerCurrent: "HellshakeYanoMarkerCurrent",
@@ -584,8 +582,7 @@ export function createPartialConfig(options: { useJapanese?: boolean }): Config 
     performanceLog: false,
   } as Config;
 }
-/**
- */
+/** */
 export async function detectWordsWithEnhancedConfig(
   denops: Denops,
   config: EnhancedWordConfig = {},
@@ -600,8 +597,7 @@ export async function detectWordsWithEnhancedConfig(
     return await detectWordsWithConfig(denops, legacyConfig);
   }
 }
-/**
- */
+/** */
 export interface ExtractWordsOptions {
   useImprovedDetection?: boolean;
   excludeJapanese?: boolean;
@@ -617,7 +613,7 @@ export interface ExtractWordsOptions {
 }
 /**
  * @param lineText
- * @returns 
+ * @returns
  */
 export function extractWords(
   lineText: string,
@@ -628,7 +624,8 @@ export function extractWords(
   const normalizedConfig = normalizeConfig(options);
   const excludeJapanese = normalizedConfig.excludeJapanese;
   // Bug 4 fix: Use config.defaultMinWordLength instead of hardcoded value
-  const minWordLength = normalizedConfig.minWordLength ?? normalizedConfig.defaultMinWordLength ?? 3;
+  const minWordLength = normalizedConfig.minWordLength ?? normalizedConfig.defaultMinWordLength ??
+    3;
   if (normalizedConfig.legacyMode || !normalizedConfig.useImprovedDetection) {
     if (!lineText || lineText.trim().length < 2) {
       return words;
@@ -762,8 +759,7 @@ export function extractWords(
   }
   return words;
 }
-/**
- */
+/** */
 interface NormalizedConfig {
   useImprovedDetection: boolean;
   excludeJapanese: boolean;
@@ -822,17 +818,14 @@ function normalizeConfig(config: ExtractWordsOptions): NormalizedConfig {
     useWordConfig,
   };
 }
-/**
- */
-/**
- */
+/** */
+/** */
 const sharedTextEncoder = new TextEncoder();
-/**
- */
+/** */
 const byteLengthCache = GlobalCache.getInstance().getCache<string, number>(CacheType.BYTE_LENGTH);
 /**
  * @param text
- * @returns 
+ * @returns
  */
 export function getByteLength(text: string): number {
   if (text.length === 0) {
@@ -857,7 +850,7 @@ export function getByteLength(text: string): number {
   return length;
 }
 /**
- * @returns 
+ * @returns
  */
 export function clearByteLengthCache(): void {
   byteLengthCache.clear();
@@ -865,7 +858,7 @@ export function clearByteLengthCache(): void {
 /**
  * @param text
  * @param charIndex
- * @returns 
+ * @returns
  */
 export function charIndexToByteIndex(text: string, charIndex: number): number {
   if (charIndex <= 0) return 0;
@@ -877,7 +870,7 @@ export function charIndexToByteIndex(text: string, charIndex: number): number {
 /**
  * @param text
  * @param byteIndex
- * @returns 
+ * @returns
  */
 export function byteIndexToCharIndex(text: string, byteIndex: number): number {
   if (byteIndex <= 0) return 0;
@@ -909,7 +902,7 @@ export function hasMultibyteCharacters(text: string): boolean {
 }
 /**
  * @param text
- * @returns 
+ * @returns
  */
 export function getEncodingInfo(text: string): {
   charLength: number;
@@ -941,12 +934,9 @@ export function getEncodingInfo(text: string): {
     charToByteMap,
   };
 }
-/**
- */
-/**
- */
-/**
- */
+/** */
+/** */
+/** */
 interface SegmentationResult {
   /** 分割されたセグメント（単語）の配列 */
   segments: string[];
@@ -957,10 +947,8 @@ interface SegmentationResult {
   /** セグメンテーションのソース */
   source: "tinysegmenter" | "fallback";
 }
-/**
- */
-/**
- */
+/** */
+/** */
 export interface DictionaryConfig {
   /** 辞書ファイルのパス */
   dictionaryPath?: string;
@@ -975,8 +963,7 @@ export interface DictionaryConfig {
   /** キャッシュサイズ */
   cacheSize?: number;
 }
-/**
- */
+/** */
 export interface CompoundMatch {
   /** マッチした文字列 */
   match: string;
@@ -985,8 +972,7 @@ export interface CompoundMatch {
   /** 終了位置 */
   endIndex: number;
 }
-/**
- */
+/** */
 export interface CacheStats {
   /** ヒット数 */
   hits: number;
@@ -995,8 +981,7 @@ export interface CacheStats {
   /** ヒット率 */
   hitRate: number;
 }
-/**
- */
+/** */
 export interface WordDictionary {
   /** カスタム単語のセット */
   customWords: Set<string>;
@@ -1031,8 +1016,7 @@ export interface WordDictionary {
   /** キャッシュ統計を取得 */
   getCacheStats(): CacheStats | null;
 }
-/**
- */
+/** */
 export interface UserDictionary {
   customWords: string[];
   preserveWords: string[];
@@ -1045,50 +1029,66 @@ export interface UserDictionary {
     description?: string;
   };
 }
-/**
- */
+/** */
 export interface HintPattern {
   pattern: string | RegExp;
   hintPosition: HintPositionRule;
   priority: number;
   description?: string;
+  // Why: compiled ではなく pattern.pattern を参照する設計も検討したが、
+  //   hot path (applyHintPatterns) で毎回 new RegExp(pattern, 'gm') するコストを
+  //   辞書ロード時の1回に抑えるため、事前コンパイル済み RegExp を保持する。
+  //   enumerable: false で JSON.stringify 時に除外されるよう設計。
+  compiled?: RegExp;
 }
 /**
+ * Set compiled RegExp on a HintPattern with enumerable:false so JSON.stringify excludes it.
  */
-export type HintPositionRule =
-  | 'capture:1' | 'capture:2' | 'capture:3'
-  | 'start' | 'end'
-  | { offset: number; from: 'start' | 'end' };
-/**
- */
-export type MergeStrategy = 'always' | 'never' | 'context';
-/**
- */
+function setCompiledRegExp(hp: HintPattern, regex: RegExp): void {
+  Object.defineProperty(hp, "compiled", {
+    value: regex,
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+}
+/** */
+export type HintPositionRule = "capture:1" | "capture:2" | "capture:3" | "start" | "end" | {
+  offset: number;
+  from: "start" | "end";
+};
+/** */
+export type MergeStrategy = "always" | "never" | "context";
+/** */
 export interface DictionaryLoaderConfig {
   dictionaryPath?: string;
   projectDictionaryPath?: string;
   useBuiltinDict?: boolean;
-  mergingStrategy?: 'override' | 'merge';
+  mergingStrategy?: "override" | "merge";
   autoReload?: boolean;
 }
-/**
- */
+/** */
 export class DictionaryLoader {
   private readonly searchPaths = [
-    '.hellshake-yano/dictionary.json',
-    'hellshake-yano.dict.json',
-    '~/.config/hellshake-yano/dictionary.json'
+    ".hellshake-yano/dictionary.json",
+    "hellshake-yano.dict.json",
+    "~/.config/hellshake-yano/dictionary.json",
   ];
 
   constructor(private config: DictionaryLoaderConfig = {}) {}
 
-  /**
-   */
+  /** */
   async loadUserDictionary(config?: DictionaryLoaderConfig): Promise<UserDictionary> {
     const resolvedConfig = { ...this.config, ...config };
     if (getDebugMode()) {
       try {
-        logMessage("DEBUG", "HINT-DEBUG", `[PointA0/loadEnter] dictionaryPath=${resolvedConfig.dictionaryPath ?? "(undefined)"} searchPathsCount=${this.searchPaths.length}`);
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          `[PointA0/loadEnter] dictionaryPath=${
+            resolvedConfig.dictionaryPath ?? "(undefined)"
+          } searchPathsCount=${this.searchPaths.length}`,
+        );
       } catch { /* ignore log error */ }
     }
     for (const searchPath of this.searchPaths) {
@@ -1107,36 +1107,49 @@ export class DictionaryLoader {
         // Why: resolvePath を経由して ~ を展開する。dictionaryPath 経路だけ展開を忘れていた非対称バグの修正。
         const resolvedDictPath = this.resolvePath(resolvedConfig.dictionaryPath);
         if (getDebugMode()) {
-          try { logMessage("DEBUG", "HINT-DEBUG", `[PointA1/dictPathTry] path=${resolvedDictPath}`); } catch {}
+          try {
+            logMessage("DEBUG", "HINT-DEBUG", `[PointA1/dictPathTry] path=${resolvedDictPath}`);
+          } catch {}
         }
         const content = await Deno.readTextFile(resolvedDictPath);
         if (getDebugMode()) {
-          try { logMessage("DEBUG", "HINT-DEBUG", `[PointA1b/fileRead] contentLen=${content.length} head=${JSON.stringify(content.slice(0, 60))}`); } catch {}
+          try {
+            logMessage(
+              "DEBUG",
+              "HINT-DEBUG",
+              `[PointA1b/fileRead] contentLen=${content.length} head=${
+                JSON.stringify(content.slice(0, 60))
+              }`,
+            );
+          } catch {}
         }
         return await this.parseDictionaryContent(content, resolvedDictPath);
       } catch (err) {
         if (getDebugMode()) {
           try {
             const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-            logMessage("ERROR", "HINT-DEBUG", `[PointA1/dictPathCatch] path=${resolvedConfig.dictionaryPath} error=${msg}`);
+            logMessage(
+              "ERROR",
+              "HINT-DEBUG",
+              `[PointA1/dictPathCatch] path=${resolvedConfig.dictionaryPath} error=${msg}`,
+            );
           } catch {}
         }
       }
     }
     return this.createEmptyDictionary();
   }
-  /**
-   */
+  /** */
   private async parseDictionaryContent(content: string, filepath: string): Promise<UserDictionary> {
     const ext = this.getFileExtension(filepath);
 
     switch (ext) {
-      case '.json':
+      case ".json":
         return this.parseJsonDictionary(content);
-      case '.yaml':
-      case '.yml':
+      case ".yaml":
+      case ".yml":
         return this.parseYamlDictionary(content);
-      case '.txt':
+      case ".txt":
         return this.parseTextDictionary(content);
       default:
         try {
@@ -1146,53 +1159,74 @@ export class DictionaryLoader {
         }
     }
   }
-  /**
-   */
+  /** */
   private parseJsonDictionary(content: string): UserDictionary {
     const data = JSON.parse(content);
     return this.convertToUserDictionary(data);
   }
-  /**
-   */
+  /** */
   private parseYamlDictionary(content: string): UserDictionary {
     if (getDebugMode()) {
-      try { logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlEnter] contentLen=${content.length}`); } catch {}
+      try {
+        logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlEnter] contentLen=${content.length}`);
+      } catch {}
     }
     const data = parseYaml(content) as unknown;
     if (getDebugMode()) {
       try {
         const t = typeof data;
-        const keys = (t === 'object' && data !== null) ? Object.keys(data as Record<string, unknown>) : [];
-        const hintArr = (t === 'object' && data !== null) ? (data as Record<string, unknown>).hintPatterns : undefined;
-        const hintInfo = Array.isArray(hintArr) ? `array(len=${hintArr.length})` : `notArray(${typeof hintArr})`;
-        logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlParsed] type=${t} keys=${JSON.stringify(keys)} hintPatterns=${hintInfo}`);
+        const keys = (t === "object" && data !== null)
+          ? Object.keys(data as Record<string, unknown>)
+          : [];
+        const hintArr = (t === "object" && data !== null)
+          ? (data as Record<string, unknown>).hintPatterns
+          : undefined;
+        const hintInfo = Array.isArray(hintArr)
+          ? `array(len=${hintArr.length})`
+          : `notArray(${typeof hintArr})`;
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          `[PointA2/yamlParsed] type=${t} keys=${JSON.stringify(keys)} hintPatterns=${hintInfo}`,
+        );
       } catch (e) {
-        logMessage("DEBUG", "HINT-DEBUG", `[PointA2/yamlParsed] log failure: ${e instanceof Error ? e.message : String(e)}`);
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          `[PointA2/yamlParsed] log failure: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
     return this.convertToUserDictionary(data);
   }
-  /**
-   */
+  /** */
   private parseTextDictionary(content: string): UserDictionary {
-    const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+    const lines = content.split("\n").map((line) => line.trim()).filter((line) =>
+      line && !line.startsWith("#")
+    );
     const dictionary = this.createEmptyDictionary();
 
     for (const line of lines) {
-      if (line.startsWith('!')) {
+      if (line.startsWith("!")) {
         dictionary.preserveWords.push(line.slice(1));
-      } else if (line.includes('=')) {
-        const [key, value] = line.split('=', 2);
+      } else if (line.includes("=")) {
+        const [key, value] = line.split("=", 2);
         dictionary.mergeRules.set(key.trim(), value.trim() as MergeStrategy);
-      } else if (line.startsWith('@')) {
-        const [priority, pattern, position] = line.slice(1).split(':', 3);
+      } else if (line.startsWith("@")) {
+        const [priority, pattern, position] = line.slice(1).split(":", 3);
         if (priority && pattern && position) {
           dictionary.hintPatterns = dictionary.hintPatterns || [];
-          dictionary.hintPatterns.push({
+          let compiled: RegExp | undefined;
+          try {
+            compiled = new RegExp(pattern, "gm");
+          } catch { /* skip invalid pattern */ }
+          const hp: HintPattern = {
             pattern: new RegExp(pattern),
             hintPosition: position as HintPositionRule,
             priority: parseInt(priority, 10) || 0,
-          });
+          };
+          if (compiled) setCompiledRegExp(hp, compiled);
+          dictionary.hintPatterns.push(hp);
         }
       } else {
         dictionary.customWords.push(line);
@@ -1201,46 +1235,69 @@ export class DictionaryLoader {
     return dictionary;
   }
   /**
- * @param data
- * @returns 
+   * @param data
+   * @returns
    */
   private convertToUserDictionary(data: unknown): UserDictionary {
     const dictionary = this.createEmptyDictionary();
-    if (typeof data !== 'object' || data === null) {
+    if (typeof data !== "object" || data === null) {
       return dictionary;
     }
     const dataObj = data as Record<string, unknown>;
     if (dataObj.customWords && Array.isArray(dataObj.customWords)) {
-      dictionary.customWords = dataObj.customWords.filter((item): item is string => typeof item === 'string');
+      dictionary.customWords = dataObj.customWords.filter((item): item is string =>
+        typeof item === "string"
+      );
     }
     if (dataObj.preserveWords && Array.isArray(dataObj.preserveWords)) {
-      dictionary.preserveWords = dataObj.preserveWords.filter((item): item is string => typeof item === 'string');
+      dictionary.preserveWords = dataObj.preserveWords.filter((item): item is string =>
+        typeof item === "string"
+      );
     }
-    if (dataObj.mergeRules && typeof dataObj.mergeRules === 'object' && dataObj.mergeRules !== null) {
+    if (
+      dataObj.mergeRules && typeof dataObj.mergeRules === "object" && dataObj.mergeRules !== null
+    ) {
       dictionary.mergeRules = new Map(Object.entries(dataObj.mergeRules));
     }
     if (dataObj.compoundPatterns && Array.isArray(dataObj.compoundPatterns)) {
       dictionary.compoundPatterns = dataObj.compoundPatterns
-        .filter((item): item is string => typeof item === 'string')
-        .map((pattern: string) => new RegExp(pattern, 'g'));
+        .filter((item): item is string => typeof item === "string")
+        .map((pattern: string) => new RegExp(pattern, "g"));
     }
     if (dataObj.hintPatterns && Array.isArray(dataObj.hintPatterns)) {
       dictionary.hintPatterns = dataObj.hintPatterns
-        .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+        .filter((item): item is Record<string, unknown> =>
+          typeof item === "object" && item !== null
+        )
         .map((pattern: Record<string, unknown>) => {
           // Why: hintPosition 未指定で captureGroup のみ指定ではなく、hintPosition 優先＋captureGroup fallback を採用。理由: YAML サンプルは captureGroup 数値形式で記述されているが従来は読み捨てていた。既存の hintPosition: "capture:N" ユーザーとの後方互換を保ちつつ、数値指定時のみ "capture:${n}" 文字列に変換する。
-          const resolvedHintPosition: HintPositionRule =
-            typeof pattern.hintPosition === 'string'
-              ? pattern.hintPosition as HintPositionRule
-              : typeof pattern.captureGroup === 'number'
-                ? (`capture:${pattern.captureGroup}` as HintPositionRule)
-                : (undefined as unknown as HintPositionRule);
-          return {
-            pattern: typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern) : pattern.pattern as RegExp,
+          const resolvedHintPosition: HintPositionRule = typeof pattern.hintPosition === "string"
+            ? pattern.hintPosition as HintPositionRule
+            : typeof pattern.captureGroup === "number"
+            ? (`capture:${pattern.captureGroup}` as HintPositionRule)
+            : (undefined as unknown as HintPositionRule);
+          const patternSrc = typeof pattern.pattern === "string"
+            ? pattern.pattern
+            : pattern.pattern as RegExp;
+          // Why: ロード時に 'gm' フラグ付きで事前コンパイル。理由: applyHintPatterns の hot path で毎回 new RegExp するコストを削減。
+          //   コンパイル失敗時は compiled を undefined にし、applyHintPatterns 側でフォールバックする。
+          let compiled: RegExp | undefined;
+          try {
+            compiled = new RegExp(
+              typeof patternSrc === "string" ? patternSrc : patternSrc.source,
+              "gm",
+            );
+          } catch {
+            // Why: 不正パターンの RegExp 生成失敗はスキップ。理由: 既存のフォールバック挙動と整合させるため。
+          }
+          const hp: HintPattern = {
+            pattern: patternSrc,
             hintPosition: resolvedHintPosition,
-            priority: typeof pattern.priority === 'number' ? pattern.priority : 0,
-            description: typeof pattern.description === 'string' ? pattern.description : undefined,
+            priority: typeof pattern.priority === "number" ? pattern.priority : 0,
+            description: typeof pattern.description === "string" ? pattern.description : undefined,
           };
+          if (compiled) setCompiledRegExp(hp, compiled);
+          return hp;
         });
       // [DEBUG-METRIC] Point B: convertToUserDictionary の hintPatterns 変換完了直後
       // Why: YAML/JSON から RegExp/hintPosition/priority への変換結果が正しいかを検証するため。
@@ -1252,19 +1309,26 @@ export class DictionaryLoader {
             hintPosition: p.hintPosition,
             priority: p.priority,
           }));
-          logMessage("DEBUG", "HINT-DEBUG", `[PointB/convert] count=${dump.length} patterns=${JSON.stringify(dump)}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointB/convert] count=${dump.length} patterns=${JSON.stringify(dump)}`,
+          );
         } catch (e) {
-          logMessage("DEBUG", "HINT-DEBUG", `[PointB/convert] log failure: ${e instanceof Error ? e.message : String(e)}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointB/convert] log failure: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }
-    if (dataObj.metadata && typeof dataObj.metadata === 'object' && dataObj.metadata !== null) {
-      dictionary.metadata = dataObj.metadata as UserDictionary['metadata'];
+    if (dataObj.metadata && typeof dataObj.metadata === "object" && dataObj.metadata !== null) {
+      dictionary.metadata = dataObj.metadata as UserDictionary["metadata"];
     }
     return dictionary;
   }
-  /**
-   */
+  /** */
   private createEmptyDictionary(): UserDictionary {
     return {
       customWords: [],
@@ -1275,26 +1339,22 @@ export class DictionaryLoader {
       metadata: {},
     };
   }
-  /**
-   */
+  /** */
   private resolvePath(path: string): string {
-    if (path.startsWith('~')) {
-      const home = Deno.env.get('HOME') || Deno.env.get('USERPROFILE') || '/tmp';
+    if (path.startsWith("~")) {
+      const home = Deno.env.get("HOME") || Deno.env.get("USERPROFILE") || "/tmp";
       return resolve(home, path.slice(2));
     }
     return resolve(path);
   }
-  /**
-   */
+  /** */
   private getFileExtension(filepath: string): string {
-    const ext = filepath.toLowerCase().split('.').pop();
-    return ext ? `.${ext}` : '';
+    const ext = filepath.toLowerCase().split(".").pop();
+    return ext ? `.${ext}` : "";
   }
 }
-/**
- */
-/**
- */
+/** */
+/** */
 export class VimConfigBridge {
   /**
    * Get dictionary configuration from Vim variables
@@ -1315,7 +1375,7 @@ export class VimConfigBridge {
 
       if (hasNewConfig) {
         // New format exists - try to read from it first
-        const newConfig = await denops.eval('g:hellshake_yano') as Record<string, unknown>;
+        const newConfig = await denops.eval("g:hellshake_yano") as Record<string, unknown>;
 
         // dictionaryPath: try new format first, then legacy
         config.dictionaryPath = (newConfig?.dictionaryPath as string) ||
@@ -1328,8 +1388,10 @@ export class VimConfigBridge {
           : await denops.eval('get(g:, "hellshake_yano_use_builtin_dict", 1)') as boolean;
 
         // mergingStrategy: try new format first, then legacy, default to 'merge'
-        config.mergingStrategy = (newConfig?.dictionaryMerge as 'override' | 'merge') ||
-          await denops.eval('get(g:, "hellshake_yano_dictionary_merge", "merge")') as 'override' | 'merge';
+        config.mergingStrategy = (newConfig?.dictionaryMerge as "override" | "merge") ||
+          await denops.eval('get(g:, "hellshake_yano_dictionary_merge", "merge")') as
+            | "override"
+            | "merge";
 
         // autoReload: try new format first, then legacy, default to false
         config.autoReload = (newConfig?.autoReload !== undefined)
@@ -1337,10 +1399,17 @@ export class VimConfigBridge {
           : await denops.eval('get(g:, "hellshake_yano_auto_reload_dict", 0)') as boolean;
       } else {
         // New format doesn't exist - read legacy format directly
-        config.dictionaryPath = await denops.eval('get(g:, "hellshake_yano_dictionary_path", "")') as string || undefined;
-        config.useBuiltinDict = await denops.eval('get(g:, "hellshake_yano_use_builtin_dict", 1)') as boolean;
-        config.mergingStrategy = await denops.eval('get(g:, "hellshake_yano_dictionary_merge", "merge")') as 'override' | 'merge';
-        config.autoReload = await denops.eval('get(g:, "hellshake_yano_auto_reload_dict", 0)') as boolean;
+        config.dictionaryPath =
+          await denops.eval('get(g:, "hellshake_yano_dictionary_path", "")') as string || undefined;
+        config.useBuiltinDict = await denops.eval(
+          'get(g:, "hellshake_yano_use_builtin_dict", 1)',
+        ) as boolean;
+        config.mergingStrategy = await denops.eval(
+          'get(g:, "hellshake_yano_dictionary_merge", "merge")',
+        ) as "override" | "merge";
+        config.autoReload = await denops.eval(
+          'get(g:, "hellshake_yano_auto_reload_dict", 0)',
+        ) as boolean;
       }
 
       return config;
@@ -1349,42 +1418,58 @@ export class VimConfigBridge {
       return {};
     }
   }
-  /**
-   */
+  /** */
   async notifyError(denops: Denops, error: string): Promise<void> {
     try {
       await denops.cmd(`echohl ErrorMsg | echo '${error}' | echohl None`);
     } catch {
     }
   }
-  /**
-   */
+  /** */
   async reloadDictionary(denops: Denops): Promise<void> {
     try {
-      await denops.call('hellshake_yano#reload_dictionary');
+      await denops.call("hellshake_yano#reload_dictionary");
     } catch {
     }
   }
 }
-/**
- */
-/**
- */
-/**
- */
+/** */
+/** */
+/** */
 interface WordWithPriority extends Word {
   hintPriority?: number;
 }
+/** */
 /**
+ * Check if a RegExp pattern requires multiline (cross-line) matching.
+ * Why: 複数行跨ぎパターンは稀。行単位走査の default ルートと join フォールバックを分岐するため。
  */
+function isMultilinePattern(re: RegExp): boolean {
+  return re.source.includes("\\n") || re.source.includes("\\r") || re.flags.includes("s");
+}
+
+/**
+ * Convert a 0-based offset in joined text to 1-based line number.
+ */
+function offsetToLine(lines: string[], offset: number): number {
+  let acc = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (acc + lines[i].length >= offset) {
+      return i + 1;
+    }
+    acc += lines[i].length + 1; // +1 for "\n"
+  }
+  return lines.length;
+}
+
 export class HintPatternProcessor {
   /**
- * @param words
- * @param text
- * @param patterns
- * @returns 
+   * @param words
+   * @param text
+   * @param patterns
+   * @returns
    */
-  applyHintPatterns(words: Word[], text: string, patterns: HintPattern[]): WordWithPriority[] {
+  applyHintPatterns(words: Word[], lines: string[], patterns: HintPattern[]): WordWithPriority[] {
     if (!patterns || patterns.length === 0) {
       return words as WordWithPriority[];
     }
@@ -1392,112 +1477,193 @@ export class HintPatternProcessor {
     const sortedPatterns = patterns.sort((a, b) => b.priority - a.priority);
 
     // [DEBUG-METRIC] Point C-entry: applyHintPatterns 入口
-    // Why: ヒント生成の実地点で、入力 text 実体・行数・パターン数が期待通り渡っているかを検証するため。
-    //      ログ文のみ debugMode ガードで囲み、マッチ処理本体の挙動は一切変更しない。
+    // Why: ヒント生成の実地点で、入力行数・パターン数が期待通り渡っているかを検証するため。
     if (getDebugMode()) {
       try {
-        const textHead = text.slice(0, 200).replace(/\n/g, "\\n");
-        const lineCount = text.split("\n").length;
-        logMessage("DEBUG", "HINT-DEBUG", `[PointC/entry] textHead=${JSON.stringify(textHead)} lineCount=${lineCount} patternCount=${sortedPatterns.length} wordCount=${words.length}`);
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          `[PointC/entry] lineCount=${lines.length} patternCount=${sortedPatterns.length} wordCount=${words.length}`,
+        );
       } catch (e) {
-        logMessage("DEBUG", "HINT-DEBUG", `[PointC/entry] log failure: ${e instanceof Error ? e.message : String(e)}`);
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          `[PointC/entry] log failure: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
 
     let priorityAssignCount = 0;
     for (const pattern of sortedPatterns) {
-      // Why: 'g' フラグ単体ではなく 'gm' を採用。理由: 複数行 join テキストに対して ^ / $ を各行頭/行末にマッチさせるため。既に RegExp インスタンスで渡された場合は呼び出し側が管理しているフラグを尊重し上書きしない。
-      const regex = typeof pattern.pattern === 'string' ? new RegExp(pattern.pattern, 'gm') : pattern.pattern;
-      let match;
+      // Why: compiled (事前コンパイル済み gm 付き RegExp) を優先使用。理由: hot path での new RegExp コストを削減。
+      //   フォールバック: compiled が undefined の場合は従来どおり pattern から生成。
+      const regex = pattern.compiled ??
+        (typeof pattern.pattern === "string" ? new RegExp(pattern.pattern, "gm") : pattern.pattern);
+
+      const isMultiline = isMultilinePattern(regex);
 
       // [DEBUG-METRIC] Point C-loop: パターン単位の統計を収集するローカル変数
-      // Why: 各パターンについて matchCount/wordFoundCount を集計し、
-      //      「マッチしてるが findWordAtPosition で wordを見つけられていない」状態を識別するため。
       let matchCount = 0;
       let wordFoundCount = 0;
       const sampleMatches: Array<Record<string, unknown>> = [];
 
-      while ((match = regex.exec(text)) !== null) {
-        matchCount++;
-        const hintTarget = this.extractHintTarget(match, pattern.hintPosition);
-        let wordFound = false;
-        if (hintTarget) {
-          const targetWord = this.findWordAtPosition(enhancedWords, hintTarget.position);
-          if (targetWord) {
-            targetWord.hintPriority = pattern.priority;
-            wordFound = true;
-            wordFoundCount++;
-            priorityAssignCount++;
+      if (isMultiline) {
+        // Why: 複数行跨ぎパターンは稀なケース。従来の join ルートで処理し性能最適化しない。
+        const text = lines.join("\n");
+        regex.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(text)) !== null) {
+          matchCount++;
+          const hintTarget = this.extractHintTarget(match, pattern.hintPosition);
+          let wordFound = false;
+          if (hintTarget) {
+            // join テキスト内オフセット → (lnum, col) へ変換
+            const lnum = offsetToLine(lines, hintTarget.position);
+            const col = hintTarget.position - lines.slice(0, lnum - 1).reduce((sum, l) =>
+              sum + l.length + 1, 0) +
+              1;
+            const targetWord = this.findWordAtPosition(enhancedWords, lnum, col);
+            if (targetWord) {
+              targetWord.hintPriority = pattern.priority;
+              wordFound = true;
+              wordFoundCount++;
+              priorityAssignCount++;
+            }
+          }
+          if (getDebugMode() && sampleMatches.length < 5) {
+            const captureIndex = typeof pattern.hintPosition === "string" &&
+                pattern.hintPosition.startsWith("capture:")
+              ? parseInt(pattern.hintPosition.split(":")[1], 10)
+              : undefined;
+            sampleMatches.push({
+              matchText: (match[0] || "").slice(0, 40),
+              captureText: captureIndex !== undefined
+                ? (match[captureIndex] || "").slice(0, 20)
+                : "(no-capture)",
+              wordFound,
+            });
           }
         }
-        if (getDebugMode() && sampleMatches.length < 5) {
-          const captureIndex = typeof pattern.hintPosition === "string" && pattern.hintPosition.startsWith("capture:")
-            ? parseInt(pattern.hintPosition.split(":")[1], 10)
-            : undefined;
-          sampleMatches.push({
-            matchText: (match[0] || "").slice(0, 40),
-            captureText: captureIndex !== undefined ? (match[captureIndex] || "").slice(0, 20) : "(no-capture)",
-            position: hintTarget?.position ?? -1,
-            wordFound,
-          });
+      } else {
+        // Why: 行単位走査ルート。join("\n") による全文字列化を回避し O(lines) のメモリ消費を削減。
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(line)) !== null) {
+            matchCount++;
+            const lnum = i + 1; // 1-origin
+            const hintTarget = this.extractHintTarget(match, pattern.hintPosition);
+            let wordFound = false;
+            if (hintTarget) {
+              // hintTarget.position は行内 0-based offset → 1-based col に変換
+              const col = hintTarget.position + 1;
+              const targetWord = this.findWordAtPosition(enhancedWords, lnum, col);
+              if (targetWord) {
+                targetWord.hintPriority = pattern.priority;
+                wordFound = true;
+                wordFoundCount++;
+                priorityAssignCount++;
+              }
+            }
+            if (getDebugMode() && sampleMatches.length < 5) {
+              const captureIndex = typeof pattern.hintPosition === "string" &&
+                  pattern.hintPosition.startsWith("capture:")
+                ? parseInt(pattern.hintPosition.split(":")[1], 10)
+                : undefined;
+              sampleMatches.push({
+                lnum,
+                matchText: (match[0] || "").slice(0, 40),
+                captureText: captureIndex !== undefined
+                  ? (match[captureIndex] || "").slice(0, 20)
+                  : "(no-capture)",
+                col: hintTarget ? hintTarget.position + 1 : -1,
+                wordFound,
+              });
+            }
+            if (!regex.global) break;
+          }
         }
       }
 
       if (getDebugMode()) {
         try {
-          logMessage("DEBUG", "HINT-DEBUG", `[PointC/pattern] pattern=${String(pattern.pattern)} flags=${regex.flags} matchCount=${matchCount} wordFoundCount=${wordFoundCount} samples=${JSON.stringify(sampleMatches)}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointC/pattern] pattern=${
+              String(pattern.pattern)
+            } flags=${regex.flags} multiline=${isMultiline} matchCount=${matchCount} wordFoundCount=${wordFoundCount} samples=${
+              JSON.stringify(sampleMatches)
+            }`,
+          );
         } catch (e) {
-          logMessage("DEBUG", "HINT-DEBUG", `[PointC/pattern] log failure: ${e instanceof Error ? e.message : String(e)}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointC/pattern] log failure: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }
 
     if (getDebugMode()) {
-      logMessage("DEBUG", "HINT-DEBUG", `[PointC/exit] totalPriorityAssigned=${priorityAssignCount}`);
+      logMessage(
+        "DEBUG",
+        "HINT-DEBUG",
+        `[PointC/exit] totalPriorityAssigned=${priorityAssignCount}`,
+      );
     }
     return this.sortByHintPriority(enhancedWords);
   }
-  /**
-   */
+  /** */
   private extractHintTarget(
     match: RegExpExecArray,
-    rule: HintPositionRule
+    rule: HintPositionRule,
   ): { text: string; position: number } | null {
-    if (typeof rule === 'string') {
-      if (rule.startsWith('capture:')) {
-        const captureIndex = parseInt(rule.split(':')[1], 10);
+    if (typeof rule === "string") {
+      if (rule.startsWith("capture:")) {
+        const captureIndex = parseInt(rule.split(":")[1], 10);
         if (match[captureIndex]) {
           return {
             text: match[captureIndex],
             position: match.index! + match[0].indexOf(match[captureIndex]),
           };
         }
-      } else if (rule === 'start') {
+      } else if (rule === "start") {
         return { text: match[0], position: match.index! };
-      } else if (rule === 'end') {
+      } else if (rule === "end") {
         return { text: match[0], position: match.index! + match[0].length - 1 };
       }
-    } else if (typeof rule === 'object' && 'offset' in rule) {
-      const basePosition = rule.from === 'start' ? match.index! : match.index! + match[0].length;
+    } else if (typeof rule === "object" && "offset" in rule) {
+      const basePosition = rule.from === "start" ? match.index! : match.index! + match[0].length;
       return { text: match[0], position: basePosition + rule.offset };
     }
     return null;
   }
   /**
- * @param words
- * @param position
- * @returns 
+   * @param words
+   * @param position
+   * @returns
    */
-  private findWordAtPosition(words: WordWithPriority[], position: number): WordWithPriority | null {
-    return words.find(word =>
+  private findWordAtPosition(
+    words: WordWithPriority[],
+    lnum: number,
+    col: number,
+  ): WordWithPriority | null {
+    // Why: join テキストの絶対オフセット比較から行番号+列位置比較に変更。
+    //   Word.line (1-based) と Word.col (1-based) で直接マッチする。
+    return words.find((word) =>
+      word.line === lnum &&
       word.col && word.text &&
-      position >= word.col &&
-      position < word.col + word.text.length
+      col >= word.col &&
+      col < word.col + word.text.length
     ) || null;
   }
   /**
- * @param words
- * @returns 
+   * @param words
+   * @returns
    */
   private sortByHintPriority(words: WordWithPriority[]): WordWithPriority[] {
     return words.sort((a, b) => {
@@ -1508,8 +1674,7 @@ export class HintPatternProcessor {
   }
 }
 
-/**
- */
+/** */
 export interface WordDetectionManagerConfig extends ImportedWordDetectionConfig {
   /** デフォルトの単語検出ストラテジー */
   defaultStrategy?: "regex" | "tinysegmenter" | "hybrid";
@@ -1534,8 +1699,7 @@ export interface WordDetectionManagerConfig extends ImportedWordDetectionConfig 
   /** 同時実行可能な検出数の上限 */
   maxConcurrentDetections?: number;
 }
-/**
- */
+/** */
 interface CacheEntry {
   /** 検出された単語の配列 */
   words: Word[];
@@ -1546,8 +1710,7 @@ interface CacheEntry {
   /** 設定のハッシュ値 */
   config_hash: string;
 }
-/**
- */
+/** */
 interface DetectionStats {
   /** 総呼び出し回数 */
   total_calls: number;
@@ -1562,8 +1725,7 @@ interface DetectionStats {
   /** ディテクター別使用回数 */
   detector_usage: Record<string, number>;
 }
-/**
- */
+/** */
 export class WordDetectionManager {
   private detectors: Map<string, ImportedWordDetector> = new Map();
   private config: Required<WordDetectionManagerConfig>;
@@ -1573,15 +1735,13 @@ export class WordDetectionManager {
   private sessionContext: DetectionContext | null = null;
   private globalConfig?: Config; // 統一的なmin_length処理のためのグローバル設定
   private unifiedConfig?: Config; // Configへの移行対応
-  /**
-   */
+  /** */
   constructor(config: WordDetectionManagerConfig = {}, globalConfig?: Config | Config) {
     this.config = this.mergeWithDefaults(config);
     [this.unifiedConfig, this.globalConfig] = resolveConfigType(globalConfig);
     this.stats = this.initializeStats();
   }
-  /**
-   */
+  /** */
   async initialize(): Promise<void> {
     if (this.initialized) return;
     const configToUse = this.unifiedConfig || this.globalConfig;
@@ -1596,13 +1756,11 @@ export class WordDetectionManager {
     }
     this.initialized = true;
   }
-  /**
-   */
+  /** */
   registerDetector(detector: ImportedWordDetector): void {
     this.detectors.set(detector.name, detector);
   }
-  /**
-   */
+  /** */
   async detectWords(
     text: string,
     startLine: number = 1,
@@ -1638,7 +1796,13 @@ export class WordDetectionManager {
       if (!detector) {
         throw new Error("No suitable detector available");
       }
-      const words = await this.detectWithTimeout(detector, text, startLine, effectiveContext, denops);
+      const words = await this.detectWithTimeout(
+        detector,
+        text,
+        startLine,
+        effectiveContext,
+        denops,
+      );
       if (useCache) {
         this.cacheResult(text, startLine, words, detector.name, effectiveContext);
       }
@@ -1662,7 +1826,12 @@ export class WordDetectionManager {
         try {
           const fallbackDetector = this.getFallbackDetector();
           if (fallbackDetector) {
-            const words = await fallbackDetector.detectWords(text, startLine, effectiveContext, denops);
+            const words = await fallbackDetector.detectWords(
+              text,
+              startLine,
+              effectiveContext,
+              denops,
+            );
             return {
               words,
               detector: `${fallbackDetector.name} (fallback)`,
@@ -1691,8 +1860,7 @@ export class WordDetectionManager {
       };
     }
   }
-  /**
-   */
+  /** */
   async detectWordsFromBuffer(
     denops: Denops,
     context?: DetectionContext,
@@ -1717,8 +1885,7 @@ export class WordDetectionManager {
       };
     }
   }
-  /**
-   */
+  /** */
   private async selectDetector(text: string): Promise<ImportedWordDetector | null> {
     const availableDetectors = Array.from(this.detectors.values())
       .filter((d) => d.canHandle(text))
@@ -1761,8 +1928,7 @@ export class WordDetectionManager {
         return availableDetectors[0];
     }
   }
-  /**
-   */
+  /** */
   private getFallbackDetector(): ImportedWordDetector | null {
     if (this.config.fallbackToRegex) {
       return this.detectors.get("RegexWordDetector") || null;
@@ -1771,8 +1937,7 @@ export class WordDetectionManager {
       .sort((a, b) => a.priority - b.priority);
     return detectors[0] || null;
   }
-  /**
-   */
+  /** */
   private async detectWithTimeout(
     detector: ImportedWordDetector,
     text: string,
@@ -1799,8 +1964,7 @@ export class WordDetectionManager {
         });
     });
   }
-  /**
-   */
+  /** */
   private generateCacheKey(
     text: string,
     startLine: number,
@@ -1820,7 +1984,7 @@ export class WordDetectionManager {
       minWordLength: this.config.minWordLength,
       maxWordLength: this.config.maxWordLength,
       defaultMinWordLength: this.config.defaultMinWordLength ||
-                           (this.globalConfig as Config | undefined)?.defaultMinWordLength,
+        (this.globalConfig as Config | undefined)?.defaultMinWordLength,
       perKeyMinLength: (this.globalConfig as Config | undefined)?.perKeyMinLength,
     };
     return this.simpleHash(JSON.stringify(relevantConfig));
@@ -1888,8 +2052,7 @@ export class WordDetectionManager {
     const allowedKeys = ["currentKey", "minWordLength", "metadata"];
     return Object.keys(context).some((key) => !allowedKeys.includes(key));
   }
-  /**
-   */
+  /** */
   private initializeStats(): DetectionStats {
     return {
       total_calls: 0,
@@ -1905,13 +2068,11 @@ export class WordDetectionManager {
     const totalDuration = this.stats.average_duration * (this.stats.total_calls - 1) + duration;
     this.stats.average_duration = totalDuration / this.stats.total_calls;
   }
-  /**
-   */
+  /** */
   getStats(): DetectionStats {
     return { ...this.stats };
   }
-  /**
-   */
+  /** */
   getCacheStats(): { size: number; maxSize: number; hitRate: number } {
     const total = this.stats.cache_hits + this.stats.cache_misses;
     return {
@@ -1920,18 +2081,15 @@ export class WordDetectionManager {
       hitRate: total > 0 ? this.stats.cache_hits / total : 0,
     };
   }
-  /**
-   */
+  /** */
   clearCache(): void {
     this.cache.clear();
   }
-  /**
-   */
+  /** */
   resetStats(): void {
     this.stats = this.initializeStats();
   }
-  /**
-   */
+  /** */
   updateConfig(newConfig: Partial<WordDetectionManagerConfig>): void {
     this.config = { ...this.config, ...newConfig };
     const enhancedConfig = newConfig as EnhancedWordConfig;
@@ -1948,7 +2106,7 @@ export class WordDetectionManager {
     }
   }
   /**
- * @returns 
+   * @returns
    */
   private affectsDetection(newConfig: Partial<WordDetectionManagerConfig>): boolean {
     const affectingKeys = [
@@ -1963,7 +2121,7 @@ export class WordDetectionManager {
     return affectingKeys.some((key) => key in newConfig);
   }
   /**
- * @returns 
+   * @returns
    */
   private shouldReinitializeDetectors(newConfig: Partial<WordDetectionManagerConfig>): boolean {
     const reinitKeys = [
@@ -1974,8 +2132,7 @@ export class WordDetectionManager {
     ];
     return reinitKeys.some((key) => key in newConfig);
   }
-  /**
-   */
+  /** */
   private reinitializeDetectors(): void {
     try {
       this.detectors.clear();
@@ -1988,8 +2145,7 @@ export class WordDetectionManager {
     } catch (error) {
     }
   }
-  /**
-   */
+  /** */
   getAvailableDetectors(): Array<{ name: string; priority: number; languages: string[] }> {
     return Array.from(this.detectors.values()).map((d) => ({
       name: d.name,
@@ -1997,19 +2153,19 @@ export class WordDetectionManager {
       languages: d.supportedLanguages,
     }));
   }
-  /**
-   */
+  /** */
   setSessionContext(context: DetectionContext | null): void {
     this.sessionContext = context;
   }
-  /**
-   */
+  /** */
   getSessionContext(): DetectionContext | null {
     return this.sessionContext;
   }
-  /**
-   */
-  async getDetectorForContext(context?: DetectionContext, text?: string): Promise<ImportedWordDetector | null> {
+  /** */
+  async getDetectorForContext(
+    context?: DetectionContext,
+    text?: string,
+  ): Promise<ImportedWordDetector | null> {
     try {
       if (!this.initialized) {
         return null;
@@ -2036,7 +2192,9 @@ export class WordDetectionManager {
           }
           break;
         case "tinysegmenter":
-          const segmenterDetector = availableDetectors.find((d) => d.name.includes("TinySegmenter"));
+          const segmenterDetector = availableDetectors.find((d) =>
+            d.name.includes("TinySegmenter")
+          );
           if (segmenterDetector && await segmenterDetector.isAvailable()) {
             return segmenterDetector;
           }
@@ -2058,8 +2216,7 @@ export class WordDetectionManager {
       return null;
     }
   }
-  /**
-   */
+  /** */
   async testDetectors(): Promise<Record<string, boolean>> {
     const results: Record<string, boolean> = {};
 
@@ -2072,8 +2229,7 @@ export class WordDetectionManager {
     }
     return results;
   }
-  /**
-   */
+  /** */
   private mergeWithDefaults(
     config: WordDetectionManagerConfig,
   ): Required<WordDetectionManagerConfig> {
@@ -2117,11 +2273,9 @@ export class WordDetectionManager {
     return merged as Required<WordDetectionManagerConfig>;
   }
 }
-/**
- */
+/** */
 let globalManager: WordDetectionManager | null = null;
-/**
- */
+/** */
 export function getWordDetectionManager(
   config?: WordDetectionManagerConfig,
   globalConfig?: Config | Config,
@@ -2133,17 +2287,18 @@ export function getWordDetectionManager(
   }
   return globalManager;
 }
-/**
- */
+/** */
 export function resetWordDetectionManager(): void {
   globalManager = null;
 }
 declare global {
-  var extractWords: ((
-    lineText: string,
-    lineNumber: number,
-    options?: ExtractWordsOptions,
-  ) => Word[]) | undefined;
+  var extractWords:
+    | ((
+      lineText: string,
+      lineNumber: number,
+      options?: ExtractWordsOptions,
+    ) => Word[])
+    | undefined;
 }
 globalThis.extractWords = extractWords;
 
@@ -2152,11 +2307,7 @@ globalThis.extractWords = extractWords;
 // ============================================================================
 
 import type { WindowInfo } from "../../types.ts";
-import {
-  getVisibleWindows,
-  getWindowVisibleLines,
-  shouldUseMultiWindowMode,
-} from "./window.ts";
+import { getVisibleWindows, getWindowVisibleLines, shouldUseMultiWindowMode } from "./window.ts";
 
 /**
  * Detect words across multiple windows
@@ -2299,7 +2450,7 @@ async function getFoldedLinesForBuffer(
       "win_execute",
       windowInfo.winid,
       script,
-      "silent"
+      "silent",
     ) as string;
 
     // 結果をパース

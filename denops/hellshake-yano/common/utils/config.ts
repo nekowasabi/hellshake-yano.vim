@@ -20,12 +20,12 @@ export function resolveConfigType(
   if (!config) return [undefined, undefined];
 
   // 新しい統合Config型の判定（perKeyMinLength または defaultMinWordLength を持つ）
-  if ('perKeyMinLength' in config || 'defaultMinWordLength' in config) {
+  if ("perKeyMinLength" in config || "defaultMinWordLength" in config) {
     return [config as Config, undefined];
   }
 
   // useJapanese を持つ場合は WordDetectionConfig
-  if ('useJapanese' in config) {
+  if ("useJapanese" in config) {
     return [config as Config, undefined];
   }
 

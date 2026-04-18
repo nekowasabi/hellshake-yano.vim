@@ -583,6 +583,10 @@ augroup HellshakeYano
   " ターミナルからファイルを開いた場合のちらつき防止（lazygit e キー対応）
   autocmd BufLeave * call hellshake_yano#core#on_buf_leave()
   autocmd BufEnter * call hellshake_yano#core#on_buf_enter_from_terminal()
+  " Process 2: TextChanged でバッファキャッシュを明示的に無効化
+  " Why: changedtick だけでは同一 tick 内の編集でキャッシュが残る懸念があるため、autocmd で明示無効化を併用
+  autocmd TextChanged,TextChangedI * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
+  autocmd BufLeave * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
   " denopsプラグインの遅延読み込み
   autocmd User DenopsPluginPost:hellshake-yano call s:on_denops_ready()
   " カラースキーム変更時にハイライトを再適用

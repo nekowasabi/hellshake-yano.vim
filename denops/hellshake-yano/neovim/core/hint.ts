@@ -262,10 +262,16 @@ export function assignHintsToWords(
       logMessage(
         "DEBUG",
         "HINT-DEBUG",
-        `[PointD/assign] mode=${mode} inputWords=${words.length} hintsAvail=${hints.length} prioritizedCount=${prioritized.length} top5=${JSON.stringify(sample)}`,
+        `[PointD/assign] mode=${mode} inputWords=${words.length} hintsAvail=${hints.length} prioritizedCount=${prioritized.length} top5=${
+          JSON.stringify(sample)
+        }`,
       );
     } catch (e) {
-      logMessage("DEBUG", "HINT-DEBUG", `[PointD/assign] log failure: ${e instanceof Error ? e.message : String(e)}`);
+      logMessage(
+        "DEBUG",
+        "HINT-DEBUG",
+        `[PointD/assign] log failure: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
   if (words.length === 0 || hints.length === 0) {
@@ -330,7 +336,13 @@ export function assignHintsToWords(
   }
   if (getDebugMode()) {
     try {
-      logMessage("DEBUG", "HINT-DEBUG", `[PointE1/overlapFilter] beforeCount=${words.length} afterCount=${filteredWords.length} dropped=${words.length - filteredWords.length}`);
+      logMessage(
+        "DEBUG",
+        "HINT-DEBUG",
+        `[PointE1/overlapFilter] beforeCount=${words.length} afterCount=${filteredWords.length} dropped=${
+          words.length - filteredWords.length
+        }`,
+      );
     } catch (_e) { /* noop */ }
   }
   const sortedWords = sortWordsByDistanceOptimized(filteredWords, cursorLine, cursorCol);

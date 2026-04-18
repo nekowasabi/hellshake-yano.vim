@@ -23,16 +23,47 @@ export class TinySegmenter {
   private postProcessSegments(segs: string[]): string[] {
     const proc: string[] = [];
     let i = 0;
-    const particles = new Set(["の", "は", "が", "を", "に", "へ", "と", "や", "で", "も", "か", "な", "よ", "ね", "ぞ", "さ", "わ", "ば", "から", "まで", "です", "ます", "だ", "である"]);
+    const particles = new Set([
+      "の",
+      "は",
+      "が",
+      "を",
+      "に",
+      "へ",
+      "と",
+      "や",
+      "で",
+      "も",
+      "か",
+      "な",
+      "よ",
+      "ね",
+      "ぞ",
+      "さ",
+      "わ",
+      "ば",
+      "から",
+      "まで",
+      "です",
+      "ます",
+      "だ",
+      "である",
+    ]);
     while (i < segs.length) {
       const cur = segs[i];
       if (cur && /^\d+$/.test(cur)) {
         let num = cur;
         let j = i + 1;
-        while (j < segs.length && /^\d+$/.test(segs[j])) { num += segs[j]; j++; }
+        while (j < segs.length && /^\d+$/.test(segs[j])) {
+          num += segs[j];
+          j++;
+        }
         if (j < segs.length) {
           const u = segs[j];
-          if (u === "%" || u === "％" || /^(年|月|日|時|分|秒)$/.test(u)) { num += u; j++; }
+          if (u === "%" || u === "％" || /^(年|月|日|時|分|秒)$/.test(u)) {
+            num += u;
+            j++;
+          }
         }
         proc.push(num);
         i = j;
@@ -41,15 +72,26 @@ export class TinySegmenter {
       if (cur === "（" || cur === "(") {
         let j = i + 1;
         let cnt = cur;
-        while (j < segs.length && segs[j] !== "）" && segs[j] !== ")") { cnt += segs[j]; j++; }
-        if (j < segs.length) { cnt += segs[j]; proc.push(cnt); i = j + 1; continue; }
+        while (j < segs.length && segs[j] !== "）" && segs[j] !== ")") {
+          cnt += segs[j];
+          j++;
+        }
+        if (j < segs.length) {
+          cnt += segs[j];
+          proc.push(cnt);
+          i = j + 1;
+          continue;
+        }
       }
       if (cur && cur.trim().length > 0) {
         let mrg = cur;
         let j = i + 1;
         while (j < segs.length) {
           const nxt = segs[j];
-          if (nxt && particles.has(nxt)) { mrg += nxt; j++; } else break;
+          if (nxt && particles.has(nxt)) {
+            mrg += nxt;
+            j++;
+          } else break;
         }
         proc.push(mrg);
         i = j;
@@ -60,8 +102,17 @@ export class TinySegmenter {
     return proc;
   }
   async segment(t: string, o?: { mergeParticles?: boolean }): Promise<SegmentationResult> {
-    if (!this.enabled) return { segments: await this.fallbackSegmentation(t), success: false, error: "TinySegmenter disabled", source: "fallback" };
-    if (!t || t.trim().length === 0) return { segments: [], success: true, source: "tinysegmenter" };
+    if (!this.enabled) {
+      return {
+        segments: await this.fallbackSegmentation(t),
+        success: false,
+        error: "TinySegmenter disabled",
+        source: "fallback",
+      };
+    }
+    if (!t || t.trim().length === 0) {
+      return { segments: [], success: true, source: "tinysegmenter" };
+    }
     const mp = o?.mergeParticles ?? true;
     const ck = `${t}:${mp}`;
     const cache = this.globalCache.getCache<string, string[]>(CacheType.ANALYSIS);
@@ -72,7 +123,12 @@ export class TinySegmenter {
       cache.set(ck, segs);
       return { segments: segs, success: true, source: "tinysegmenter" };
     } catch (e) {
-      return { segments: await this.fallbackSegmentation(t), success: false, error: e instanceof Error ? e.message : "Unknown error", source: "fallback" };
+      return {
+        segments: await this.fallbackSegmentation(t),
+        success: false,
+        error: e instanceof Error ? e.message : "Unknown error",
+        source: "fallback",
+      };
     }
   }
   private async fallbackSegmentation(t: string): Promise<string[]> {
@@ -82,7 +138,10 @@ export class TinySegmenter {
     let lt = "";
     for (const c of cs) {
       const ct = this.getCharacterType(c);
-      if (ct !== lt && cur.length > 0) { segs.push(cur); cur = c; } else cur += c;
+      if (ct !== lt && cur.length > 0) {
+        segs.push(cur);
+        cur = c;
+      } else cur += c;
       lt = ct;
     }
     if (cur.length > 0) segs.push(cur);
@@ -97,19 +156,36 @@ export class TinySegmenter {
     if (/\s/.test(c)) return "space";
     return "other";
   }
-  hasJapanese(t: string): boolean { return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(t); }
-  shouldSegment(t: string, th: number = 4): boolean { return this.hasJapanese(t) && t.length >= th; }
-  clearCache(): void { this.globalCache.getCache<string, string[]>(CacheType.ANALYSIS).clear(); }
+  hasJapanese(t: string): boolean {
+    return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(t);
+  }
+  shouldSegment(t: string, th: number = 4): boolean {
+    return this.hasJapanese(t) && t.length >= th;
+  }
+  clearCache(): void {
+    this.globalCache.getCache<string, string[]>(CacheType.ANALYSIS).clear();
+  }
   getCacheStats(): { size: number; maxSize: number; hitRate: number } {
     const cache = this.globalCache.getCache<string, string[]>(CacheType.ANALYSIS);
     const stats = cache.getStats();
     const cfg = this.globalCache.getCacheConfig(CacheType.ANALYSIS);
     return { size: stats.size, maxSize: cfg.size, hitRate: stats.hitRate };
   }
-  setEnabled(e: boolean): void { this.enabled = e; }
-  isEnabled(): boolean { return this.enabled; }
+  setEnabled(e: boolean): void {
+    this.enabled = e;
+  }
+  isEnabled(): boolean {
+    return this.enabled;
+  }
   async test(): Promise<{ success: boolean; results: SegmentationResult[] }> {
-    const tcs = ["これはテストです", "私の名前は田中です", "今日は良い天気ですね", "Hello World", "プログラミング言語", ""];
+    const tcs = [
+      "これはテストです",
+      "私の名前は田中です",
+      "今日は良い天気ですね",
+      "Hello World",
+      "プログラミング言語",
+      "",
+    ];
     const res: SegmentationResult[] = [];
     let sc = 0;
     for (const tc of tcs) {

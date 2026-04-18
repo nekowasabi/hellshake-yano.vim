@@ -61,12 +61,24 @@ export class RegexWordDetector implements WordDetector {
   private globalConfig?: Config;
   private unifiedConfig?: Config;
   constructor(config: WordDetectionConfig = {}, gc?: Config | Config) {
-    this.config = { strategy: "regex", useJapanese: true, minWordLength: 1, maxWordLength: 50, exclude_numbers: false, exclude_single_chars: false, cacheEnabled: true, batchSize: 50, ...config };
+    this.config = {
+      strategy: "regex",
+      useJapanese: true,
+      minWordLength: 1,
+      maxWordLength: 50,
+      exclude_numbers: false,
+      exclude_single_chars: false,
+      cacheEnabled: true,
+      batchSize: 50,
+      ...config,
+    };
     [this.unifiedConfig, this.globalConfig] = resolveConfigType(gc);
   }
   private getEffectiveMinLength(c?: DetectionContext, k?: string): number {
     if (c?.minWordLength !== undefined) return c.minWordLength;
-    if (this.unifiedConfig && k) return this.unifiedConfig.perKeyMinLength?.[k] || this.unifiedConfig.defaultMinWordLength;
+    if (this.unifiedConfig && k) {
+      return this.unifiedConfig.perKeyMinLength?.[k] || this.unifiedConfig.defaultMinWordLength;
+    }
     if (this.globalConfig && k) return Core.getMinLengthForKey(this.globalConfig, k);
     return this.config.minWordLength || 1;
   }
@@ -81,12 +93,17 @@ export class RegexWordDetector implements WordDetector {
     }
     return this.applyFilters(words, c);
   }
-  canHandle(t: string): boolean { return true; }
-  async isAvailable(): Promise<boolean> { return true; }
+  canHandle(t: string): boolean {
+    return true;
+  }
+  async isAvailable(): Promise<boolean> {
+    return true;
+  }
   private extractWordsImproved(lt: string, ln: number, c?: DetectionContext): Word[] {
     const uj = c?.config?.useJapanese ?? this.config.useJapanese;
     const ej = !uj;
-    return globalThis.extractWords?.(lt, ln, { useImprovedDetection: true, excludeJapanese: ej }) || [];
+    return globalThis.extractWords?.(lt, ln, { useImprovedDetection: true, excludeJapanese: ej }) ||
+      [];
   }
   private applyFilters(words: Word[], c?: DetectionContext): Word[] {
     const ml = this.getEffectiveMinLength(c, c?.currentKey);
@@ -114,7 +131,66 @@ export class TinySegmenterWordDetector implements WordDetector {
   readonly priority = 10;
   readonly supportedLanguages = ["ja"];
   private readonly japaneseRegex = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/;
-  private readonly particles = new Set(["の", "が", "を", "に", "へ", "と", "から", "まで", "より", "は", "も", "こそ", "さえ", "でも", "しか", "まで", "だけ", "ばかり", "ほど", "くらい", "など", "なり", "やら", "か", "のみ", "ば", "と", "ても", "でも", "のに", "ので", "から", "けど", "けれど", "けれども", "が", "し", "て", "で", "ながら", "つつ", "たり", "な", "よ", "ね", "か", "ぞ", "ぜ", "さ", "わ", "の", "です", "ます", "だ", "である", "や", "とか", "だの"]);
+  private readonly particles = new Set([
+    "の",
+    "が",
+    "を",
+    "に",
+    "へ",
+    "と",
+    "から",
+    "まで",
+    "より",
+    "は",
+    "も",
+    "こそ",
+    "さえ",
+    "でも",
+    "しか",
+    "まで",
+    "だけ",
+    "ばかり",
+    "ほど",
+    "くらい",
+    "など",
+    "なり",
+    "やら",
+    "か",
+    "のみ",
+    "ば",
+    "と",
+    "ても",
+    "でも",
+    "のに",
+    "ので",
+    "から",
+    "けど",
+    "けれど",
+    "けれども",
+    "が",
+    "し",
+    "て",
+    "で",
+    "ながら",
+    "つつ",
+    "たり",
+    "な",
+    "よ",
+    "ね",
+    "か",
+    "ぞ",
+    "ぜ",
+    "さ",
+    "わ",
+    "の",
+    "です",
+    "ます",
+    "だ",
+    "である",
+    "や",
+    "とか",
+    "だの",
+  ]);
   async detectWords(t: string, sl: number, c?: DetectionContext, d?: Denops): Promise<Word[]> {
     if (!this.canHandle(t)) return [];
     const words: Word[] = [];
@@ -133,9 +209,18 @@ export class TinySegmenterWordDetector implements WordDetector {
           if (mp) segs = this.postProcessSegments(segs);
           let ci = 0;
           for (const seg of segs) {
-            if (seg.trim().length === 0) { ci += seg.length; continue; }
-            if (mp && this.particles.has(seg)) { ci += seg.length; continue; }
-            if (seg.length < ml) { ci += seg.length; continue; }
+            if (seg.trim().length === 0) {
+              ci += seg.length;
+              continue;
+            }
+            if (mp && this.particles.has(seg)) {
+              ci += seg.length;
+              continue;
+            }
+            if (seg.length < ml) {
+              ci += seg.length;
+              continue;
+            }
             const idx = lt.indexOf(seg, ci);
             if (idx !== -1) {
               const col = idx + 1;
@@ -163,20 +248,30 @@ export class TinySegmenterWordDetector implements WordDetector {
     let i = 0;
     while (i < segs.length) {
       const cur = segs[i];
-      if (!cur || cur.trim().length === 0) { i++; continue; }
+      if (!cur || cur.trim().length === 0) {
+        i++;
+        continue;
+      }
       let mrg = cur;
       let j = i + 1;
       while (j < segs.length) {
         const nxt = segs[j];
-        if (nxt && this.particles.has(nxt)) { mrg += nxt; j++; } else break;
+        if (nxt && this.particles.has(nxt)) {
+          mrg += nxt;
+          j++;
+        } else break;
       }
       proc.push(mrg);
       i = j;
     }
     return proc;
   }
-  canHandle(t: string): boolean { return this.japaneseRegex.test(t); }
-  async isAvailable(): Promise<boolean> { return true; }
+  canHandle(t: string): boolean {
+    return this.japaneseRegex.test(t);
+  }
+  async isAvailable(): Promise<boolean> {
+    return true;
+  }
 }
 export class HybridWordDetector implements WordDetector {
   readonly name = "HybridWordDetector";
@@ -194,7 +289,10 @@ export class HybridWordDetector implements WordDetector {
     try {
       const uj = c?.config?.useJapanese ?? true;
       if (!uj) return await this.regexDetector.detectWords(t, sl, c, d);
-      const [rr, tr] = await Promise.allSettled([this.regexDetector.detectWords(t, sl, c, d), this.tinySegmenterDetector.detectWords(t, sl, c, d)]);
+      const [rr, tr] = await Promise.allSettled([
+        this.regexDetector.detectWords(t, sl, c, d),
+        this.tinySegmenterDetector.detectWords(t, sl, c, d),
+      ]);
       const rw = rr.status === "fulfilled" ? rr.value : [];
       const tw = tr.status === "fulfilled" ? tr.value : [];
       const mw = this.mergeAndDeduplicateWords(rw, tw);
@@ -203,10 +301,15 @@ export class HybridWordDetector implements WordDetector {
       return [];
     }
   }
-  canHandle(t: string): boolean { return true; }
+  canHandle(t: string): boolean {
+    return true;
+  }
   async isAvailable(): Promise<boolean> {
     try {
-      const [ra, ta] = await Promise.all([this.regexDetector.isAvailable?.() ?? true, this.tinySegmenterDetector.isAvailable()]);
+      const [ra, ta] = await Promise.all([
+        this.regexDetector.isAvailable?.() ?? true,
+        this.tinySegmenterDetector.isAvailable(),
+      ]);
       return ra && ta;
     } catch {
       return false;

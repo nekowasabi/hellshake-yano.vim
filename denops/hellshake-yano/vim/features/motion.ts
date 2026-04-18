@@ -87,18 +87,18 @@ export class VimMotion {
  * キーリピート設定
  */
 export interface KeyRepeatConfig {
-  enabled: boolean;              // 機能有効/無効
-  threshold: number;             // リピート判定閾値（デフォルト50ms）
-  resetDelay: number;            // リセット遅延（デフォルト300ms）
+  enabled: boolean; // 機能有効/無効
+  threshold: number; // リピート判定閾値（デフォルト50ms）
+  resetDelay: number; // リセット遅延（デフォルト300ms）
 }
 
 /**
  * モーション検出結果
  */
 export interface MotionDetectionResult {
-  shouldShowHints: boolean;      // ヒント表示すべきか
-  skipReason?: string;           // スキップ理由（デバッグ用）
-  newCount: number;              // 更新後のカウント
+  shouldShowHints: boolean; // ヒント表示すべきか
+  skipReason?: string; // スキップ理由（デバッグ用）
+  newCount: number; // 更新後のカウント
 }
 
 /**
@@ -118,7 +118,7 @@ export class VimMotionDetector {
 
   constructor(
     timeoutMs: number = 2000,
-    threshold: number = 2
+    threshold: number = 2,
   ) {
     this.state = {
       lastMotion: "",
@@ -143,7 +143,7 @@ export class VimMotionDetector {
   detectMotion(
     motionKey: string,
     count: number,
-    keyRepeatConfig: KeyRepeatConfig
+    keyRepeatConfig: KeyRepeatConfig,
   ): MotionDetectionResult {
     const currentTime = Date.now();
 
@@ -227,7 +227,7 @@ export class VimMotionDetector {
    */
   private checkKeyRepeat(
     currentTime: number,
-    config: KeyRepeatConfig
+    config: KeyRepeatConfig,
   ): boolean {
     if (!config.enabled) {
       this.lastKeyTime = currentTime;
@@ -310,7 +310,7 @@ export class VimMotionDetector {
   static getMotionCount(
     key: string,
     perKeyMotionCount?: Record<string, number>,
-    defaultMotionCount: number = 3
+    defaultMotionCount: number = 3,
   ): number {
     if (perKeyMotionCount && key in perKeyMotionCount) {
       return perKeyMotionCount[key];

@@ -40,11 +40,16 @@ import {
   assignHintsToWords,
   filterWordsByDirection,
   generateHints,
+  OVERLAP_SKIP_OPTS,
   resolveDirectionalContext,
   validateHintKeyConfig,
-  OVERLAP_SKIP_OPTS,
 } from "./hint.ts";
-import { DictionaryLoader, HintPatternProcessor, type UserDictionary, VimConfigBridge } from "./word.ts";
+import {
+  DictionaryLoader,
+  HintPatternProcessor,
+  type UserDictionary,
+  VimConfigBridge,
+} from "./word.ts";
 import {
   isControlCharacter,
   isValidColorName,
@@ -392,6 +397,10 @@ export class Core {
   private continuousJumpCount = 0;
   /** 直近のジャンプが発生したバッファ番号 */
   private lastJumpBufnr: number | null = null;
+  /** バッファ行キャッシュ — changedtick 一致時に getline RPC をスキップ */
+  // Why: showHints 毎に getline(1,"$") が 300-600ms の RPC 転送を発生させるため、
+  //   changedtick 連動の配列キャッシュでスキップする。copy しない（mutate しない前提）。
+  private cachedBuffer: { bufnr: number; changedtick: number; lines: string[] } | null = null;
   private constructor(config?: Partial<Config>) {
     this.config = { ...getDefaultConfig(), ...config };
   }
@@ -608,6 +617,24 @@ export class Core {
       if (this.dictionaryLoader) {
       }
     } catch (error) {
+    }
+  }
+
+  /**
+   * Invalidate the buffer line cache for the given bufnr (or unconditionally).
+   * Called from TextChanged / TextChangedI / BufLeave autocmd to ensure
+   * stale cache is never reused after an edit.
+   *
+   * Why: changedtick alone can miss same-tick edits in edge cases;
+   *      explicit invalidation via autocmd guarantees correctness.
+   */
+  invalidateBufferCache(bufnr?: number): void {
+    if (bufnr !== undefined) {
+      if (this.cachedBuffer?.bufnr === bufnr) {
+        this.cachedBuffer = null;
+      }
+    } else {
+      this.cachedBuffer = null;
     }
   }
   /*   * 現在のヒント一覧を取得   * @returns 現在表示中のヒントマッピング配列
@@ -1007,7 +1034,13 @@ export class Core {
 
       if (getDebugMode()) {
         try {
-          logMessage("DEBUG", "HINT-DEBUG", `[PointE2/beforeAssign] wordsCount=${words.length} hintsCount=${hints.length} directionalEnabled=${directionalContext !== "none"} mode=${modeString}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointE2/beforeAssign] wordsCount=${words.length} hintsCount=${hints.length} directionalEnabled=${
+              directionalContext !== "none"
+            } mode=${modeString}`,
+          );
         } catch (_e) { /* noop */ }
       }
 
@@ -1015,18 +1048,61 @@ export class Core {
       //   showHintsInternal から直接呼び出す。辞書未指定 / hintPatterns 空の場合は no-op で通過。
       const hintPatterns = this.cachedDictionary?.hintPatterns ?? [];
       if (hintPatterns.length > 0) {
-        const bufferLines = await denops.call("getline", 1, "$") as string[];
-        const bufferText = bufferLines.join("\n");
+        // [Timing/getline] + [Timing/join]: bufferLines 取得と join の所要時間を計測
+        // Why: hintPatterns 処理が体感遅延の原因かを分離確認するため。debugMode=false では no-op。
+        const _t0 = getDebugMode() ? performance.now() : 0;
+        // Why: getline(1,"$") の RPC 転送 (300-600ms) をスキップするため、
+        //   changedtick 連動の配列キャッシュを参照。bufnr + changedtick 一致で cache hit。
+        const _bufnr = await denops.call("bufnr", "%") as number;
+        const _changedtick = await denops.call("getbufvar", _bufnr, "changedtick") as number;
+        let bufferLines: string[];
+        const _cacheHit = this.cachedBuffer !== null &&
+          this.cachedBuffer.bufnr === _bufnr &&
+          this.cachedBuffer.changedtick === _changedtick;
+        if (_cacheHit && this.cachedBuffer) {
+          bufferLines = this.cachedBuffer.lines;
+        } else {
+          bufferLines = await denops.call("getline", 1, "$") as string[];
+          this.cachedBuffer = { bufnr: _bufnr, changedtick: _changedtick, lines: bufferLines };
+        }
+        if (getDebugMode()) {
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[Timing/getline] elapsed=${
+              (performance.now() - _t0).toFixed(2)
+            }ms lineCount=${bufferLines.length} cacheHit=${_cacheHit}`,
+          );
+        }
+        // Why: join("\n") を廃止し行単位走査に変更。300-600ms の join コストを削減。
         if (!this.hintPatternProcessor) {
           this.hintPatternProcessor = new HintPatternProcessor();
         }
-        const enhancedWords = this.hintPatternProcessor.applyHintPatterns(words, bufferText, hintPatterns);
+        const _t2 = getDebugMode() ? performance.now() : 0;
+        const enhancedWords = this.hintPatternProcessor.applyHintPatterns(
+          words,
+          bufferLines,
+          hintPatterns,
+        );
+        if (getDebugMode()) {
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[Timing/applyHintPatterns] elapsed=${
+              (performance.now() - _t2).toFixed(2)
+            }ms wordCount=${words.length} patternCount=${hintPatterns.length}`,
+          );
+        }
         // [DEBUG-METRIC] PointD: applyHintPatterns の効果を観測
         if (getDebugMode()) {
           const prioritized = enhancedWords.filter(
             (w: { hintPriority?: number }) => (w.hintPriority ?? 0) > 0,
           );
-          logMessage("DEBUG", "HINT-DEBUG", `[PointD/applyHintPatterns] prioritizedCount=${prioritized.length} totalWords=${enhancedWords.length} patternsApplied=${hintPatterns.length}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointD/applyHintPatterns] prioritizedCount=${prioritized.length} totalWords=${enhancedWords.length} patternsApplied=${hintPatterns.length}`,
+          );
         }
         words.splice(0, words.length, ...enhancedWords);
       }
@@ -1888,16 +1964,21 @@ export class Core {
           }
           let fileExists = false;
           if (resolvedPath !== "(none)") {
-            try { Deno.statSync(resolvedPath); fileExists = true; } catch { fileExists = false; }
+            try {
+              Deno.statSync(resolvedPath);
+              fileExists = true;
+            } catch {
+              fileExists = false;
+            }
           }
           const hintPatterns = loadedDict.hintPatterns || [];
           const parseSuccess = loadedDict !== null && typeof loadedDict === "object";
           const firstPatternSummary = hintPatterns.length > 0
             ? JSON.stringify({
-                pattern: String(hintPatterns[0].pattern),
-                hintPosition: hintPatterns[0].hintPosition,
-                priority: hintPatterns[0].priority,
-              })
+              pattern: String(hintPatterns[0].pattern),
+              hintPosition: hintPatterns[0].hintPosition,
+              priority: hintPatterns[0].priority,
+            })
             : "(none)";
           logMessage(
             "DEBUG",
@@ -1905,7 +1986,11 @@ export class Core {
             `[PointA/dictLoad] resolvedPath=${resolvedPath} fileExists=${fileExists} parseSuccess=${parseSuccess} hintPatternsCount=${hintPatterns.length} firstPattern=${firstPatternSummary}`,
           );
         } catch (e) {
-          logMessage("DEBUG", "HINT-DEBUG", `[PointA/dictLoad] log failure: ${e instanceof Error ? e.message : String(e)}`);
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointA/dictLoad] log failure: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     } catch (error) {

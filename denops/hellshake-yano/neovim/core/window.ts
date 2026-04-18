@@ -26,7 +26,7 @@ import type { Config, WindowInfo } from "../../types.ts";
  */
 export async function isValidBuffer(
   denops: Denops,
-  bufnr: number
+  bufnr: number,
 ): Promise<boolean> {
   try {
     const exists = (await denops.call("bufexists", bufnr)) as number;
@@ -50,7 +50,7 @@ export async function isValidBuffer(
  */
 export async function shouldUseMultiWindowMode(
   denops: Denops,
-  config: Config
+  config: Config,
 ): Promise<boolean> {
   // マルチウィンドウモードが無効なら即座にfalse
   if (!config.multiWindowMode) {
@@ -75,7 +75,7 @@ export async function shouldUseMultiWindowMode(
  */
 export async function getVisibleWindows(
   denops: Denops,
-  config: Config
+  config: Config,
 ): Promise<WindowInfo[]> {
   const result: WindowInfo[] = [];
 
@@ -94,7 +94,7 @@ export async function getVisibleWindows(
 
     // Batch all getbufvar calls into a single IPC round-trip
     const buftypes = await denops.batch(
-      ...winInfoList.map((info) => ["getbufvar", info.bufnr, "&buftype"] as [string, ...unknown[]])
+      ...winInfoList.map((info) => ["getbufvar", info.bufnr, "&buftype"] as [string, ...unknown[]]),
     ) as string[];
 
     for (let i = 0; i < winInfoList.length; i++) {
@@ -146,13 +146,13 @@ export async function getVisibleWindows(
  */
 export async function getWindowVisibleLines(
   denops: Denops,
-  windowInfo: WindowInfo
+  windowInfo: WindowInfo,
 ): Promise<string[]> {
   try {
     // バッファ有効性チェック（Race Condition 対策）
     if (!(await isValidBuffer(denops, windowInfo.bufnr))) {
       console.warn(
-        `[window.ts] Buffer ${windowInfo.bufnr} is no longer valid (likely closed during async operation)`
+        `[window.ts] Buffer ${windowInfo.bufnr} is no longer valid (likely closed during async operation)`,
       );
       return [];
     }
@@ -163,7 +163,7 @@ export async function getWindowVisibleLines(
       windowInfo.bufnr,
       windowInfo.topline - 1, // 0-indexed に変換
       windowInfo.botline, // exclusive なのでそのまま
-      false // strict_indexing = false
+      false, // strict_indexing = false
     )) as string[];
 
     return lines;
@@ -171,7 +171,7 @@ export async function getWindowVisibleLines(
     // Race condition による Invalid buffer id エラーは警告レベルに
     if (error instanceof Error && error.message.includes("Invalid buffer id")) {
       console.warn(
-        `[window.ts] Buffer became invalid during getWindowVisibleLines: ${error.message}`
+        `[window.ts] Buffer became invalid during getWindowVisibleLines: ${error.message}`,
       );
     } else {
       console.error("[window.ts] getWindowVisibleLines error:", error);
