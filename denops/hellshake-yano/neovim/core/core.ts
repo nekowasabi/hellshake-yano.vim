@@ -42,8 +42,9 @@ import {
   generateHints,
   resolveDirectionalContext,
   validateHintKeyConfig,
+  OVERLAP_SKIP_OPTS,
 } from "./hint.ts";
-import { DictionaryLoader, type UserDictionary, VimConfigBridge } from "./word.ts";
+import { DictionaryLoader, HintPatternProcessor, type UserDictionary, VimConfigBridge } from "./word.ts";
 import {
   isControlCharacter,
   isValidColorName,
@@ -369,6 +370,14 @@ export class Core {
   private dictionaryLoader: DictionaryLoader | null = null;
   /** Vim設定ブリッジ */
   private vimConfigBridge: VimConfigBridge | null = null;
+  /** キャッシュ済み辞書データ (applyHintPatterns で参照) */
+  // Why: loadedDict をインスタンスに保持。理由: initializeDictionarySystem で 1 回ロードした辞書を
+  //   showHintsInternal から毎回アクセス可能にするため。再ロードは reload 時のみ発生。
+  private cachedDictionary: UserDictionary | null = null;
+  /** HintPatternProcessor の遅延初期化インスタンス */
+  // Why: new HintPatternProcessor() を showHintsInternal 呼び出しごとに生成するのではなく
+  //   1 回だけ生成して再利用。理由: applyHintPatterns はステートレスなので使い回し可能。
+  private hintPatternProcessor: HintPatternProcessor | null = null;
   /** ヒント描画中かどうかの状態 */
   private _isRenderingHints: boolean = false;
   /** 描画処理を中断するためのAbortController */
@@ -1001,6 +1010,27 @@ export class Core {
           logMessage("DEBUG", "HINT-DEBUG", `[PointE2/beforeAssign] wordsCount=${words.length} hintsCount=${hints.length} directionalEnabled=${directionalContext !== "none"} mode=${modeString}`);
         } catch (_e) { /* noop */ }
       }
+
+      // Why: HintPatternProcessor は従来 dead code だった。captureGroup / hintPosition を実機能化するため
+      //   showHintsInternal から直接呼び出す。辞書未指定 / hintPatterns 空の場合は no-op で通過。
+      const hintPatterns = this.cachedDictionary?.hintPatterns ?? [];
+      if (hintPatterns.length > 0) {
+        const bufferLines = await denops.call("getline", 1, "$") as string[];
+        const bufferText = bufferLines.join("\n");
+        if (!this.hintPatternProcessor) {
+          this.hintPatternProcessor = new HintPatternProcessor();
+        }
+        const enhancedWords = this.hintPatternProcessor.applyHintPatterns(words, bufferText, hintPatterns);
+        // [DEBUG-METRIC] PointD: applyHintPatterns の効果を観測
+        if (getDebugMode()) {
+          const prioritized = enhancedWords.filter(
+            (w: { hintPriority?: number }) => (w.hintPriority ?? 0) > 0,
+          );
+          logMessage("DEBUG", "HINT-DEBUG", `[PointD/applyHintPatterns] prioritizedCount=${prioritized.length} totalWords=${enhancedWords.length} patternsApplied=${hintPatterns.length}`);
+        }
+        words.splice(0, words.length, ...enhancedWords);
+      }
+
       // Why: skipOverlapDetection: true — detectAdjacentWords + shouldSkipHintForOverlap が
       // 日本語文書で 30-60% の単語を過剰削除するため無効化。割当制御は assignHintsToWords に委ねる。
       const hintMappings = assignHintsToWords(
@@ -1013,7 +1043,7 @@ export class Core {
           hintPosition: this.config.hintPosition,
           bothMinWordLength: this.config.bothMinWordLength,
         },
-        { skipOverlapDetection: true },
+        OVERLAP_SKIP_OPTS,
       );
 
       await this.displayHintsOptimized(denops, hintMappings, modeString);
@@ -1845,6 +1875,9 @@ export class Core {
       // Why: 戻り値破棄ではなく const で捕捉する方針を採用。理由: パス解決・パース結果・hintPatterns 実体を
       //      検証するには戻り値が必須だが、ロジック変更ではなく「受け取るだけ」の最小改変に留める。
       const loadedDict = await this.dictionaryLoader.loadUserDictionary(dictConfig);
+      // Why: loadedDict を cachedDictionary に保持。理由: showHintsInternal で applyHintPatterns を呼ぶ際、
+      //   hintPatterns にアクセスするため。毎回 loadUserDictionary を呼ぶと I/O コストが発生する。
+      this.cachedDictionary = loadedDict;
       if (getDebugMode()) {
         try {
           let resolvedPath = "(none)";
@@ -1925,6 +1958,7 @@ export class Core {
       }
       const dictConfig = await this.vimConfigBridge.getConfig(denops);
       const dictionary = await this.dictionaryLoader.loadUserDictionary(dictConfig);
+      this.cachedDictionary = dictionary;
       await denops.cmd('echo "Dictionary reloaded successfully"');
     } catch (error) {
       await denops.cmd(`echoerr "Failed to reload dictionary: ${error}"`);

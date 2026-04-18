@@ -1,6 +1,6 @@
 import type { Denops } from "@denops/std";
 import type { Config, HintMapping, Word } from "../../types.ts";
-import { assignHintsToWords, calculateHintPosition } from "../core/hint.ts";
+import { assignHintsToWords, calculateHintPosition, OVERLAP_SKIP_OPTS } from "../core/hint.ts";
 import { generateHintsFromConfig, recordPerformance } from "../../common/utils/performance.ts";
 import { clearDetectionCache } from "../core/word.ts";
 import { batchGet, callAtomic } from "../../common/utils/batch.ts";
@@ -74,10 +74,11 @@ export async function displayHintsOptimized(
   const cl = cp[1], cc = cp[2];
   let ah = hints;
   if (hints.length < words.length) ah = generateHintsFromConfig(words.length, config);
+  // Why: overlap filter を常時スキップ。日本語連続語で priorityRules(symbolsPriority:1, wordsPriority:2) が誤削除する既知バグを回避（core.ts:1004-1016 と対称）
   const nh = assignHintsToWords(words, ah, cl, cc, "normal", {
     hintPosition: config.hintPosition,
     bothMinWordLength: config.bothMinWordLength,
-  });
+  }, OVERLAP_SKIP_OPTS);
   if (currentHints) {
     currentHints.length = 0;
     currentHints.push(...nh);
@@ -719,10 +720,11 @@ export async function displayHintsAutoMultiBuffer(
       originalLine: w.line,
     }));
 
+    // Why: overlap filter を常時スキップ。日本語連続語で priorityRules(symbolsPriority:1, wordsPriority:2) が誤削除する既知バグを回避（core.ts:1004-1016 と対称）
     const nh = assignHintsToWords(adjustedWords, ah, cl, cc, "normal", {
       hintPosition: config.hintPosition,
       bothMinWordLength: config.bothMinWordLength,
-    });
+    }, OVERLAP_SKIP_OPTS);
 
     // Restore original line values to prevent hint spacing issues
     const restoredHints = nh.map(h => ({

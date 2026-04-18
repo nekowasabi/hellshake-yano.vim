@@ -69,6 +69,9 @@ export function getDisplayWidth(text: string, tabWidth = 8): number {
 import { getByteLength } from "./word.ts";
 export const BATCH_PROCESS_THRESHOLD = 500;
 export const BATCH_BATCH_SIZE = 250;
+// Why: 3箇所（core.ts / extmark-display.ts Path A / Path B）で同じオプションを共有するため定数化。
+// 日本語連続語で detectAdjacentWords が過剰削除する既知バグの回避用。
+export const OVERLAP_SKIP_OPTS: { skipOverlapDetection: boolean } = { skipOverlapDetection: true };
 export function convertToDisplayColumn(line: string, charIndex: number, tabWidth = 8): number {
   if (charIndex <= 0) {
     return 1;
