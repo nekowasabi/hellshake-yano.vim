@@ -755,6 +755,24 @@ let g:hellshake_yano = #{
 \ }
 ```
 
+## Performance
+
+The dictionary-based hint pipeline has been optimized for large files. No configuration changes are required -- the improvements are transparent.
+
+### Dictionary Hint Pipeline Optimization
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Hint display (44,949-line buffer) | 1636 ms | 253 ms | **84.5% reduction / 6.46x faster** |
+
+Key optimizations:
+- **getline array caching** with `changedtick` invalidation -- avoids repeated RPC calls to retrieve buffer lines
+- **TextChanged autocmd invalidation** -- ensures cache is always consistent with buffer state
+- **Line-by-line regex traversal** -- replaces `join("\n")` bulk approach with per-line `regex.exec(line)`, reducing string allocation overhead
+- **RegExp pre-compilation** -- dictionary patterns are compiled at load time into a `compiled` field, eliminating runtime regex construction
+
+All changes are internal. User-facing behavior, configuration options, and hint placement remain unchanged.
+
 ## Usage
 
 After installation, the plugin enhances Vim's built-in word motion commands to work correctly with Japanese text. Navigate using standard Vim motions:
