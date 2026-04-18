@@ -120,6 +120,8 @@ export interface Config {
   motionCounterTimeout: number;
   showHintOnMotionThreshold: boolean;
   debugMode: boolean;
+  /** デバッグログファイルパス（未設定時は console のみ） */
+  debugLogFile?: string;
   performanceLog: boolean;
   debug?: boolean;
   useNumericMultiCharHints?: boolean;

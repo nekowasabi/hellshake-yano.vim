@@ -6,6 +6,8 @@ import type {
   Word,
 } from "../../types.ts";
 import { DEFAULT_HINT_MARKERS } from "../../types.ts";
+// [DEBUG-METRIC] Point D 用: 既存 logger インフラ再利用（新規 logger 作成禁止方針）
+import { getDebugMode, logMessage } from "../../common/utils/logger.ts";
 import type { Config } from "../../types.ts";
 import { HintGeneratorFactory } from "./hint/hint-generator-strategies.ts";
 import { type CacheStatistics, CacheType, GlobalCache } from "../../cache.ts";
@@ -241,7 +243,32 @@ export function assignHintsToWords(
   config?: { hintPosition?: string; bothMinWordLength?: number },
   optimizationConfig?: { skipOverlapDetection?: boolean },
 ): HintMapping[] {
+  // [DEBUG-METRIC] Point D: assignHintsToWords 入口（ヒント割当直前）
+  // Why: Point A-C を通過した hintPriority が実際にこの関数まで届いているかを検証するため。
+  //      Point C の結果と突合し、伝搬の断絶地点を特定可能にする。ログ文のみで本体ロジックは不変。
+  if (getDebugMode()) {
+    try {
+      type WordLike = Word & { hintPriority?: number };
+      const prioritized = (words as WordLike[]).filter((w) => w.hintPriority !== undefined);
+      const sample = prioritized.slice(0, 5).map((w) => ({
+        text: w.text,
+        line: w.line,
+        col: w.col,
+        hintPriority: w.hintPriority,
+      }));
+      logMessage(
+        "DEBUG",
+        "HINT-DEBUG",
+        `[PointD/assign] mode=${mode} inputWords=${words.length} hintsAvail=${hints.length} prioritizedCount=${prioritized.length} top5=${JSON.stringify(sample)}`,
+      );
+    } catch (e) {
+      logMessage("DEBUG", "HINT-DEBUG", `[PointD/assign] log failure: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
   if (words.length === 0 || hints.length === 0) {
+    if (getDebugMode()) {
+      logMessage("DEBUG", "HINT-DEBUG", `[PointD/assign] early-exit mappings=0`);
+    }
     return [];
   }
   const hintPositionSetting = config?.hintPosition ?? "start";
@@ -297,6 +324,11 @@ export function assignHintsToWords(
       }
     }
     filteredWords = words.filter((word) => !wordsToSkip.has(word));
+  }
+  if (getDebugMode()) {
+    try {
+      logMessage("DEBUG", "HINT-DEBUG", `[PointE1/overlapFilter] beforeCount=${words.length} afterCount=${filteredWords.length} dropped=${words.length - filteredWords.length}`);
+    } catch (_e) { /* noop */ }
   }
   const sortedWords = sortWordsByDistanceOptimized(filteredWords, cursorLine, cursorCol);
 

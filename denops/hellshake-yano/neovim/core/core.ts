@@ -3,6 +3,8 @@
  * TDD Red-Green-Refactor方法論に従って実装 */
 import type { Denops } from "@denops/std";
 import { type CacheStatistics, LRUCache } from "../../cache.ts";
+// [DEBUG-METRIC] Point A 用: 既存 logger インフラ再利用（新規 logger 作成禁止方針）
+import { getDebugMode, logMessage } from "../../common/utils/logger.ts";
 import type { Config } from "../../types.ts";
 import { DEFAULT_CONFIG, getDefaultConfig, mergeConfig, validateConfig } from "../../config.ts";
 import type {
@@ -994,6 +996,13 @@ export class Core {
         return;
       }
 
+      if (getDebugMode()) {
+        try {
+          logMessage("DEBUG", "HINT-DEBUG", `[PointE2/beforeAssign] wordsCount=${words.length} hintsCount=${hints.length} directionalEnabled=${directionalContext !== "none"} mode=${modeString}`);
+        } catch (_e) { /* noop */ }
+      }
+      // Why: skipOverlapDetection: true — detectAdjacentWords + shouldSkipHintForOverlap が
+      // 日本語文書で 30-60% の単語を過剰削除するため無効化。割当制御は assignHintsToWords に委ねる。
       const hintMappings = assignHintsToWords(
         words,
         hints,
@@ -1004,6 +1013,7 @@ export class Core {
           hintPosition: this.config.hintPosition,
           bothMinWordLength: this.config.bothMinWordLength,
         },
+        { skipOverlapDetection: true },
       );
 
       await this.displayHintsOptimized(denops, hintMappings, modeString);
@@ -1722,7 +1732,10 @@ export class Core {
   ): Promise<number | undefined> {
     const { word, hint } = mapping;
     const hintLine = word.line;
+    // Why: hintByteCol は word.ts で byteIndex+1 として設定済みの 1-indexed バイトオフセット。
+    // hintByteCol → hintCol → word.byteCol → word.col の順にフォールバック。
     const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
+    // Why: nvim_buf_set_extmark は 0-indexed を要求するため -1 する。
     const nvimLine = hintLine - 1;
     const nvimCol = hintByteCol - 1;
     const highlightGroup = this.getHighlightGroupName(isCandidate);
@@ -1735,12 +1748,33 @@ export class Core {
       if (!bufValid) {
         return undefined;
       }
+      // Why: Invalid 'line' / 'col' エラーを防ぐため、nvim_buf_line_count と行バイト長で
+      // 範囲チェックを行う。out-of-range の場合は extmark をスキップして undefined を返す。
+      const lineCount = await denops.call("nvim_buf_line_count", bufnr) as number;
+      if (nvimLine < 0 || nvimLine >= lineCount) {
+        return undefined;
+      }
+      const lineBytes = await denops.call(
+        "nvim_buf_get_lines",
+        bufnr,
+        nvimLine,
+        nvimLine + 1,
+        false,
+      ) as string[];
+      if (!lineBytes || lineBytes.length === 0) {
+        return undefined;
+      }
+      const lineByteLen = new TextEncoder().encode(lineBytes[0]).length;
+      // Why: clamp — col がバイト長を超える場合、行末に寄せることで
+      // Invalid 'col' エラーを回避しつつヒントを表示継続する。
+      const safeNvimCol = Math.min(Math.max(0, nvimCol), lineByteLen);
+
       const extmarkId = await denops.call(
         "nvim_buf_set_extmark",
         bufnr,
         extmarkNamespace,
         nvimLine,
-        nvimCol,
+        safeNvimCol,
         {
           "virt_text": [[hint, highlightGroup]],
           "virt_text_pos": "overlay",
@@ -1807,7 +1841,40 @@ export class Core {
       this.vimConfigBridge = new VimConfigBridge();
       await this.registerDictionaryCommands(denops);
       const dictConfig = await this.vimConfigBridge.getConfig(denops);
-      await this.dictionaryLoader.loadUserDictionary(dictConfig);
+      // [DEBUG-METRIC] Point A: 辞書ロード完了地点
+      // Why: 戻り値破棄ではなく const で捕捉する方針を採用。理由: パス解決・パース結果・hintPatterns 実体を
+      //      検証するには戻り値が必須だが、ロジック変更ではなく「受け取るだけ」の最小改変に留める。
+      const loadedDict = await this.dictionaryLoader.loadUserDictionary(dictConfig);
+      if (getDebugMode()) {
+        try {
+          let resolvedPath = "(none)";
+          if (dictConfig.dictionaryPath) {
+            resolvedPath = dictConfig.dictionaryPath.startsWith("~")
+              ? (Deno.env.get("HOME") || "") + dictConfig.dictionaryPath.slice(1)
+              : dictConfig.dictionaryPath;
+          }
+          let fileExists = false;
+          if (resolvedPath !== "(none)") {
+            try { Deno.statSync(resolvedPath); fileExists = true; } catch { fileExists = false; }
+          }
+          const hintPatterns = loadedDict.hintPatterns || [];
+          const parseSuccess = loadedDict !== null && typeof loadedDict === "object";
+          const firstPatternSummary = hintPatterns.length > 0
+            ? JSON.stringify({
+                pattern: String(hintPatterns[0].pattern),
+                hintPosition: hintPatterns[0].hintPosition,
+                priority: hintPatterns[0].priority,
+              })
+            : "(none)";
+          logMessage(
+            "DEBUG",
+            "HINT-DEBUG",
+            `[PointA/dictLoad] resolvedPath=${resolvedPath} fileExists=${fileExists} parseSuccess=${parseSuccess} hintPatternsCount=${hintPatterns.length} firstPattern=${firstPatternSummary}`,
+          );
+        } catch (e) {
+          logMessage("DEBUG", "HINT-DEBUG", `[PointA/dictLoad] log failure: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     } catch (error) {
       // Silently handle dictionary initialization errors
       // Dictionary system is optional - plugin should continue to work without it
