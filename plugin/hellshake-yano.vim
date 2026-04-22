@@ -583,12 +583,9 @@ augroup HellshakeYano
   " ターミナルからファイルを開いた場合のちらつき防止（lazygit e キー対応）
   autocmd BufLeave * call hellshake_yano#core#on_buf_leave()
   autocmd BufEnter * call hellshake_yano#core#on_buf_enter_from_terminal()
-  " Process 2: TextChanged でバッファキャッシュを明示的に無効化
-  " Why: changedtick だけでは同一 tick 内の編集でキャッシュが残る懸念があるため、autocmd で明示無効化を併用
-  autocmd TextChanged,TextChangedI * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
-  autocmd BufLeave * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
   " denopsプラグインの遅延読み込み
   autocmd User DenopsPluginPost:hellshake-yano call s:on_denops_ready()
+  autocmd User DenopsPluginPost:hellshake-yano call s:setup_denops_autocmds()
   " カラースキーム変更時にハイライトを再適用
   autocmd ColorScheme * call s:apply_custom_highlights()
 augroup END
@@ -607,6 +604,16 @@ function! s:on_denops_ready() abort
   " ユーザー設定をdenops側に送信（TypeScript側でデフォルト値とマージ）
   " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   silent! call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
+endfunction
+
+" Why: denops dispatcher 登録完了後に TextChanged/BufLeave autocmd を有効化する
+" main() の非同期実行中に denops#notify が呼ばれると "No service is registered" エラーになるため
+function! s:setup_denops_autocmds() abort
+  augroup HellshakeYanoDenops
+    autocmd!
+    autocmd TextChanged,TextChangedI * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
+    autocmd BufLeave * silent! call denops#notify('hellshake-yano', 'invalidateBufferCache', [bufnr('%')])
+  augroup END
 endfunction
 
 " プラグインの初期化を遅延実行
