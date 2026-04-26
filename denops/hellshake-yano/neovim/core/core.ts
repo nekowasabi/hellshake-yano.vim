@@ -57,10 +57,12 @@ import {
   validateHighlightColor,
   validateHighlightGroupName,
 } from "../../validation-utils.ts";
+import { callAtomic } from "../../common/utils/batch.ts";
 import { MULTI_BUFFER_EXTMARK_STATE } from "../display/extmark-display.ts";
 
 /** Neovim extmark namespace name */
 const EXTMARK_NAMESPACE = "hellshake_yano_hints";
+const CORE_TEXT_ENCODER = new TextEncoder();
 
 /**
  * @param threshold
@@ -841,9 +843,7 @@ export class Core {
     mode: string = "normal",
     signal?: AbortSignal,
   ): Promise<void> {
-    const batchSize = 50; // バッチサイズ
-    let extmarkFailCount = 0;
-    const maxFailures = 5;
+    const batchSize = 200;
     let extmarkNamespace: number;
     try {
       extmarkNamespace = await denops.call(
@@ -855,52 +855,125 @@ export class Core {
       return;
     }
 
-    for (let i = 0; i < hints.length; i += batchSize) {
-      if (signal?.aborted) {
+    if (signal?.aborted || hints.length === 0) {
+      return;
+    }
+
+    try {
+      const [bufValid, lineCount] = await Promise.all([
+        denops.call("bufexists", bufnr) as Promise<number>,
+        denops.call("line", "$") as Promise<number>,
+      ]);
+      if (!bufValid || lineCount < 1) {
         return;
       }
-      const batch = hints.slice(i, i + batchSize);
+
+      const candidates = hints.filter((mapping) => {
+        const line = mapping.word.line;
+        return line >= 1 && line <= lineCount;
+      });
+      if (candidates.length === 0) {
+        return;
+      }
+
+      const uniqueLines = [...new Set(candidates.map((mapping) => mapping.word.line - 1))];
+      const lineCalls = uniqueLines.map((line) =>
+        [
+          "nvim_buf_get_lines",
+          bufnr,
+          line,
+          line + 1,
+          false,
+        ] as [string, ...unknown[]]
+      );
+      const lineResults = await callAtomic(denops, lineCalls);
+      const lineLengthCache = new Map<number, number>();
+      for (let i = 0; i < uniqueLines.length; i++) {
+        const lineContent = lineResults[i] as string[];
+        const byteLength = lineContent.length > 0
+          ? CORE_TEXT_ENCODER.encode(lineContent[0]).length
+          : 0;
+        lineLengthCache.set(uniqueLines[i], byteLength);
+      }
+
+      const extmarkCalls: Array<[string, ...unknown[]]> = [];
+      for (const mapping of candidates) {
+        const { word, hint } = mapping;
+        const line = word.line - 1;
+        const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
+        const col = Math.max(0, hintByteCol - 1);
+        const lineByteLength = lineLengthCache.get(line);
+        if (lineByteLength === undefined || col > lineByteLength) {
+          continue;
+        }
+
+        extmarkCalls.push([
+          "nvim_buf_set_extmark",
+          bufnr,
+          extmarkNamespace,
+          line,
+          col,
+          {
+            virt_text: [[hint, "HellshakeYanoMarker"]],
+            virt_text_pos: "overlay",
+            priority: 100,
+          },
+        ]);
+      }
+
+      for (let i = 0; i < extmarkCalls.length; i += batchSize) {
+        if (signal?.aborted) {
+          return;
+        }
+        await callAtomic(denops, extmarkCalls.slice(i, i + batchSize));
+      }
+    } catch (_batchError) {
       try {
-        await Promise.all(batch.map(async (mapping, index) => {
-          const { word, hint } = mapping;
-          try {
-            const bufValid = await denops.call("bufexists", bufnr) as number;
-            if (!bufValid) {
-              throw new Error(`Buffer ${bufnr} no longer exists`);
-            }
-            const hintLine = word.line;
-            const hintCol = mapping.hintCol || word.col;
-            const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
-            const lineCount = await denops.call("line", "$") as number;
-            if (hintLine > lineCount || hintLine < 1) {
-              return;
-            }
-            const nvimLine = hintLine - 1;
-            const nvimCol = hintByteCol - 1;
-            await denops.call(
-              "nvim_buf_set_extmark",
-              bufnr,
-              extmarkNamespace,
-              nvimLine,
-              Math.max(0, nvimCol),
-              {
-                virt_text: [[hint, "HellshakeYanoMarker"]],
-                virt_text_pos: "overlay",
-                priority: 100,
-              },
-            );
-          } catch (extmarkError) {
-            extmarkFailCount++;
-            if (extmarkFailCount >= maxFailures) {
-              const remainingHints = hints.slice(i + index + 1);
-              if (remainingHints.length > 0) {
-                await this.displayHintsWithMatchAddBatch(denops, remainingHints, mode, signal);
-              }
-              return;
-            }
-          }
-        }));
-      } catch (batchError) {
+        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      } catch {
+        // ignore cleanup failure before fallback
+      }
+      await this.displayHintsWithExtmarksSequential(denops, bufnr, extmarkNamespace, hints, signal);
+    }
+  }
+
+  private async displayHintsWithExtmarksSequential(
+    denops: Denops,
+    bufnr: number,
+    extmarkNamespace: number,
+    hints: HintMapping[],
+    signal?: AbortSignal,
+  ): Promise<void> {
+    let extmarkFailCount = 0;
+    const maxFailures = 5;
+    const lineCount = await denops.call("line", "$") as number;
+
+    for (const mapping of hints) {
+      if (signal?.aborted || extmarkFailCount >= maxFailures) {
+        return;
+      }
+      const { word, hint } = mapping;
+      const hintLine = word.line;
+      const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
+      if (hintLine > lineCount || hintLine < 1) {
+        continue;
+      }
+
+      try {
+        await denops.call(
+          "nvim_buf_set_extmark",
+          bufnr,
+          extmarkNamespace,
+          hintLine - 1,
+          Math.max(0, hintByteCol - 1),
+          {
+            virt_text: [[hint, "HellshakeYanoMarker"]],
+            virt_text_pos: "overlay",
+            priority: 100,
+          },
+        );
+      } catch {
+        extmarkFailCount++;
       }
     }
   }
@@ -1694,10 +1767,12 @@ export class Core {
       if (!partialInput) {
         return;
       }
-      const mode = config.mode || "normal";
       // マルチバッファ対応: 全ヒントからユニークなバッファを取得
       const uniqueBuffers = new Set<number>();
-      for (const mapping of this.currentHints) {
+      const hintsForBufferDetection = this.currentHints.length > 0
+        ? this.currentHints
+        : hintMappings;
+      for (const mapping of hintsForBufferDetection) {
         const bufnr = mapping.word?.bufnr ?? 0;
         if (bufnr > 0) uniqueBuffers.add(bufnr);
       }
@@ -1711,8 +1786,21 @@ export class Core {
       ) as number;
       if (signal.aborted) return;
       // 各バッファのextmarkをクリア
-      for (const bufnr of uniqueBuffers) {
-        await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+      const clearCalls = [...uniqueBuffers].map((bufnr) =>
+        [
+          "nvim_buf_clear_namespace",
+          bufnr,
+          extmarkNamespace,
+          0,
+          -1,
+        ] as [string, ...unknown[]]
+      );
+      try {
+        await callAtomic(denops, clearCalls);
+      } catch {
+        for (const bufnr of uniqueBuffers) {
+          await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+        }
       }
       if (signal.aborted) return;
       const candidateHints: HintMapping[] = [];
@@ -1728,45 +1816,23 @@ export class Core {
       const asyncCandidates = candidateHints.slice(SYNC_BATCH_SIZE);
       // フォールバック用に現在のバッファを取得
       const currentBufnr = await denops.call("bufnr", "%") as number;
-      for (const mapping of syncCandidates) {
-        if (signal.aborted) return;
-        try {
-          const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          const extmarkId = await this.setHintExtmark(
-            denops,
-            mapping,
-            targetBufnr,
-            extmarkNamespace,
-            true,
-          );
-
-          // MULTI_BUFFER_EXTMARK_STATE に追跡登録
-          if (extmarkId !== undefined) {
-            MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
-          }
-        } catch (error) {
-        }
-      }
+      await this.setHintExtmarksBatch(
+        denops,
+        syncCandidates,
+        currentBufnr,
+        extmarkNamespace,
+        true,
+        signal,
+      );
       const syncNonCandidates = nonCandidateHints.slice(0, Math.min(5, nonCandidateHints.length));
-      for (const mapping of syncNonCandidates) {
-        if (signal.aborted) return;
-        try {
-          const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-          const extmarkId = await this.setHintExtmark(
-            denops,
-            mapping,
-            targetBufnr,
-            extmarkNamespace,
-            false,
-          );
-
-          // MULTI_BUFFER_EXTMARK_STATE に追跡登録
-          if (extmarkId !== undefined) {
-            MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
-          }
-        } catch (error) {
-        }
-      }
+      await this.setHintExtmarksBatch(
+        denops,
+        syncNonCandidates,
+        currentBufnr,
+        extmarkNamespace,
+        false,
+        signal,
+      );
       const shouldRedraw = await denops.call("hellshake_yano#core#should_redraw") as boolean;
       if (shouldRedraw) {
         await denops.cmd("redraw");
@@ -1775,44 +1841,22 @@ export class Core {
       if (asyncCandidates.length > 0 || asyncNonCandidates.length > 0) {
         queueMicrotask(async () => {
           try {
-            for (const mapping of asyncCandidates) {
-              if (signal.aborted) return;
-              try {
-                const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                const extmarkId = await this.setHintExtmark(
-                  denops,
-                  mapping,
-                  targetBufnr,
-                  extmarkNamespace,
-                  true,
-                );
-
-                // MULTI_BUFFER_EXTMARK_STATE に追跡登録
-                if (extmarkId !== undefined) {
-                  MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
-                }
-              } catch (error) {
-              }
-            }
-            for (const mapping of asyncNonCandidates) {
-              if (signal.aborted) return;
-              try {
-                const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
-                const extmarkId = await this.setHintExtmark(
-                  denops,
-                  mapping,
-                  targetBufnr,
-                  extmarkNamespace,
-                  false,
-                );
-
-                // MULTI_BUFFER_EXTMARK_STATE に追跡登録
-                if (extmarkId !== undefined) {
-                  MULTI_BUFFER_EXTMARK_STATE.add(targetBufnr);
-                }
-              } catch (error) {
-              }
-            }
+            await this.setHintExtmarksBatch(
+              denops,
+              asyncCandidates,
+              currentBufnr,
+              extmarkNamespace,
+              true,
+              signal,
+            );
+            await this.setHintExtmarksBatch(
+              denops,
+              asyncNonCandidates,
+              currentBufnr,
+              extmarkNamespace,
+              false,
+              signal,
+            );
           } catch (err) {
           }
         });
@@ -1891,6 +1935,116 @@ export class Core {
     } catch (error) {
       console.error(`[hellshake-yano] Failed to set hint extmark in buffer ${bufnr}:`, error);
       return undefined;
+    }
+  }
+  private async setHintExtmarksBatch(
+    denops: Denops,
+    mappings: HintMapping[],
+    currentBufnr: number,
+    extmarkNamespace: number,
+    isCandidate: boolean,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (signal.aborted || mappings.length === 0) {
+      return;
+    }
+
+    const highlightGroup = this.getHighlightGroupName(isCandidate);
+    const priority = isCandidate ? 1001 : 1000;
+    const byBuffer = new Map<number, HintMapping[]>();
+    for (const mapping of mappings) {
+      const targetBufnr = mapping.word?.bufnr ?? currentBufnr;
+      const bufferHints = byBuffer.get(targetBufnr);
+      if (bufferHints) {
+        bufferHints.push(mapping);
+      } else {
+        byBuffer.set(targetBufnr, [mapping]);
+      }
+    }
+
+    for (const [bufnr, bufferHints] of byBuffer) {
+      if (signal.aborted) return;
+
+      try {
+        const [bufValid, lineCount] = await Promise.all([
+          denops.call("bufexists", bufnr) as Promise<number>,
+          denops.call("nvim_buf_line_count", bufnr) as Promise<number>,
+        ]);
+        if (!bufValid || lineCount < 1) {
+          continue;
+        }
+
+        const candidates = bufferHints.filter((mapping) => {
+          const line = mapping.word.line;
+          return line >= 1 && line <= lineCount;
+        });
+        if (candidates.length === 0) {
+          continue;
+        }
+
+        const uniqueLines = [...new Set(candidates.map((mapping) => mapping.word.line - 1))];
+        const lineCalls = uniqueLines.map((line) =>
+          [
+            "nvim_buf_get_lines",
+            bufnr,
+            line,
+            line + 1,
+            false,
+          ] as [string, ...unknown[]]
+        );
+        const lineResults = await callAtomic(denops, lineCalls);
+        const lineLengthCache = new Map<number, number>();
+        for (let i = 0; i < uniqueLines.length; i++) {
+          const lineContent = lineResults[i] as string[];
+          const byteLength = lineContent.length > 0
+            ? CORE_TEXT_ENCODER.encode(lineContent[0]).length
+            : 0;
+          lineLengthCache.set(uniqueLines[i], byteLength);
+        }
+
+        const extmarkCalls: Array<[string, ...unknown[]]> = [];
+        for (const mapping of candidates) {
+          const { word, hint } = mapping;
+          const line = word.line - 1;
+          const hintByteCol = mapping.hintByteCol || mapping.hintCol || word.byteCol || word.col;
+          const lineByteLength = lineLengthCache.get(line);
+          if (lineByteLength === undefined) {
+            continue;
+          }
+          const col = Math.min(Math.max(0, hintByteCol - 1), lineByteLength);
+          extmarkCalls.push([
+            "nvim_buf_set_extmark",
+            bufnr,
+            extmarkNamespace,
+            line,
+            col,
+            {
+              "virt_text": [[hint, highlightGroup]],
+              "virt_text_pos": "overlay",
+              "priority": priority,
+            },
+          ]);
+        }
+
+        if (extmarkCalls.length > 0) {
+          await callAtomic(denops, extmarkCalls);
+          MULTI_BUFFER_EXTMARK_STATE.add(bufnr);
+        }
+      } catch {
+        for (const mapping of bufferHints) {
+          if (signal.aborted) return;
+          const extmarkId = await this.setHintExtmark(
+            denops,
+            mapping,
+            bufnr,
+            extmarkNamespace,
+            isCandidate,
+          );
+          if (extmarkId !== undefined) {
+            MULTI_BUFFER_EXTMARK_STATE.add(bufnr);
+          }
+        }
+      }
     }
   }
   private async processBatchedExtmarks(
