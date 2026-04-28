@@ -1,373 +1,246 @@
-# VimScript/TypeScript(Denops) 統合調査レポート
+# hints表示繰り返しによる描画低下の調査報告
 
-**調査日**: 2026-01-25
-**目的**: Vim用VimScriptとNeovim用TypeScriptの二重管理を解消し、Denops側に統一する
+## 症状
 
----
+- nvimを開いたまま、あるいは大きいファイルでヒントを何度も表示させると描画が遅くなる
+- nvim再起動で一時的に解消される
+- メモリは十分に確保されている
 
-## 1. 現状のコードベース規模
+## 調査内容
 
-| 区分 | 行数 | 主要ファイル |
-|------|------|-------------|
-| VimScript (autoload/) | 約5,064行 | core.vim, display.vim, motion.vim, word_detector.vim |
-| TypeScript (denops/) | 約14,689行 | core.ts (3,462行), word.ts (2,264行), hint.ts (736行) |
+### 観測された蓄積箇所
 
-### 1.1 VimScript モジュール構成
+| # | 変数/状態                        | ファイル:行             | 上限           | クリーンアップ                       | 影響                |
+| - | -------------------------------- | ----------------------- | -------------- | ------------------------------------ | ------------------- |
+| 1 | `pluginState.performanceMetrics` | `core.ts:260-265`       | **なし**       | **未実施** (cleanupPluginに含まれず) | 中                  |
+| 2 | `Core.performanceMetrics`        | `core.ts:370-375`       | 50 (slice -50) | `clearDebugInfo()`                   | 低                  |
+| 3 | `performance.ts` 配列            | `performance.ts:43-51`  | 50 (shift)     | `resetPerformanceMetrics()`          | 低                  |
+| 4 | GlobalCache LRU (全種)           | `unified-cache.ts`      | 50-2000        | 各clear()                            | **なし**            |
+| 5 | `adjacencyCache`                 | `hint.ts:649`           | 200 (LRU)      | 自動evict                            | **なし**            |
+| 6 | `CHAR_WIDTH_CACHE`               | `hint.ts:32`            | 500 (LRU)      | 自動evict                            | **なし**            |
+| 7 | Neovim extmark 内部状態          | Neovim C実装 (MarkTree) | 可変           | clear_namespaceで削除                | **未確定 (要実測)** |
 
-| ファイル | 行数 | 機能 |
-|----------|------|------|
-| `core.vim` | 442 | 状態管理、統合処理 |
-| `display.vim` | 493 | popup/extmark表示（Vim/Neovim両対応） |
-| `motion.vim` | 657 | モーション連打検出 |
-| `word_detector.vim` | 468 | 単語検出（日本語対応） |
-| `input.vim` | 315 | キー入力処理（ブロッキング） |
-| `hint_generator.vim` | 230 | ヒント文字列生成 |
-| `visual.vim` | 219 | ビジュアルモード対応 |
-| `config.vim` | 161 | 設定管理 |
-| `dictionary.vim` | 186 | 辞書連携（Denops API呼び出し） |
-| `util.vim` | 155 | 共通ユーティリティ |
+### 観測点1: pluginState.performanceMetrics の潜在的リーク (debug 経路)
 
-### 1.2 TypeScript ディレクトリ構造
-
-```
-denops/hellshake-yano/
-├── main.ts (707行) - メインエントリーポイント
-├── config.ts (625行) - 設定管理
-├── types.ts (350行) - 型定義
-├── common/ - 共通ユーティリティ
-├── integration/ - 統合レイヤー
-│   ├── implementation-selector.ts - 実装選択
-│   └── mapping-manager.ts - マッピング管理
-├── neovim/ - Neovim専用実装
-│   ├── core/core.ts (3,462行) - コアロジック
-│   ├── core/word.ts (2,264行) - 単語検出
-│   ├── core/hint.ts (736行) - ヒント生成
-│   └── display/extmark-display.ts (604行)
-└── vim/ - Vim専用実装
-    ├── display/popup-display.ts (133行)
-    └── features/motion.ts, visual.ts
-```
-
----
-
-## 2. deno-denops-std API リファレンス
-
-**ソース**: https://github.com/vim-denops/deno-denops-std
-
-### 2.1 モジュール構成
-
-| ディレクトリ | 用途 | Vim/Neovim分岐 |
-|-------------|------|---------------|
-| `function/` | Vim/Neovim関数ラッパー | `vim/`, `nvim/` サブディレクトリで分離 |
-| `popup/` | ポップアップ/フローティングウィンドウ | `vim.ts`, `nvim.ts` で分離 |
-| `buffer/` | バッファ操作 | 共通API（内部で分岐） |
-| `buffer/decoration.ts` | ハイライト装飾 | 内部で `prop_add` / `extmark` 分岐 |
-
-### 2.2 Vim/Neovim 表示系API比較
-
-#### Vim: popup_create + prop_add
+**ファイル**: `core.ts:260-265`, `core.ts:4001-4006` **問題**:
+`pluginState.performanceMetrics`の配列(`showHints`, `hideHints`, `wordDetection`,
+`hintGeneration`)に上限がなく、`cleanupPlugin()` (core.ts:285-292) でもクリアされない。 ただし
+`Core.recordPerformance()` (core.ts:1221) は別配列に **50件上限** で記録するため、肥大化しない。
+無制限に push される経路は `recordPerformanceMetric` 系 (core.ts:498, core.ts:4001) のみで、Grep
+の限り通常経路 (`showHintsInternal`) からは呼ばれていない。
+よって本観測点は「描画低下の主要因」ではなく、「未使用または debug
+経路でのみ発生し得る潜在的リーク」と位置づける。
 
 ```typescript
-// popup_create オプション
-{
-  line, col,           // 位置（1-indexed）
-  pos: 'topleft',      // アンカー位置
-  fixed: true,
-  maxheight, minheight,
-  maxwidth, minwidth,
-  border, borderchars,
-  highlight,
-  zindex,
-  posinvert: false,    // Neovim互換
-  flip: false,
-  scrollbar: 0
+// core.ts:285 — cleanupPlugin、performanceMetricsをクリアしていない
+function cleanupPlugin(denops: Denops): Promise<void> {
+  pluginState.status = "cleaned";
+  pluginState.initialized = false;
+  pluginState.hintsVisible = false;
+  pluginState.caches.words.clear();
+  pluginState.caches.hints.clear();
+  // ← performanceMetrics.clear() が欠落
+  return Promise.resolve();
 }
-
-// prop_add（テキスト装飾）- 事前に型登録が必要
-prop_type_add(name, { highlight, priority })
-prop_add_list(type, [[lnum, col, lnum_end, col_end], ...])
 ```
 
-#### Neovim: nvim_open_win + nvim_buf_set_extmark
+### 仮説: Neovim extmark まわりの劣化 (要実測)
+
+大ファイルでヒント表示を繰り返すと:
+
+1. `hideHintsOptimized` (core.ts:574) → `nvim_buf_clear_namespace`
+2. `displayHintsWithExtmarksBatch` (core.ts:839) → `callAtomic` で 200 件単位のバッチ呼び出し
+   (core.ts:846, 928)
+3. これを毎回繰り返す
+
+Neovim の extmark は MarkTree (tree 系データ構造) で管理されるため、当初想定した「flat array +
+free-list
+断片化」モデルは成立しない。再起動で解消する現象の説明としては、以下を並列に計測候補として挙げる:
+
+- バッファ内 extmark 総数の累積
+- `nvim__redraw` / 描画コスト
+- word detection のキャッシュヒット率
+- callAtomic バッチサイズ超過時のフォールバック
+
+加えて、`hideHintsOptimized` の catch ブロックが空 (core.ts:593)
+でエラーを握り潰しているため、実際の失敗が観測できていない可能性がある。
 
 ```typescript
-// nvim_open_win オプション
-{
-  relative: 'editor' | 'cursor',
-  row, col,            // 位置（0-indexed）
-  width, height,
-  anchor: 'NW' | 'NE' | 'SW' | 'SE',
-  border,
-  focusable: false,    // Vim互換のため
-  zindex
+} catch (error) {
+  // ← 空！エラーログすらない
 }
-
-// nvim_buf_set_extmark（テキスト装飾）
-nvim_buf_set_extmark(buffer, ns_id, line, col, {
-  virt_text: [[text, hl_group]],
-  virt_text_pos: 'overlay',
-  hl_group,
-  end_row, end_col,
-  priority
-})
 ```
 
-### 2.3 座標系の違い（重要）
+### 安全な箇所 (蓄積しない設計)
 
-| 項目 | Vim | Neovim |
-|------|-----|--------|
-| 行番号 | 1-indexed | 0-indexed |
-| 列番号 | 1-indexed | 0-indexed |
-| 列の単位 | 表示列 | バイト位置 |
-| 変換処理 | screenpos() | 不要（直接指定） |
+- `Core.recordPerformance()` (core.ts:1221-1231) → `performanceLog` guard + slice(-50) cap
+- `performance.ts` の `performanceMetrics` → shift() で50上限
+- GlobalCache の LRU 全種 → maxSize で保護
+- `ExtmarkDisplayAdapter` (extmark-display-adapter.ts) → hideAll() で hints/extmarkIds をクリア
+- `PopupDisplayAdapter` (popup-display.ts) → hideAll() で popupIds をクリア
+- `MULTI_BUFFER_EXTMARK_STATE` (extmark-display.ts:338) → clearHintsMultiBuffer でクリア
+- `MotionManager.counters` (core.ts:104) → reset/resetCounter でクリア
 
-### 2.4 装飾（decoration）の違い
+## 修正提案
 
-| 項目 | Vim (prop_add) | Neovim (extmark) |
-|------|---------------|------------------|
-| 事前登録 | 必要（prop_type_add） | 不要 |
-| 名前空間 | 型名で管理 | nvim_create_namespace |
-| 削除 | prop_remove | nvim_buf_del_extmark |
-| 一括削除 | prop_remove({type}) | nvim_buf_clear_namespace |
-| 優先度 | 型名に含める | opts.priority |
+> **進捗**: 修正提案 1 / 2 / 3 はすべて 2026-04-28 の OODA サイクルで実装済み。 詳細は `PLAN.md`
+> (Progress Map 13/13 completed) と `plan/process-*.md` を参照。 後段「## Instrumentation 使用手順
+> (Process 200 追記)」に debug 出力の読み方を記載。
 
-### 2.5 Denops統一API
+### 1. cleanupPluginにperformanceMetricsクリアを追加 (debug 経路の念のため対策)
 
-```typescript
-// popup モジュール - Vim/Neovim共通インターフェース
-import * as popup from "jsr:@denops/std/popup";
-const win = await popup.open(denops, {
-  bufnr,
-  relative: "editor",
-  width: 20,
-  height: 20,
-  row: 1,
-  col: 1,
-});
-await win.close();
+**core.ts:285-292**
 
-// buffer/decoration - 統一された装飾API
-import { decorate } from "jsr:@denops/std/buffer";
-await decorate(denops, bufnr, decorations);
-// 内部でVim/Neovim分岐を処理
-
-// function モジュール - 型安全なVim関数呼び出し
-import * as fn from "jsr:@denops/std/function";
-import * as nvimFn from "jsr:@denops/std/function/nvim";
-import * as vimFn from "jsr:@denops/std/function/vim";
-```
-
----
-
-## 3. 主要なNeovim固有API（extmark関連）
+> ✅ 実装済み (Process 01)
+>
+> - 適用箇所: `denops/hellshake-yano/neovim/core/core.ts` `cleanupPlugin()` 内
+> - 4 配列 (showHints/hideHints/wordDetection/hintGeneration) を空配列に再代入
+> - 連続失敗カウンタ `extmarkClearErrorCount` のリセットも同関数内で実施 (Process 03 と整合)
+> - テスト: `tests/cleanup_plugin_test.ts` `[REGRESSION] cleanupPlugin clears performanceMetrics`
 
 ```typescript
-// 名前空間作成
-nvim_create_namespace(denops, name): Promise<number>
-
-// extmark設定
-nvim_buf_set_extmark(denops, buffer, ns_id, line, col, opts): Promise<number>
-// opts: { virt_text, virt_text_pos, hl_group, end_row, end_col, priority }
-
-// extmark取得
-nvim_buf_get_extmark_by_id(denops, buffer, ns_id, id, opts): Promise<[number, number]>
-nvim_buf_get_extmarks(denops, buffer, ns_id, start, end, opts): Promise<unknown[]>
-
-// extmark削除
-nvim_buf_del_extmark(denops, buffer, ns_id, id): Promise<boolean>
-nvim_buf_clear_namespace(denops, buffer, ns_id, line_start, line_end): Promise<void>
-```
-
----
-
-## 4. 主要なVim固有API（popup/prop関連）
-
-```typescript
-// popup関連
-popup_create(denops, what, options): Promise<number>  // ウィンドウID
-popup_close(denops, id, result?): Promise<void>
-popup_list(denops): Promise<number[]>
-popup_getpos(denops, id): Promise<Record<string, unknown>>
-popup_getoptions(denops, id): Promise<Record<string, unknown>>
-
-// prop関連
-prop_type_add(denops, name, props): Promise<void>
-prop_add(denops, lnum, col, props): Promise<void>
-prop_add_list(denops, type, items): Promise<void>
-prop_remove(denops, props, lnum?, lnum_end?): Promise<number>
-prop_list(denops, lnum, props?): Promise<unknown[]>
-prop_find(denops, props, direction?): Promise<unknown>
-```
-
----
-
-## 5. 重複機能の特定と統合優先度
-
-| 機能 | VimScript | TypeScript | 重複度 | 統合難易度 | 優先度 |
-|------|-----------|------------|--------|-----------|--------|
-| dictionary | 186行 | 51行 | 低 | **低** | **1** |
-| config | 161行 | 625行 | 高 | **低** | **2** |
-| hint_generator | 230行 | 736行 | 高 | **低** | **3** |
-| word_detector | 468行 | 2,264行 | 高 | 中 | 4 |
-| display | 493行 | 737行 | 高 | 中 | 5 |
-| visual | 219行 | 113行 | 中 | 中 | 6 |
-| motion | 657行 | 82行 | 中 | 高 | 7 |
-| input | 315行 | (内包) | 低 | 高 | 8 |
-| core | 442行 | 3,462行 | 高 | 高 | 9 |
-
----
-
-## 6. 推奨統合順序
-
-### Phase 1: 低リスク（各1-2日）
-
-1. **dictionary統合**
-   - 現状: VimScript版は既にDenops APIをラップ
-   - 作業: VimScript版を削除し、TypeScript版に一本化
-   - Denops API: `denops.dispatch('hellshake-yano', 'reloadDictionary')`
-
-2. **config統合**
-   - 現状: TypeScript側にconfig-mapper/unifier/migratorが存在
-   - 作業: VimScript版config.vimをDenops呼び出しに置き換え
-
-3. **hint_generator統合**
-   - 現状: TypeScript版の方が高機能（ストラテジーパターン）
-   - 作業: VimScript版をDenops API呼び出しに置き換え
-
-### Phase 2: 中リスク（各2-4日）
-
-4. **word_detector統合**
-   - 現状: TypeScript版がはるかに高機能（キャッシュ、最適化）
-   - 作業: VimScript版をDenops API呼び出しに置き換え
-   - 考慮点: パフォーマンス測定が必要
-
-5. **display統合**
-   - 現状: 3つの実装が存在
-   - 作業: `@denops/std/popup` と `@denops/std/buffer/decoration` を活用
-   - 考慮点: 座標変換ロジックの正確な移植
-
-6. **visual統合**
-   - 作業: TypeScript版を拡張し、VimScript版を置き換え
-   - 考慮点: 選択範囲の取得タイミング
-
-### Phase 3: 高リスク（各5-10日）
-
-7. **motion統合**
-   - 考慮点: タイマー処理、v:count処理のDenops移植
-
-8. **input統合**
-   - 考慮点: getchar()ブロッキング入力の非同期化
-
-9. **core統合**
-   - 考慮点: 全機能の回帰テスト
-
----
-
-## 7. 技術的リスクと対策
-
-| リスク | 影響度 | 対策 |
-|--------|-------|------|
-| Denops呼び出しのレイテンシ | 中 | バッチ処理、キャッシュ活用 |
-| Vim 8.0との互換性 | 中 | CI/CDでのVim 8.0テスト |
-| タイマーAPI挙動差異 | 高 | CLAUDE.mdの知見を活用 |
-| v:count消失問題 | 高 | 現行の回避策を維持 |
-| 座標系の違い | 高 | Denops統一APIを活用 |
-
----
-
-## 8. 既知のVim/Neovim差異（CLAUDE.mdより）
-
-### 8.1 timer_start()のコールバック引数
-- タイマーIDが第1引数として自動渡し
-- Vimでラムダ使用時は`+lambda`ビルドオプションが必要
-
-### 8.2 nvim_buf_set_extmark()のid=0
-- 「自動割り当て」ではなく「ID 0の操作」と解釈される
-- 自動割り当てを希望する場合はidオプションを省略
-
-### 8.3 colパラメータ
-- extmarkはバイト位置（0-indexed）
-- popupは表示列（1-indexed）
-- マルチバイト文字で要注意
-
-### 8.4 nvim_buf_clear_namespace(0, ...)
-- 「カレントバッファのみ」を意味
-- 「全バッファ」ではない
-- マルチバッファ対応時は明示的にバッファ番号を指定
-
----
-
-## 9. 期待効果
-
-- 約5,000行のVimScript削減可能
-- TypeScript版の高機能（キャッシュ、最適化、高度なヒント割り当て）をVimでも利用可能
-- メンテナンス性の向上
-- バグ修正の一元化
-- 型安全性の向上
-
----
-
-## 10. 参考リンク
-
-- [deno-denops-std](https://github.com/vim-denops/deno-denops-std) - Denops標準ライブラリ
-- [Denops Documentation](https://vim-denops.github.io/denops-documentation/) - 公式ドキュメント
-- [JSR @denops/std](https://jsr.io/@denops/std) - JSRパッケージ
-
----
-
-## 11. Phase 2.1 で発見された座標系の問題
-
-### 11.1 col の不一致問題
-
-Phase 2.1 (word_detector 統合) で、VimScript と TypeScript の `col` 座標の意味が異なることが判明。
-
-| 項目 | VimScript | TypeScript |
-|------|-----------|------------|
-| `col` | バイト位置 (1-indexed) | 表示列 (1-indexed) |
-| `byteCol` | なし | バイト位置 (1-indexed) |
-
-**問題**: マルチバイト文字（日本語など）を含む行で、座標が一致しない。
-
-**例**: `"abc日本語def"` の `"本"` の位置
-- VimScript `col`: 7 (byte)
-- TypeScript `col`: 6 (display) ← **不一致!**
-- TypeScript `byteCol`: 7 (byte) ← 一致
-
-### 11.2 実装パターン: byteCol 優先
-
-TypeScript側で `word.byteCol ?? word.col` パターンを使用し、バイト位置を優先取得。
-
-```typescript
-function toVimWordData(word: Word): Record<string, unknown> {
-  const encoder = new TextEncoder();
-  const byteLen = encoder.encode(word.text).length;
-  const col = word.byteCol ?? word.col;  // byteCol 優先
-  return {
-    text: word.text,
-    lnum: word.line,
-    col: col,
-    end_col: col + byteLen,
+function cleanupPlugin(denops: Denops): Promise<void> {
+  pluginState.status = "cleaned";
+  pluginState.initialized = false;
+  pluginState.hintsVisible = false;
+  pluginState.caches.words.clear();
+  pluginState.caches.hints.clear();
+  pluginState.performanceMetrics = {
+    showHints: [],
+    hideHints: [],
+    wordDetection: [],
+    hintGeneration: [],
   };
+  return Promise.resolve();
 }
 ```
 
-**実装箇所**: `denops/hellshake-yano/main.ts` lines 137-150
+### 2. hideHintsOptimizedの空catchにログ出力追加
 
-### 11.3 回避策
+**core.ts:592-593**
 
-1. **TypeScript側**: `byteCol` フィールドを明示的に設定
-2. **VimScript側**: `col` をそのまま使用（バイト位置として扱う）
-3. **変換関数**: `toVimWordData()` で `byteCol` を優先
+`hideHintsOptimized` は hot path のため、`console.warn`
+直接呼び出しは連続失敗時にログが氾濫する恐れがある。core.ts:7 で import 済みの `logMessage`
+(logger.ts:92) を使うこと。`logMessage` のシグネチャは
+`(level: LogLevel, context: string, message: string)` のため引数順に注意する。
 
-### 11.4 教訓
+```typescript
+} catch (error) {
+  logMessage("ERROR", "hellshake-yano", `Failed to clear extmarks: ${String(error)}`);
+}
+```
 
-- VimScript と TypeScript で同じフィールド名でも意味が異なる場合がある
-- マルチバイト文字を扱う場合は必ず座標系の確認が必要
-- Phase 1.1-1.3 では辞書・設定・ヒント生成のため、この問題は顕在化しなかった
-- Phase 2.1 (単語検出) で初めて座標の正確性が要求され、問題が発見された
+ERROR レベルは debug flag に依存せず常時出力されるため、hot path
+で連続失敗が起きるとログが氾濫する。連続失敗カウンタで間引くか、初回のみ出して以降は抑制する設計が望ましい。
+
+> ✅ 実装済み (Process 02 + 03)
+>
+> - Process 02: nvim path の空 catch を `logMessage("ERROR", "hellshake-yano", ...)` に置換
+> - Process 03: モジュールスコープに `let extmarkClearErrorCount = 0` と
+>   `const EXTMARK_ERROR_LOG_INTERVAL = 100` を導入
+> - ロジック: `count === 1 || count % 100 === 0` のときのみ logMessage を発火
+> - cleanupPlugin で counter を 0 リセット (再 initialize 後の初回失敗を確実に観測)
+> - テスト: `tests/hide_hints_error_logging_test.ts`
+>   (初回出力検証)、`tests/error_throttling_test.ts` (200 回連続失敗で 3 回のみ + cleanup リセット)
+
+### 3. 描画劣化の実測手順を先行実施
+
+namespace 定期再作成案は、`nvim_create_namespace(name)` が同名で既存 id を返す idempotent API
+である以上、別名化しなければ効果がなく、別名化すると namespace 自体が増加するリスクがある
+(core.ts:64 で `EXTMARK_NAMESPACE = "hellshake_yano_hints"`
+固定)。先に修正に着手するのではなく、以下を計測する:
+
+- show/hide サイクル数とバッファ内 extmark 総数の推移
+- `displayHintsWithExtmarksBatch` の所要時間 (callAtomic 呼び出し回数 × バッチ実行時間)
+- `nvim_buf_clear_namespace` のタイミングと所要時間
+- Neovim バージョン (extmark 実装はバージョン依存)
+
+> ✅ 実装済み (Process 04 / 05 / 06)
+>
+> - Process 04: `displayHintsWithExtmarksBatch` 全体所要時間を `performance.now()` で計測
+> - Process 05: callAtomic 呼び出し回数 (`batchCount`) と総 extmark 数 (`totalMarks`)
+>   を呼び出し側でラップ計測
+> - Process 06: `nvim_buf_clear_namespace` 前後の所要時間を計測
+> - 共通設計: `getDebugMode()` を関数冒頭で 1 回だけ評価。debugMode=false 時は `performance.now()`
+>   呼び出し含めゼロコスト (early evaluate)
+> - 出力先: `logMessage("DEBUG", "hellshake-yano:perf", ...)`
+> - テスト: `tests/display_hints_timing_test.ts`、`tests/clear_namespace_timing_test.ts`
+
+## Instrumentation 使用手順 (Process 200 追記)
+
+### debugMode の有効化
+
+`init.vim` または `init.lua` に以下を追加:
+
+```vim
+let g:hellshake_yano = {'debugMode': v:true}
+" 任意: ファイル追跡用
+let g:hellshake_yano = extend(g:hellshake_yano, {'debugLogFile': expand('~/hellshake-yano-debug.log')})
+```
+
+### 観測される DEBUG ログ形式
+
+| ログ行                                                                                                   | 意味                                                                      | 出所            |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------- |
+| `[DEBUG] [hellshake-yano:perf] displayHintsWithExtmarksBatch: 12.34ms, batches=3, marks=512`             | 全体描画 1 サイクルの所要時間とバッチ統計                                 | Process 04 / 05 |
+| `[DEBUG] [hellshake-yano:perf] displayHintsWithExtmarksBatch: 0.05ms, batches=0, marks=0 (early-return)` | hints 0 件 / signal abort で早期終了                                      | Process 04      |
+| `[DEBUG] [hellshake-yano:perf] displayHintsWithExtmarksBatch: 8.90ms, batches=1, marks=200 (aborted)`    | バッチ途中で signal abort                                                 | Process 04 / 05 |
+| `[DEBUG] [hellshake-yano:perf] displayHintsWithExtmarksBatch: 14.50ms, batches=2, marks=300 (fallback)`  | callAtomic 失敗 → sequential fallback 経路                                | Process 04 / 05 |
+| `[DEBUG] [hellshake-yano:perf] clearNamespace: 0.12ms`                                                   | hideHints 時の `nvim_buf_clear_namespace` 所要時間                        | Process 06      |
+| `[ERROR] [hellshake-yano] Failed to clear extmarks: <error>`                                             | nvim_buf_clear_namespace 失敗 (debug 無効でも常時出力 / 100 回ごと間引き) | Process 02 / 03 |
+
+### show/hide 100 サイクル後の所要時間増加チェック手順
+
+1. Neovim を起動して `:HellshakeYano` 等で初回ヒント表示
+2. 上記 debugMode 設定で `g:hellshake_yano.debugLogFile` を有効化
+3. 同一バッファで show / hide を 100 回繰り返す（`hjkl` 系 motion で自動的に show 発火）
+4. ログから `displayHintsWithExtmarksBatch: Xms` の `X` 値の時系列変化を抽出
+   (`grep -oE "displayHintsWithExtmarksBatch: [0-9.]+ms"`)
+5. `clearNamespace: Xms` も同様に抽出
+6. 線形劣化 / 急激劣化 / 横ばいのいずれかを判定し、Process 300 振り返りに反映
+
+## 今後の確認事項
+
+- `performanceLog`が有効になっているか（core.ts:1226の`this.config.performanceLog`）
+- 実際のextmark数とサイクル数
+- Neovimバージョン（extmark実装はバージョンによって異なる）
 
 ---
 
-**更新履歴**
-- 2026-01-25: 初版作成
-- 2026-02-06: Phase 2.1 座標系問題の文書化追加
+# Cycle 3 観測結果 (2026-04-28 15:52)
+
+## 仮説検証結果
+
+| 仮説                            | 結果        | 実測根拠                                                       |
+| ------------------------------- | ----------- | -------------------------------------------------------------- |
+| extmark 描画劣化                | ❌ **反証** | `displayHintsWithExtmarksBatch` 0.78-26.67ms (線形、想定内)    |
+| `nvim_buf_clear_namespace` 劣化 | ❌ **反証** | `clearNamespace` 0.12-4.27ms (想定内)                          |
+| 真因は別箇所 (getline/RPC)      | ✅ **支持** | `Timing/getline` elapsed=890ms / 901ms / 819ms (lineCount≈45k) |
+
+## 新発見
+
+### Finding 1: getline ボトルネック (最高優先)
+
+- 45k+ 行バッファで `nvim_buf_get_lines` (RPC + serialize) が ~900ms
+- show 1 サイクルあたり 1 回 (cacheHit=false) のため、subjective slowdown の主因
+- 対策候補: viewport 限定 / キャッシュ invalidation 戦略の見直し
+
+### Finding 2: multi-buffer extmark 座標オーバーフロー (中優先)
+
+- `processExtmarksForBuffer` (extmark-display.ts:513) で `Invalid 'col'/'line': out of range`
+- multi-buffer (buffer 4, 5) で 3 回観測、single-buffer では未発生
+- 対策候補: 投入前 line/col クランプ + set_extmark 失敗用 throttling
+
+### Finding 3: dictionary pattern wordFoundCount=0 (低優先)
+
+- `matchCount=32 wordFoundCount=0` (2 patterns)
+- col base (0/1) または bytes/chars 不一致が候補
+- 別 PLAN として分離推奨
+
+## Next Cycle
+
+詳細は `PLAN-followup-cycle3.md` を参照。優先度順:
+
+1. RC-1 (getline) → Process 03/04
+2. RC-2 (multi-buffer) → Process 01/02
+3. RC-3 (dictionary) → 別 PLAN 起票検討
