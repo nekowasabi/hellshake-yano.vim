@@ -64,6 +64,61 @@ import { MULTI_BUFFER_EXTMARK_STATE } from "../display/extmark-display.ts";
 const EXTMARK_NAMESPACE = "hellshake_yano_hints";
 const CORE_TEXT_ENCODER = new TextEncoder();
 
+// Why: hot path (hideHintsOptimized の nvim_buf_clear_namespace) で連続失敗が起きた際に、
+//   ERROR レベルログが debug flag 非依存で常時出力されるためログ氾濫を招く。
+//   モジュールスコープのカウンタで初回 + N 回ごとに間引くことで検知能力を維持しつつ抑制する。
+//   cleanupPlugin でリセットすることで pluginState ライフサイクルと整合させる。
+let extmarkClearErrorCount = 0;
+const EXTMARK_ERROR_LOG_INTERVAL = 100;
+
+/**
+ * RC-1 (PLAN-followup-cycle3 Process 03): getline キャッシュヒット率の累積計測。
+ * Why: 単発の cacheHit ログだけでは長期傾向 (キャッシュ無効化頻度) が見えない。
+ *      hits / (hits+misses) を 100 回ごとに集計し、cache miss 理由も併記することで
+ *      mitigation 設計 (Process 04 viewport 切替) の効果検証材料とする。
+ *      debugMode 配下のみで動作し、hot path はゼロコスト。
+ */
+let getlineCacheHitCount = 0;
+let getlineCacheMissCount = 0;
+let getlineCacheLastMissReason: string = "";
+const GETLINE_CACHE_REPORT_INTERVAL = 100;
+export const VIEWPORT_GETLINE_THRESHOLD = 5000;
+
+/** テスト用: getline cache 計測カウンタをリセット */
+export function resetGetlineCacheStats(): void {
+  getlineCacheHitCount = 0;
+  getlineCacheMissCount = 0;
+  getlineCacheLastMissReason = "";
+}
+
+/** テスト用: getline cache 計測カウンタを取得 */
+export function getGetlineCacheStats(): {
+  hits: number;
+  misses: number;
+  lastMissReason: string;
+} {
+  return {
+    hits: getlineCacheHitCount,
+    misses: getlineCacheMissCount,
+    lastMissReason: getlineCacheLastMissReason,
+  };
+}
+
+export function resolveGetlineScope(
+  totalLineCount: number,
+  viewportStart: number,
+  viewportEnd: number,
+): { scope: "full" | "viewport"; startLine: number; endLine: number } {
+  if (totalLineCount >= VIEWPORT_GETLINE_THRESHOLD) {
+    return {
+      scope: "viewport",
+      startLine: Math.max(1, viewportStart),
+      endLine: Math.max(viewportStart, viewportEnd),
+    };
+  }
+  return { scope: "full", startLine: 1, endLine: totalLineCount };
+}
+
 /**
  * @param threshold
  * @param timeoutMs
@@ -288,6 +343,21 @@ function cleanupPlugin(denops: Denops): Promise<void> {
   pluginState.hintsVisible = false;
   pluginState.caches.words.clear();
   pluginState.caches.hints.clear();
+  // Why: pushPerformanceMetric() 経由で debugMode 有効時のみ蓄積されるが、
+  //   cleanup 時にリセットしないと debug 長期セッションで配列が無制限に成長する。
+  //   pluginState.performanceMetrics の 4 配列を空配列に置換することで潜在的リークを防止。
+  pluginState.performanceMetrics.showHints = [];
+  pluginState.performanceMetrics.hideHints = [];
+  pluginState.performanceMetrics.wordDetection = [];
+  pluginState.performanceMetrics.hintGeneration = [];
+  // Why: pluginState ライフサイクルと連続失敗カウンタを整合させる。
+  //   再 initialize 後の最初の失敗を確実に観測するため、cleanup 時にリセットする。
+  extmarkClearErrorCount = 0;
+  // Why: getline cache 統計も pluginState ライフサイクルと整合させる。
+  //   再初期化後の長期傾向を独立して計測できるようにするため、cleanup 時にリセット。
+  getlineCacheHitCount = 0;
+  getlineCacheMissCount = 0;
+  getlineCacheLastMissReason = "";
   return Promise.resolve();
 }
 /** */
@@ -402,7 +472,14 @@ export class Core {
   /** バッファ行キャッシュ — changedtick 一致時に getline RPC をスキップ */
   // Why: showHints 毎に getline(1,"$") が 300-600ms の RPC 転送を発生させるため、
   //   changedtick 連動の配列キャッシュでスキップする。copy しない（mutate しない前提）。
-  private cachedBuffer: { bufnr: number; changedtick: number; lines: string[] } | null = null;
+  private cachedBuffer: {
+    bufnr: number;
+    changedtick: number;
+    lines: string[];
+    startLine: number;
+    endLine: number;
+    scope: "full" | "viewport";
+  } | null = null;
   private constructor(config?: Partial<Config>) {
     this.config = { ...getDefaultConfig(), ...config };
   }
@@ -589,8 +666,35 @@ export class Core {
             "nvim_create_namespace",
             EXTMARK_NAMESPACE,
           ) as number;
+          // Why: show/hide サイクル繰り返しで nvim_buf_clear_namespace の所要時間が
+          //   増加するか実測するための timing 計測。debugMode 配下でのみ評価することで
+          //   通常 path のオーバーヘッドをゼロに保つ (early evaluate)。
+          const isDebug = getDebugMode();
+          const clearStart = isDebug ? performance.now() : 0;
           await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
+          if (isDebug) {
+            const duration = performance.now() - clearStart;
+            logMessage(
+              "DEBUG",
+              "hellshake-yano:perf",
+              `clearNamespace: ${duration.toFixed(2)}ms`,
+            );
+          }
         } catch (error) {
+          // Why: 空 catch でエラー握り潰しを止め、ERROR レベルで可視化する。
+          //   ただし hot path のため連続失敗時のログ氾濫を防ぐべく
+          //   初回 + EXTMARK_ERROR_LOG_INTERVAL 回ごとに間引いて出力する。
+          extmarkClearErrorCount++;
+          if (
+            extmarkClearErrorCount === 1 ||
+            extmarkClearErrorCount % EXTMARK_ERROR_LOG_INTERVAL === 0
+          ) {
+            logMessage(
+              "ERROR",
+              "hellshake-yano",
+              `Failed to clear extmarks: ${String(error)}`,
+            );
+          }
         }
       } else {
         try {
@@ -844,6 +948,13 @@ export class Core {
     signal?: AbortSignal,
   ): Promise<void> {
     const batchSize = 200;
+    // Why: debugMode 無効時はオーバーヘッドゼロを保証するため、
+    //   関数冒頭で 1 度だけ評価し、以降の `if (isDebug)` 分岐で参照する。
+    //   performance.now() / バッチ計測変数も isDebug=false 時は実質未使用となる。
+    const isDebug = getDebugMode();
+    const perfStart = isDebug ? performance.now() : 0;
+    let batchCount = 0;
+    let totalMarks = 0;
     let extmarkNamespace: number;
     try {
       extmarkNamespace = await denops.call(
@@ -856,6 +967,16 @@ export class Core {
     }
 
     if (signal?.aborted || hints.length === 0) {
+      if (isDebug) {
+        const duration = performance.now() - perfStart;
+        logMessage(
+          "DEBUG",
+          "hellshake-yano:perf",
+          `displayHintsWithExtmarksBatch: ${
+            duration.toFixed(2)
+          }ms, batches=0, marks=0 (early-return)`,
+        );
+      }
       return;
     }
 
@@ -923,15 +1044,54 @@ export class Core {
 
       for (let i = 0; i < extmarkCalls.length; i += batchSize) {
         if (signal?.aborted) {
+          if (isDebug) {
+            const duration = performance.now() - perfStart;
+            logMessage(
+              "DEBUG",
+              "hellshake-yano:perf",
+              `displayHintsWithExtmarksBatch: ${
+                duration.toFixed(2)
+              }ms, batches=${batchCount}, marks=${totalMarks} (aborted)`,
+            );
+          }
           return;
         }
-        await callAtomic(denops, extmarkCalls.slice(i, i + batchSize));
+        const slice = extmarkCalls.slice(i, i + batchSize);
+        // Why: callAtomic のバッチサイズが extmark 劣化の要因かを特定するため、
+        //   呼び出し回数 (batchCount) と累積マーク数 (totalMarks) を計測する。
+        //   batch.ts に instrumentation を入れず呼び出し側でラップすることで
+        //   他用途の callAtomic に副作用を出さない (Coding Principle 3)。
+        if (isDebug) {
+          batchCount++;
+          totalMarks += slice.length;
+        }
+        await callAtomic(denops, slice);
+      }
+      if (isDebug) {
+        const duration = performance.now() - perfStart;
+        logMessage(
+          "DEBUG",
+          "hellshake-yano:perf",
+          `displayHintsWithExtmarksBatch: ${
+            duration.toFixed(2)
+          }ms, batches=${batchCount}, marks=${totalMarks}`,
+        );
       }
     } catch (_batchError) {
       try {
         await denops.call("nvim_buf_clear_namespace", bufnr, extmarkNamespace, 0, -1);
       } catch {
         // ignore cleanup failure before fallback
+      }
+      if (isDebug) {
+        const duration = performance.now() - perfStart;
+        logMessage(
+          "DEBUG",
+          "hellshake-yano:perf",
+          `displayHintsWithExtmarksBatch: ${
+            duration.toFixed(2)
+          }ms, batches=${batchCount}, marks=${totalMarks} (fallback)`,
+        );
       }
       await this.displayHintsWithExtmarksSequential(denops, bufnr, extmarkNamespace, hints, signal);
     }
@@ -1124,28 +1284,87 @@ export class Core {
         // [Timing/getline] + [Timing/join]: bufferLines 取得と join の所要時間を計測
         // Why: hintPatterns 処理が体感遅延の原因かを分離確認するため。debugMode=false では no-op。
         const _t0 = getDebugMode() ? performance.now() : 0;
-        // Why: getline(1,"$") の RPC 転送 (300-600ms) をスキップするため、
-        //   changedtick 連動の配列キャッシュを参照。bufnr + changedtick 一致で cache hit。
+        // Why: 大規模バッファで getline(1,"$") が 800-900ms まで悪化したため、
+        //   line('w0')..line('w$') の viewport 行だけを取得する。単語検出も表示対象は
+        //   viewport 中心なので、辞書パターン適用の行番号は startLine で補正する。
         const _bufnr = await denops.call("bufnr", "%") as number;
         const _changedtick = await denops.call("getbufvar", _bufnr, "changedtick") as number;
+        const _totalLineCount = await denops.call("line", "$") as number;
+        const _useViewportGetline = _totalLineCount >= VIEWPORT_GETLINE_THRESHOLD;
+        const _viewportStart = _useViewportGetline ? await denops.call("line", "w0") as number : 1;
+        const _viewportEnd = _useViewportGetline
+          ? await denops.call("line", "w$") as number
+          : _totalLineCount;
+        const _getlineScope = resolveGetlineScope(_totalLineCount, _viewportStart, _viewportEnd);
+        const _startLine = _getlineScope.startLine;
+        const _endLine = _getlineScope.endLine;
+        const _cacheScope = _getlineScope.scope;
         let bufferLines: string[];
         const _cacheHit = this.cachedBuffer !== null &&
           this.cachedBuffer.bufnr === _bufnr &&
-          this.cachedBuffer.changedtick === _changedtick;
+          this.cachedBuffer.changedtick === _changedtick &&
+          this.cachedBuffer.scope === _cacheScope &&
+          this.cachedBuffer.startLine === _startLine &&
+          this.cachedBuffer.endLine === _endLine;
+        // RC-1 Process 03: cache hit/miss 累積カウンタ更新 + miss 理由記録
+        // Why: 単発の cacheHit ログだけでは長期傾向が見えない。hits/misses を累積し
+        //      100 回ごとに hit rate を出力することで mitigation 効果を計測可能にする。
+        let _missReason = "";
+        if (_cacheHit) {
+          getlineCacheHitCount++;
+        } else {
+          getlineCacheMissCount++;
+          if (this.cachedBuffer === null) {
+            _missReason = "no-cache";
+          } else if (this.cachedBuffer.bufnr !== _bufnr) {
+            _missReason = "bufnr-changed";
+          } else if (this.cachedBuffer.changedtick !== _changedtick) {
+            _missReason = "changedtick-changed";
+          } else if (this.cachedBuffer.scope !== _cacheScope) {
+            _missReason = "scope-changed";
+          } else if (
+            this.cachedBuffer.startLine !== _startLine ||
+            this.cachedBuffer.endLine !== _endLine
+          ) {
+            _missReason = "viewport-changed";
+          } else {
+            _missReason = "unknown";
+          }
+          getlineCacheLastMissReason = _missReason;
+        }
         if (_cacheHit && this.cachedBuffer) {
           bufferLines = this.cachedBuffer.lines;
         } else {
-          bufferLines = await denops.call("getline", 1, "$") as string[];
-          this.cachedBuffer = { bufnr: _bufnr, changedtick: _changedtick, lines: bufferLines };
+          bufferLines = await denops.call("getline", _startLine, _endLine) as string[];
+          this.cachedBuffer = {
+            bufnr: _bufnr,
+            changedtick: _changedtick,
+            lines: bufferLines,
+            startLine: _startLine,
+            endLine: _endLine,
+            scope: _cacheScope,
+          };
         }
         if (getDebugMode()) {
+          const _totalCalls = getlineCacheHitCount + getlineCacheMissCount;
           logMessage(
             "DEBUG",
             "HINT-DEBUG",
             `[Timing/getline] elapsed=${
               (performance.now() - _t0).toFixed(2)
-            }ms lineCount=${bufferLines.length} cacheHit=${_cacheHit}`,
+            }ms lineCount=${bufferLines.length} fullLineCount=${_totalLineCount} scope=${_cacheScope} range=${_startLine}..${_endLine} cacheHit=${_cacheHit}${
+              _missReason ? ` missReason=${_missReason}` : ""
+            }`,
           );
+          // 100 回ごとに hit rate サマリーを出力
+          if (_totalCalls > 0 && _totalCalls % GETLINE_CACHE_REPORT_INTERVAL === 0) {
+            const _hitRate = (getlineCacheHitCount / _totalCalls * 100).toFixed(1);
+            logMessage(
+              "DEBUG",
+              "HINT-DEBUG",
+              `[Cache/getline] hits=${getlineCacheHitCount} misses=${getlineCacheMissCount} hitRate=${_hitRate}% lastMiss=${getlineCacheLastMissReason}`,
+            );
+          }
         }
         // Why: join("\n") を廃止し行単位走査に変更。300-600ms の join コストを削減。
         if (!this.hintPatternProcessor) {
@@ -1156,6 +1375,7 @@ export class Core {
           words,
           bufferLines,
           hintPatterns,
+          _startLine,
         );
         if (getDebugMode()) {
           logMessage(

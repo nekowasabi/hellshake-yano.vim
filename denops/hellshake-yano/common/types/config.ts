@@ -103,6 +103,7 @@ export interface Config {
   highlightHintMarkerCurrent: string | HighlightColor;
   suppressOnKeyRepeat: boolean;
   keyRepeatThreshold: number;
+  keyRepeatResetDelay: number;
   useJapanese: boolean;
   wordDetectionStrategy: WordDetectionStrategy;
   enableTinySegmenter: boolean;
@@ -200,6 +201,7 @@ export const DEFAULT_CONFIG: Config = {
   highlightHintMarkerCurrent: "DiffText",
   suppressOnKeyRepeat: true,
   keyRepeatThreshold: 50,
+  keyRepeatResetDelay: 300,
   useJapanese: false,
   wordDetectionStrategy: "hybrid",
   enableTinySegmenter: true,

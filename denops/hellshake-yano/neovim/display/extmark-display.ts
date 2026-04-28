@@ -4,9 +4,108 @@ import { assignHintsToWords, calculateHintPosition, OVERLAP_SKIP_OPTS } from "..
 import { generateHintsFromConfig, recordPerformance } from "../../common/utils/performance.ts";
 import { clearDetectionCache } from "../core/word.ts";
 import { batchGet, callAtomic } from "../../common/utils/batch.ts";
+import { logMessage } from "../../common/utils/logger.ts";
 
 /** Module-level singleton to avoid per-line TextEncoder instantiation */
 const TEXT_ENCODER = new TextEncoder();
+
+/**
+ * RC-2 (PLAN-followup-cycle3): multi-buffer 切替時に line/col が
+ * ターゲットバッファのサイズを超えて E5555 (Invalid 'col'/'line') を発生させる
+ * 問題への対策。投入前に座標をバリデーション/クランプする純関数として切り出し、
+ * テスト容易性を確保する。
+ */
+export const EXTMARK_CLAMP_WARN_INTERVAL = 100;
+let extmarkClampWarnCount = 0;
+
+/**
+ * RC-2 (PLAN-followup-cycle3 Process 02): set_extmark callAtomic 失敗時の throttling
+ * Why: ERROR レベルは debug flag 非依存で常時出力されるため、hot path で連続失敗すると
+ *      ログが氾濫する。初回 + N 回ごとに間引く (PLAN.md Process 03 と同パターン)。
+ */
+export const EXTMARK_SET_FAIL_LOG_INTERVAL = 100;
+let extmarkSetFailCount = 0;
+
+/** テスト用: warn カウンタをリセット */
+export function resetExtmarkClampWarnCounter(): void {
+  extmarkClampWarnCount = 0;
+}
+
+/** テスト用: set_extmark 失敗カウンタをリセット */
+export function resetExtmarkSetFailCounter(): void {
+  extmarkSetFailCount = 0;
+}
+
+/**
+ * Clamp/skip 判定の結果。
+ * - "ok":   そのまま投入可能
+ * - "clamp": col を line 長に丸めて投入
+ * - "skip":  投入から除外
+ */
+export interface ClampResult {
+  action: "ok" | "clamp" | "skip";
+  line: number;
+  col: number;
+  reason?: "line-overflow" | "negative" | "line-missing" | "col-clamped";
+}
+
+/**
+ * Why: callAtomic 失敗による extmark バッチ全体の停止を投入前に防ぐ。
+ *      col overflow は clamp（mark 維持）、line overflow は skip（投入不可）と
+ *      使い分けることで、ヒント可視化を最大限残しつつ E5555 を回避する。
+ *
+ * @param line - 0-indexed buffer line
+ * @param col - 0-indexed byte column
+ * @param bufLineCount - 対象バッファの total line count
+ * @param lineLengthCache - 既に取得済の line ごとの byte length
+ */
+export function clampMarkPosition(
+  line: number,
+  col: number,
+  bufLineCount: number,
+  lineLengthCache: Map<number, number>,
+): ClampResult {
+  // 防御的: 負値は skip
+  if (line < 0 || col < 0) {
+    emitClampWarn(`skipped mark with negative position (line=${line}, col=${col})`);
+    return { action: "skip", line, col, reason: "negative" };
+  }
+
+  // line overflow: bufLineCount と等しい / 超過は skip
+  if (line >= bufLineCount) {
+    emitClampWarn(
+      `skipped marks due to line overflow (line=${line}, bufLineCount=${bufLineCount})`,
+    );
+    return { action: "skip", line, col, reason: "line-overflow" };
+  }
+
+  // line content が取得できなかった場合は skip（cache miss）
+  const lineLength = lineLengthCache.get(line);
+  if (lineLength === undefined) {
+    return { action: "skip", line, col, reason: "line-missing" };
+  }
+
+  // col overflow: clamp（投入は継続）
+  if (col > lineLength) {
+    logMessage("DEBUG", "ExtmarkClamp", `clamped col ${col} -> ${lineLength} at line ${line}`);
+    return { action: "clamp", line, col: lineLength, reason: "col-clamped" };
+  }
+
+  return { action: "ok", line, col };
+}
+
+/**
+ * 連続失敗抑制つき WARN 出力（PLAN.md Process 03 と同パターン）
+ */
+function emitClampWarn(message: string): void {
+  if (
+    extmarkClampWarnCount === 0 ||
+    extmarkClampWarnCount % EXTMARK_CLAMP_WARN_INTERVAL === 0
+  ) {
+    logMessage("WARN", "ExtmarkClamp", message);
+  }
+  extmarkClampWarnCount++;
+}
 
 export const HIGHLIGHT_BATCH_SIZE = 15;
 /** Maximum hint length for small batch synchronous display */
@@ -420,7 +519,7 @@ function groupHintsByBuffer(hints: HintMapping[]): Map<number, HintMapping[]> {
  * @param bufnr - Target buffer number
  * @returns Array of created extmark IDs
  */
-async function processExtmarksForBuffer(
+export async function processExtmarksForBuffer(
   denops: Denops,
   hints: HintMapping[],
   config: Config,
@@ -430,9 +529,20 @@ async function processExtmarksForBuffer(
   const highlightGroup = getHighlightGroupName(config);
   const extmarkIds: number[] = [];
 
+  // Why: nvim_buf_line_count を 1 回だけ取得し、line overflow を投入前に検出する (RC-2)。
+  //      multi-buffer 切替時にターゲットバッファのサイズを超える line/col を渡すと
+  //      callAtomic が E5555 で停止するため、事前バリデーションで防ぐ。
+  let bufLineCount = Number.MAX_SAFE_INTEGER; // 取得失敗時はバリデーション無効化
+  try {
+    bufLineCount = await denops.call("nvim_buf_line_count", bufnr) as number;
+  } catch {
+    // バッファが消えた等 — 既存の callAtomic 失敗ハンドラに委ねる（保険として残す）
+  }
+
   // Why: callAtomic (一括取得) instead of per-hint nvim_buf_get_lines — O(N) IPC を O(1) に削減。
   // 制約 C2: callAtomic はエラー発生時に途中停止するため、事前に uniqueLines の重複を除去して呼び出す。
-  const uniqueLines = [...new Set(hints.map((h) => h.word.line - 1))].filter((l) => l >= 0);
+  const uniqueLines = [...new Set(hints.map((h) => h.word.line - 1))]
+    .filter((l) => l >= 0 && l < bufLineCount);
   const lineLengthCache = new Map<number, number>();
 
   if (uniqueLines.length > 0) {
@@ -468,29 +578,21 @@ async function processExtmarksForBuffer(
 
     // Use hintByteCol for byte position (nvim_buf_set_extmark expects byte index)
     // Fall back to word.byteCol or word.col if hintByteCol is not available
-    const line = h.word.line - 1; // 0-indexed
-    const col = (h.hintByteCol !== undefined && h.hintByteCol > 0)
+    const rawLine = h.word.line - 1; // 0-indexed
+    const rawCol = (h.hintByteCol !== undefined && h.hintByteCol > 0)
       ? h.hintByteCol - 1
       : (h.word.byteCol !== undefined && h.word.byteCol > 0)
       ? h.word.byteCol - 1
       : h.word.col - 1;
 
-    // Validate line and col to prevent E5555 (col out of range) errors
-    if (line < 0 || col < 0) {
-      continue; // Skip invalid positions
-    }
-
-    // Get line length from pre-fetched cache; skip if buffer/line unavailable
-    const lineLength = lineLengthCache.get(line);
-    if (lineLength === undefined) {
-      // Buffer or line doesn't exist, skip this hint
+    // Why: clampMarkPosition で投入前に line/col をバリデーション/クランプする (RC-2)。
+    //      line overflow → skip、col overflow → clamp、line < 0 / col < 0 → skip。
+    const clamped = clampMarkPosition(rawLine, rawCol, bufLineCount, lineLengthCache);
+    if (clamped.action === "skip") {
       continue;
     }
-
-    // Skip if col is beyond line length (would cause E5555)
-    if (col > lineLength) {
-      continue;
-    }
+    const line = clamped.line;
+    const col = clamped.col;
 
     extmarkCalls.push([
       "nvim_buf_set_extmark",
@@ -515,11 +617,22 @@ async function processExtmarksForBuffer(
         extmarkIds.push(result as number);
       }
     } catch (error) {
-      // callAtomic failed — log and return partial IDs collected so far
-      console.warn(
-        `[hellshake-yano] callAtomic failed for nvim_buf_set_extmark in buffer ${bufnr}:`,
-        error,
-      );
+      // Why: callAtomic failed — log via logMessage with throttling instead of console.warn.
+      //      ERROR レベルは debug flag 非依存で常時出力されるため、hot path で連続失敗時の
+      //      ログ氾濫を防ぐ (PLAN-followup-cycle3 Process 02、PLAN.md Process 03 と同パターン)。
+      extmarkSetFailCount++;
+      if (
+        extmarkSetFailCount === 1 ||
+        extmarkSetFailCount % EXTMARK_SET_FAIL_LOG_INTERVAL === 0
+      ) {
+        logMessage(
+          "ERROR",
+          "ExtmarkSetFail",
+          `callAtomic failed for nvim_buf_set_extmark in buffer ${bufnr} (count=${extmarkSetFailCount}): ${
+            String(error)
+          }`,
+        );
+      }
     }
   }
 

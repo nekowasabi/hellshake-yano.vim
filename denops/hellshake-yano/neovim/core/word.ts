@@ -1469,7 +1469,12 @@ export class HintPatternProcessor {
    * @param patterns
    * @returns
    */
-  applyHintPatterns(words: Word[], lines: string[], patterns: HintPattern[]): WordWithPriority[] {
+  applyHintPatterns(
+    words: Word[],
+    lines: string[],
+    patterns: HintPattern[],
+    startLine: number = 1,
+  ): WordWithPriority[] {
     if (!patterns || patterns.length === 0) {
       return words as WordWithPriority[];
     }
@@ -1519,8 +1524,9 @@ export class HintPatternProcessor {
           let wordFound = false;
           if (hintTarget) {
             // join テキスト内オフセット → (lnum, col) へ変換
-            const lnum = offsetToLine(lines, hintTarget.position);
-            const col = hintTarget.position - lines.slice(0, lnum - 1).reduce((sum, l) =>
+            const relativeLnum = offsetToLine(lines, hintTarget.position);
+            const lnum = relativeLnum + startLine - 1;
+            const col = hintTarget.position - lines.slice(0, relativeLnum - 1).reduce((sum, l) =>
               sum + l.length + 1, 0) +
               1;
             const targetWord = this.findWordAtPosition(enhancedWords, lnum, col);
@@ -1553,7 +1559,7 @@ export class HintPatternProcessor {
           let match: RegExpExecArray | null;
           while ((match = regex.exec(line)) !== null) {
             matchCount++;
-            const lnum = i + 1; // 1-origin
+            const lnum = i + startLine; // 1-origin buffer line
             const hintTarget = this.extractHintTarget(match, pattern.hintPosition);
             let wordFound = false;
             if (hintTarget) {
