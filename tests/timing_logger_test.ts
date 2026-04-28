@@ -9,13 +9,14 @@
  *      挙動を検証し、debugMode=false 時の no-op 保証とログフォーマットを確認する。
  */
 
-import { assertEquals, assertMatch, assertNotMatch } from "@std/assert";
-import { describe, it, beforeEach, afterEach } from "@std/testing/bdd";
+import { assertEquals, assertMatch } from "@std/assert";
+import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   getDebugMode,
-  setDebugMode,
   logMessage,
+  setDebugMode,
 } from "../denops/hellshake-yano/common/utils/logger.ts";
+import { resolveGetlineScope } from "../denops/hellshake-yano/neovim/core/core.ts";
 
 /**
  * console.log を一時キャプチャするヘルパー
@@ -96,7 +97,11 @@ describe("P101: Timing Logger / Debug Mode", () => {
       setDebugMode(false);
       const capture = captureConsole();
       try {
-        logMessage("DEBUG", "HINT-DEBUG", "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true");
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true",
+        );
         assertEquals(capture.logs.length, 0, "DEBUG ログは出力されないべき");
         assertEquals(capture.errors.length, 0);
         assertEquals(capture.warns.length, 0);
@@ -144,7 +149,11 @@ describe("P101: Timing Logger / Debug Mode", () => {
       setDebugMode(true);
       const capture = captureConsole();
       try {
-        logMessage("DEBUG", "HINT-DEBUG", "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true");
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true",
+        );
         assertEquals(capture.logs.length, 1);
         assertMatch(capture.logs[0], /\[DEBUG\]/);
       } finally {
@@ -256,12 +265,32 @@ describe("P101: Timing Logger / Debug Mode", () => {
       setDebugMode(false);
       const capture = captureConsole();
       try {
-        logMessage("DEBUG", "HINT-DEBUG", "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true");
-        logMessage("DEBUG", "HINT-DEBUG", "[Timing/applyHintPatterns] elapsed=12.45ms wordCount=42 patternCount=3");
-        logMessage("DEBUG", "HINT-DEBUG", "[PointD/applyHintPatterns] prioritizedCount=5 totalWords=42 patternsApplied=3");
-        logMessage("DEBUG", "HINT-DEBUG", "[PointE2/beforeAssign] wordsCount=42 hintsCount=42 directionalEnabled=true mode=normal");
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[Timing/getline] elapsed=5.23ms lineCount=100 cacheHit=true",
+        );
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[Timing/applyHintPatterns] elapsed=12.45ms wordCount=42 patternCount=3",
+        );
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[PointD/applyHintPatterns] prioritizedCount=5 totalWords=42 patternsApplied=3",
+        );
+        logMessage(
+          "DEBUG",
+          "HINT-DEBUG",
+          "[PointE2/beforeAssign] wordsCount=42 hintsCount=42 directionalEnabled=true mode=normal",
+        );
 
-        assertEquals(capture.logs.length, 0, "debugMode=false のときは全 DEBUG ログが抑制されるべき");
+        assertEquals(
+          capture.logs.length,
+          0,
+          "debugMode=false のときは全 DEBUG ログが抑制されるべき",
+        );
         assertEquals(capture.errors.length, 0);
         assertEquals(capture.warns.length, 0);
       } finally {
@@ -287,6 +316,24 @@ describe("P101: Timing Logger / Debug Mode", () => {
       logMessage("DEBUG", "TEST", "visible again");
       assertEquals(capture3.logs.length, 1, "debugMode=true に戻すとログが再出力される");
       capture3.restore();
+    });
+  });
+
+  describe("RC-1 viewport getline scope", () => {
+    it("[REGRESSION] 大規模バッファでは viewport 範囲だけを選択する", () => {
+      assertEquals(resolveGetlineScope(44949, 120, 180), {
+        scope: "viewport",
+        startLine: 120,
+        endLine: 180,
+      });
+    });
+
+    it("[REGRESSION] 小規模バッファでは従来通り全体範囲を選択する", () => {
+      assertEquals(resolveGetlineScope(100, 20, 40), {
+        scope: "full",
+        startLine: 1,
+        endLine: 100,
+      });
     });
   });
 });

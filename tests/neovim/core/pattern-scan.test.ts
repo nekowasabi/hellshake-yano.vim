@@ -71,6 +71,33 @@ describe("Process 3: 行単位走査テスト", () => {
     assertEquals(delta.hintPriority, 100, "行4 Delta に priority 100 が付与");
   });
 
+  it("[REGRESSION] viewport 行だけ渡した場合も開始行オフセットで実バッファ行にマッチする", () => {
+    const processor = new HintPatternProcessorCtor();
+
+    const lines = [
+      "- [ ] Alpha",
+      "- [ ] Bravo",
+    ];
+    const startLine = 120;
+    const colA = lines[0].indexOf("A") + 1;
+    const colB = lines[1].indexOf("B") + 1;
+    const words = [
+      makeWord("Alpha", 120, colA),
+      makeWord("Bravo", 121, colB),
+      makeWord("Outside", 1, 1),
+    ];
+    const patterns = [capturePattern("^\\s*-\\s*\\[\\s\\]\\s+(.)", 1, 100)];
+
+    const result = processor.applyHintPatterns(words, lines, patterns, startLine);
+    const alpha = result.find((w: { text: string }) => w.text === "Alpha");
+    const bravo = result.find((w: { text: string }) => w.text === "Bravo");
+    const outside = result.find((w: { text: string }) => w.text === "Outside");
+
+    assertEquals(alpha?.hintPriority, 100);
+    assertEquals(bravo?.hintPriority, 100);
+    assertEquals(outside?.hintPriority, undefined);
+  });
+
   // -------------------------------------------------------------------------
   // Case B: 非 capture パターン (/bclassb/) の行単位走査 (default ルート)
   // -------------------------------------------------------------------------
@@ -413,7 +440,7 @@ describe("Process 4: 事前コンパイル (compiled RegExp) 再利用", () => {
 
     // 不正パターン (compiled なし、pattern も string として invalid ではないが
     // compiled が undefined のケースをシミュレート)
-    const patterns = [
+    const _patterns = [
       {
         pattern: "[invalid regex((((",
         hintPosition: "start" as const,
