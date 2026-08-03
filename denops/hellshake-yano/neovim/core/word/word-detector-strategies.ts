@@ -4,7 +4,7 @@ import type { Config } from "../../../config.ts";
 import { Core } from "../core.ts";
 import { tinysegmenter } from "./word-segmenter.ts";
 import { resolveConfigType } from "../../../common/utils/config.ts";
-import { charIndexToByteIndex } from "../word.ts";
+import { charIndexToByteIndex, getDisplayColumn } from "../word.ts";
 export interface WordDetector {
   readonly name: string;
   readonly priority: number;
@@ -223,7 +223,7 @@ export class TinySegmenterWordDetector implements WordDetector {
             }
             const idx = lt.indexOf(seg, ci);
             if (idx !== -1) {
-              const col = idx + 1;
+              const col = getDisplayColumn(lt, idx) + 1;
               let bc: number;
               try {
                 bc = charIndexToByteIndex(lt, idx) + 1;

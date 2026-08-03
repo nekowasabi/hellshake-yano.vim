@@ -192,7 +192,19 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
     config = { ...defaultConfig, ...userConfig } as Config;
 
     // Coreインスタンスの設定を更新
-    core.updateConfig(config);
+    // Why: 不正な設定値はここでthrowされうる。dispatcher登録前に伝播させると
+    // プラグイン全体が無反応になるため、ここで吸収してデフォルトのまま続行する。
+    try {
+      core.updateConfig(config);
+    } catch (error) {
+      console.error(
+        "[hellshake-yano] Invalid g:hellshake_yano config, falling back to defaults:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    // Why: core.updateConfig() はlegacyのsnake_caseキーをcamelCaseへ正規化する。
+    // module-level config もCore側の正規化済みの値と一致させる。
+    config = core.getConfig();
 
     // Dictionary初期化
     await initializeDictionarySystem(denops);
@@ -240,8 +252,19 @@ async function initializeVimLayer(denops: Denops): Promise<void> {
         if (typeof cfg === "object" && cfg !== null) {
           const core = Core.getInstance(config);
           const configUpdate = cfg as Partial<Config>;
-          core.updateConfig(configUpdate);
-          config = { ...config, ...configUpdate };
+          try {
+            core.updateConfig(configUpdate);
+          } catch (error) {
+            console.error(
+              "[hellshake-yano] Invalid config update, ignoring:",
+              error instanceof Error ? error.message : String(error),
+            );
+            return;
+          }
+          // Why: core.updateConfig() はlegacyのsnake_caseキーをcamelCaseへ正規化する。
+          // 生のconfigUpdateを再マージすると正規化結果とズレるため、Core側の正規化済み
+          // 設定をそのままmodule-level configに反映する。
+          config = core.getConfig();
         }
       },
 
@@ -664,7 +687,19 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
     config = { ...defaultConfig, ...userConfig } as Config;
 
     // Coreインスタンスの設定を更新
-    core.updateConfig(config);
+    // Why: 不正な設定値はここでthrowされうる。dispatcher登録前に伝播させると
+    // プラグイン全体が無反応になるため、ここで吸収してデフォルトのまま続行する。
+    try {
+      core.updateConfig(config);
+    } catch (error) {
+      console.error(
+        "[hellshake-yano] Invalid g:hellshake_yano config, falling back to defaults:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    // Why: core.updateConfig() はlegacyのsnake_caseキーをcamelCaseへ正規化する。
+    // module-level config もCore側の正規化済みの値と一致させる。
+    config = core.getConfig();
 
     if (denops.meta.host === "nvim") {
       extmarkNamespace = await denops.call(
@@ -965,9 +1000,19 @@ async function initializeNeovimLayer(denops: Denops): Promise<void> {
         if (typeof cfg === "object" && cfg !== null) {
           const core = Core.getInstance(config);
           const configUpdate = cfg as Partial<Config>;
-          core.updateConfig(configUpdate);
-          // グローバル設定も更新（直接Configを使用）
-          config = { ...config, ...configUpdate };
+          try {
+            core.updateConfig(configUpdate);
+          } catch (error) {
+            console.error(
+              "[hellshake-yano] Invalid config update, ignoring:",
+              error instanceof Error ? error.message : String(error),
+            );
+            return;
+          }
+          // Why: core.updateConfig() はlegacyのsnake_caseキーをcamelCaseへ正規化する。
+          // 生のconfigUpdateを再マージすると正規化結果とズレるため、Core側の正規化済み
+          // 設定をそのままグローバル設定に反映する。
+          config = core.getConfig();
         }
       },
 

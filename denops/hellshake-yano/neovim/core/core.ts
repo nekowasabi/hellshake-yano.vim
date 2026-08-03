@@ -45,7 +45,9 @@ import {
   validateHintKeyConfig,
 } from "./hint.ts";
 import {
+  byteIndexToCharIndex,
   DictionaryLoader,
+  getDisplayColumn,
   HintPatternProcessor,
   type UserDictionary,
   VimConfigBridge,
@@ -1224,7 +1226,13 @@ export class Core {
         | [number, number, number, number]
         | undefined;
       const cursorLine = cursorPos ? cursorPos[1] : 1;
-      const cursorCol = cursorPos ? cursorPos[2] : 1;
+      // Why: getpos(".")[2] はバイト列番号だが、word.col はタブ展開後の表示列
+      // （getDisplayColumn 由来）。単位を揃えないと日本語等の全角文字を含む行で
+      // カーソル位置とwordの列比較（方向フィルタ・カーソル包含判定・距離ソート）が破綻する。
+      const cursorByteCol = cursorPos ? cursorPos[2] : 1;
+      const cursorLineText = await denops.call("getline", cursorLine) as string;
+      const cursorCharIndex = byteIndexToCharIndex(cursorLineText, cursorByteCol - 1);
+      const cursorCol = getDisplayColumn(cursorLineText, cursorCharIndex) + 1;
       const directionalContext = resolveDirectionalContext(
         this.config.currentKeyContext,
         this.config.directionalHintFilter,

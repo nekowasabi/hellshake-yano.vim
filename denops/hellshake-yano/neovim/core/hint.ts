@@ -158,8 +158,10 @@ function createSingleHintMapping(word: Word, hint: string, pos: string): HintMap
   const c = () => {
     if (hc === undefined) {
       if (pos === "end") {
-        hc = word.col + word.text.length - 1;
-        hbc = word.byteCol ? word.byteCol + getByteLength(word.text) - 1 : hc;
+        hc = word.col + getDisplayWidth(word.text) - 1;
+        hbc = word.byteCol !== undefined
+          ? word.byteCol + getByteLength(word.text) - 1
+          : hc;
       } else {
         hc = word.col;
         hbc = word.byteCol ?? word.col;

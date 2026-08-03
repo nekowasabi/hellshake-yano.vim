@@ -306,12 +306,24 @@ elseif exists('g:hellshake_yano_vim_config') && has_key(g:hellshake_yano_vim_con
   endif
 endif
 
+" 単一文字かつ安全な文字集合のキーのみをマッピング対象として許可する。
+" execute printf('... %s ...', key, ...) で key をマッピングLHSへ未エスケープで
+" 展開しているため、ここで弾かないと '|' 等を含む値でコマンドインジェクションが成立する。
+function! s:is_safe_motion_key(key) abort
+  return type(a:key) == v:t_string
+        \ && match(a:key, '^[a-zA-Z0-9!@#$%^&*()_+=\[\]{}|;:,.<>?/~`-]$') != -1
+endfunction
+
 if s:motion_enabled
   " 対象キーをループしてマッピング（Normal mode）
   " Phase D-7 Process3 Sub1 (修正版): <expr>マッピングで直接v:count1を取得
   " autoload関数の遅延読み込みによるv:count消失問題を回避するため、
   " plugin/でマッピングを直接実装（autoload関数を経由しない）
   for s:key in s:motion_keys
+    if !s:is_safe_motion_key(s:key)
+      echom '[hellshake-yano] Warning: skipping invalid motion key: ' . string(s:key)
+      continue
+    endif
     " <expr>マッピングを使用して数値プレフィックス（カウント）を取得
     " v:count1を直接printfに渡し、handle_with_count()を呼び出す
     " この方法により、autoload関数読み込み前にカウントが保存される
@@ -323,6 +335,9 @@ if s:motion_enabled
   " Phase D-7 Process3 Sub2 (修正版): timer_start()で非同期的にモーション検出処理を実行
   " autoload関数の遅延読み込み問題を回避するため、v:count1を先に取得してからモーションキーを返す
   for s:key in s:motion_keys
+    if !s:is_safe_motion_key(s:key)
+      continue
+    endif
     " Visual modeでもモーション検出を有効化
     " timer_start()で非同期的にhandle_visual_internal()を呼び出し、
     " v:count1を取得してカウント付きモーションキー（例: "5j"）を返す

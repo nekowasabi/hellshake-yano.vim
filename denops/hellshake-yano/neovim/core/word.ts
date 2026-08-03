@@ -443,7 +443,7 @@ function isWideCharacter(char: string): boolean {
  * @param tabWidth
  * @returns
  */
-function getDisplayColumn(text: string, charIndex: number, tabWidth = 8): number {
+export function getDisplayColumn(text: string, charIndex: number, tabWidth = 8): number {
   let displayCol = 0;
   for (let i = 0; i < charIndex && i < text.length; i++) {
     if (text[i] === "\t") {
@@ -2143,8 +2143,8 @@ export class WordDetectionManager {
     try {
       this.detectors.clear();
       const regexDetector = new ImportedRegexWordDetector(this.config);
-      const segmenterDetector = new ImportedRegexWordDetector(this.config);
-      const hybridDetector = new ImportedRegexWordDetector(this.config);
+      const segmenterDetector = new ImportedTinySegmenterWordDetector();
+      const hybridDetector = new ImportedHybridWordDetector(this.config);
       this.registerDetector(regexDetector);
       this.registerDetector(segmenterDetector);
       this.registerDetector(hybridDetector);

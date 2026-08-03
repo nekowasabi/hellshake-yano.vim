@@ -188,6 +188,15 @@ endfunction
 " マッピング設定関数
 "=============================================================================
 
+" s:is_safe_motion_key() - マッピングLHSとして安全な単一文字キーか判定
+"
+" execute printf('... %s ...', key, ...) で key をマッピングLHSへ未エスケープで
+" 展開しているため、ここで弾かないと '|' 等を含む値でコマンドインジェクションが成立する。
+function! s:is_safe_motion_key(key) abort
+  return type(a:key) == v:t_string
+        \ && match(a:key, '^[a-zA-Z0-9!@#$%^&*()_+=\[\]{}|;:,.<>?/~`-]$') != -1
+endfunction
+
 " s:setup_unified_mappings() - 統合版のマッピング設定
 "
 " モーション検出マッピングとビジュアルモードマッピングを設定
@@ -197,6 +206,10 @@ function! s:setup_unified_mappings() abort
   " Phase D-7 Process3 Sub1: <expr>マッピングでv:count1を取得（autoload遅延読み込み問題対策）
   if get(g:hellshake_yano, 'motionCounterEnabled', v:true)
     for key in get(g:hellshake_yano, 'countedMotions', ['w', 'b', 'e'])
+      if !s:is_safe_motion_key(key)
+        echom '[hellshake-yano] Warning: skipping invalid motion key: ' . string(key)
+        continue
+      endif
       execute printf('nnoremap <silent> <expr> %s printf(":\<C-u>call hellshake_yano_vim#motion#handle_with_count(%s, %%d)\<CR>", v:count1)',
         \ key, string(key))
     endfor
@@ -208,6 +221,9 @@ function! s:setup_unified_mappings() abort
   " v:count1はVim側が自動的にモーションに適用するため明示不要
   if get(g:hellshake_yano, 'motionCounterEnabled', v:true)
     for key in get(g:hellshake_yano, 'countedMotions', ['w', 'b', 'e'])
+      if !s:is_safe_motion_key(key)
+        continue
+      endif
       " Visual modeでもモーション検出を有効化
       execute printf('xnoremap <silent> <expr> %s hellshake_yano_vim#motion#visual_schedule(%s)',
         \ key, string(key))
@@ -249,6 +265,10 @@ function! s:setup_vimscript_mappings() abort
   " Phase D-7 Process3 Sub1: <expr>マッピングでv:count1を取得（autoload遅延読み込み問題対策）
   if l:motion_enabled
     for key in l:motion_keys
+      if !s:is_safe_motion_key(key)
+        echom '[hellshake-yano] Warning: skipping invalid motion key: ' . string(key)
+        continue
+      endif
       execute printf('nnoremap <silent> <expr> %s printf(":\<C-u>call hellshake_yano_vim#motion#handle_with_count(%s, %%d)\<CR>", v:count1)',
         \ key, string(key))
     endfor
