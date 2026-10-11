@@ -130,8 +130,9 @@ A differential check against the checked-out TypeScript hint generator passed
 scriptnames for the synthetic profile. This is not the user's actual init.vim:
 that final handoff check still requires an authorized copy in the VM.
 
-S3 is deliberately not started: this VM only has `vim.tiny` with `-eval` and
-`-popupwin`. Adding full Vim requires separate approval. The native runtime is
+At that earlier checkpoint S3 had not started because only `vim.tiny` was
+available. Full Vim was subsequently approved and installed; the current S3
+opt-in implementation is documented in `docs/native-vim-progress.md`. The native runtime is
 still opt-in; no plugin entry was switched and no denops files were deleted.
 Full migration completion must not be inferred from the native tests passing.
 
@@ -252,3 +253,15 @@ Specific S4 parity questions, beyond supported-method names:
   detector. Complete legacy dictionary merge/compound semantics are not ported.
 
 These are review items, not reasons to switch defaults or remove denops now.
+
+
+## Subsequent Vim9 checkpoint
+
+The first 16 Lua/bridge commits are now published (equivalent final tree at
+`0135632`; original local `265f393`). See `docs/native-vim-progress.md` for the
+workspace-local full-Vim installation, Vim9 implementation and remaining
+cutover conditions. A subsequent regression fixes doubled single quotes in YAML
+scalars containing comment markers or separators in both native readers.
+`mergeRules` and `compoundPatterns` remain stored data; a fresh whole-tree search
+found no old execution use beyond declarations/loading/empty initialization, so
+this is not evidence by itself of a working legacy feature being removed.

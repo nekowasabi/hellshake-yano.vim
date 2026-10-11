@@ -1,4 +1,26 @@
-# Handoff (hy-plan, 2026-10-11 15:37 JST)
+# Current checkpoint (2026-10-11, dot VM)
+
+The approved S2 checkpoint was published to `feat/remove-denops` as
+`0135632f9a76fe9a8b3f22b9d7fc5e3d14e92917`. Its tree is byte-for-byte equivalent
+to original local `265f393`; publishing through the connected GitHub API changed
+commit IDs. All 16 original IDs are preserved in commit trailers and in the
+review artifact's mapping. No force update, merge or deployment occurred.
+
+Full Vim and its runtime were subsequently approved and installed workspace-local
+from checksum-verified Debian packages. S3 now has a tested, explicit opt-in Vim9
+runtime and Vimscript bridge. See `docs/native-vim-progress.md` for current scope,
+test commands and the exact cutover gates. These additional commits are local at
+this checkpoint; publication of the original 16 commits does not mean all later
+work has reached the remote. Plugin entry files and denops remain unchanged.
+
+The user's actual init.vim is still unavailable here. Synthetic Neovim and Vim
+profiles record rtp/scriptnames but do not complete that final requirement.
+
+---
+
+## Historical handoff and earlier checkpoints
+
+### Handoff (hy-plan, 2026-10-11 15:37 JST)
 Repo nekowasabi/hellshake-yano.vim, branch feat/remove-denops, HEAD 35b46d8 (base main d8fe9db). Draft PR only, no merge or force-push. WSL clone ~/repos/hellshake-yano.vim on takets-pc (push via SSH). The user's live install ~/.config/nvim/plugged/hellshake-yano.vim is read-only.
 Done: S1 (Claude Code, f5c8155) parity table docs/denops-parity.md + scripts/test-{vim,nvim}.sh. S2a (Codex, 35b46d8) known-failures gate, exit-code based tests, plugged-path test fix. Tests: vim and nvim both PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13, exit 0.
 Resolved before S2 (hy-critique, measured on box vim 9.1 / nvim 0.10.4): (1) KNOWN 20 > main failures 17/18 is fine: running main d8fe9db with the new gate gives the same 20 known failures; the old script counted tests as PASS even when an assert_* failed inside them (e.g. test_jump_multi.vim). (2) The gate exits 1 when a test not in the list breaks (checked by breaking test_jump_multi.vim line 56). (3) scripts/test-vim-gate.py is the unit test for the gate itself (scripts/vim-test-gate.py); renaming it is optional.
