@@ -15,8 +15,8 @@ export def Setup(options: dict<any> = {})
     throw 'hellshake-yano: Vim9 dictionary integration is not implemented yet'
   endif
   var reactivate = active
-  Deactivate()
   Core.Setup(resolved)
+  Deactivate()
   config = resolved
   if reactivate
     Activate()
@@ -39,6 +39,7 @@ export def Enable(enabled: bool)
     Setup()
   endif
   config.enabled = enabled
+  Motion.Reset()
   if !enabled
     Hide()
   endif
@@ -91,7 +92,7 @@ export def Show(key: string = ''): string
       status = ReadInput()
     catch
       Hide()
-      throw v:exception
+      throw 'hellshake-yano: ' .. v:exception
     endtry
     if status !=# 'jump' || !config.continuousHintMode
       return status
@@ -188,7 +189,7 @@ export def Activate()
   augroup END
   catch
     Deactivate()
-    throw v:exception
+    throw 'hellshake-yano: ' .. v:exception
   endtry
 enddef
 

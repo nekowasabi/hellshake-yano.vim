@@ -61,6 +61,32 @@ Core.Setup({singleCharKeys: '0', multiCharKeys: '', useNumericMultiCharHints: tr
 Core.Show(words)
 assert_equal('jump', Core.Input('0').status)
 
+Core.Setup({singleCharKeys: [], multiCharKeys: ['B', 'C']})
+cursor(1, 1)
+Core.Show(words + [{line: 2, col: 1, text: '日本語', winid: win, bufnr: buf}])
+assert_equal('partial', Core.Input('B').status)
+assert_equal(3, len(popup_list()))
+assert_equal(['BB', 'BC', 'CB'], map(Core.State().popup_ids, (_, id) => getbufline(winbufnr(id), 1)[0]))
+assert_equal(['HellshakeYanoNativeCurrent', 'HellshakeYanoNativeCurrent', 'HellshakeYanoNativeHint'],
+  map(Core.State().popup_ids, (_, id) => popup_getoptions(id).highlight))
+Core.Hide()
+Core.Setup({singleCharKeys: ['A']})
+Core.Show([{line: 2, col: 2, text: '日本語', winid: win, bufnr: buf}])
+assert_equal('stale', Core.Input('A').status)
+assert_equal([], popup_list())
+Core.Setup({highlightHintMarker: {fg: '#123456', bg: '#654321', ctermfg: 12},
+  highlightHintMarkerCurrent: 'Search'})
+assert_equal('#123456', hlget('HellshakeYanoNativeHint')[0].guifg)
+assert_equal('Search', hlget('HellshakeYanoNativeCurrent')[0].linksto)
+var old_highlights = hlget('HellshakeYanoNativeHint')
+var rejected = false
+try
+  Core.Setup({highlightHintMarker: {fg: 'not_a_real_color'}})
+catch /^hellshake-yano:/
+  rejected = true
+endtry
+assert_true(rejected)
+assert_equal(old_highlights, hlget('HellshakeYanoNativeHint'))
 if !empty(v:errors)
   writefile(v:errors, '/dev/stderr')
   cquit

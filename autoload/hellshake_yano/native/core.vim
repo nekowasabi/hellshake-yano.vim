@@ -21,10 +21,43 @@ export def Hide()
   endfor
 enddef
 
+def Highlight(name: string, value: any)
+  var attributes: dict<any> = {name: name}
+  if type(value) == v:t_string
+    attributes.linksto = value
+    attributes.force = true
+  else
+    for [key, field] in items({fg: 'guifg', bg: 'guibg', ctermfg: 'ctermfg', ctermbg: 'ctermbg'})
+      if has_key(value, key)
+        attributes[field] = type(value[key]) == v:t_number ? string(value[key]) : value[key]
+      endif
+    endfor
+  endif
+  hlset([{name: name, cleared: true, linksto: 'NONE'}])
+  if hlset([attributes]) != 0
+    throw 'hellshake-yano: invalid highlight attributes'
+  endif
+enddef
+
 export def Setup(options: dict<any> = {})
+  var names = ['HellshakeYanoNativeHint', 'HellshakeYanoNativeCurrent']
+  var saved = map(copy(names), (_, name) => hlget(name))
+  try
+    Highlight(names[0], get(options, 'highlightHintMarker', 'DiffAdd'))
+    Highlight(names[1], get(options, 'highlightHintMarkerCurrent', 'DiffText'))
+  catch
+    for i in range(len(names))
+      hlset([{name: names[i], cleared: true, linksto: 'NONE'}])
+      if !empty(saved[i])
+        hlset(saved[i])
+      endif
+    endfor
+    throw 'hellshake-yano: ' .. v:exception
+  endtry
   Hide()
   config = deepcopy(options)
-  highlight default link HellshakeYanoNativeHint IncSearch
+  highlight default link HellshakeYanoMarker HellshakeYanoNativeHint
+  highlight default link HellshakeYanoHint HellshakeYanoNativeHint
 enddef
 
 export def State(): dict<any>
@@ -33,8 +66,16 @@ export def State(): dict<any>
 enddef
 
 def Valid(target: dict<any>): bool
-  return !empty(getwininfo(target.winid)) && winbufnr(target.winid) == target.bufnr
-    && getbufvar(target.bufnr, 'changedtick') == target.changedtick
+  if empty(getwininfo(target.winid)) || winbufnr(target.winid) != target.bufnr
+    || getbufvar(target.bufnr, 'changedtick') != target.changedtick
+    return false
+  endif
+  var lines = getbufline(target.bufnr, target.line)
+  if empty(lines) || target.col < 1 || target.col > strlen(lines[0])
+    return false
+  endif
+  var byte = char2nr(strpart(lines[0], target.col - 1, 1), true)
+  return byte < 128 || byte >= 192
 enddef
 
 def Render()
@@ -45,26 +86,24 @@ def Render()
   endfor
   try
     for target in targets
-      if stridx(target.hint, prefix) != 0 || !Valid(target)
+      if !Valid(target)
         continue
       endif
       var position = screenpos(target.winid, target.line, target.col)
       if position.row == 0 || position.col == 0
         continue
       endif
-      var label = strpart(target.hint, strlen(prefix))
-      if empty(label)
-        label = target.hint
-      endif
+      var label = target.hint
+      var group = !empty(prefix) && stridx(label, prefix) == 0 ? 'HellshakeYanoNativeCurrent' : 'HellshakeYanoNativeHint'
       var id = popup_create(label, {line: position.row, col: position.col,
         pos: 'topleft', fixed: true, wrap: false, padding: [0, 0, 0, 0],
-        mapping: false, highlight: 'HellshakeYanoNativeHint', zindex: 200,
+        mapping: false, highlight: group, zindex: 200,
         scrollbar: false})
       add(popups, id)
     endfor
   catch
     Hide()
-    throw v:exception
+    throw 'hellshake-yano: ' .. v:exception
   endtry
 enddef
 
