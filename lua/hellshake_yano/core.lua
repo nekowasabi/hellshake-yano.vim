@@ -5,14 +5,24 @@ local config_module = require('hellshake_yano.config')
 local config = config_module.resolve()
 local state = {visible = false, targets = {}, prefix = ''}
 local buffers = {}
+local floats = {}
 
-function M.hide()
+local function clear_display()
+  for _, float in ipairs(floats) do
+    if vim.api.nvim_win_is_valid(float.win) then vim.api.nvim_win_close(float.win, true) end
+    if vim.api.nvim_buf_is_valid(float.buf) then vim.api.nvim_buf_delete(float.buf, {force = true}) end
+  end
+  floats = {}
   for buffer in pairs(buffers) do
     if vim.api.nvim_buf_is_valid(buffer) then
       vim.api.nvim_buf_clear_namespace(buffer, M.namespace, 0, -1)
     end
   end
   buffers = {}
+end
+
+function M.hide()
+  clear_display()
   state = {visible = false, targets = {}, prefix = ''}
 end
 
@@ -54,20 +64,36 @@ local function valid(word)
 end
 
 local function render()
-  for buffer in pairs(buffers) do
-    if vim.api.nvim_buf_is_valid(buffer) then vim.api.nvim_buf_clear_namespace(buffer, M.namespace, 0, -1) end
-  end
-  for _, target in ipairs(state.targets) do
-    if valid(target) then
-      local match = state.prefix ~= '' and target.hint:sub(1, #state.prefix) == state.prefix
-      local group = match and 'HellshakeYanoNativeCurrent' or 'HellshakeYanoNativeHint'
-      vim.api.nvim_buf_set_extmark(target.bufnr, M.namespace, target.line - 1, target.col - 1, {
-        virt_text = {{target.hint, group}}, virt_text_pos = 'overlay',
-        hl_mode = 'combine', priority = 200,
-      })
-      buffers[target.bufnr] = true
+  clear_display()
+  local ok, err = pcall(function()
+    for _, target in ipairs(state.targets) do
+      if valid(target) then
+        local match = state.prefix ~= '' and target.hint:sub(1, #state.prefix) == state.prefix
+        local group = match and 'HellshakeYanoNativeCurrent' or 'HellshakeYanoNativeHint'
+        if config.multiWindowMode then
+          -- Extmarks belong to buffers, so they cannot distinguish two views of
+          -- one buffer. Window-relative floats keep each target's label unique.
+          local buf = vim.api.nvim_create_buf(false, true)
+          local item = {buf = buf, win = -1}
+          floats[#floats + 1] = item
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, {target.hint})
+          item.win = vim.api.nvim_open_win(buf, false, {
+            relative = 'win', win = target.winid, bufpos = {target.line - 1, target.col - 1},
+            row = 0, col = 0, width = math.max(1, vim.fn.strdisplaywidth(target.hint)), height = 1,
+            style = 'minimal', focusable = false, noautocmd = true, zindex = 200,
+          })
+          vim.wo[item.win].winhighlight = 'Normal:' .. group
+        else
+          vim.api.nvim_buf_set_extmark(target.bufnr, M.namespace, target.line - 1, target.col - 1, {
+            virt_text = {{target.hint, group}}, virt_text_pos = 'overlay',
+            hl_mode = 'combine', priority = 200,
+          })
+          buffers[target.bufnr] = true
+        end
+      end
     end
-  end
+  end)
+  if not ok then M.hide(); error(err) end
 end
 
 -- words: {text, line, col, bufnr?, winid?}; all positions are 1-based bytes.
@@ -102,12 +128,13 @@ function M.input(key)
   if not state.visible then return 'inactive', key end
   if key == '\27' or key == '' then M.hide(); return 'cancelled' end
   -- Preserve the legacy single-window contract: lowercase remains normal motion.
-  if key:match('^[a-z]$') then M.hide(); return 'cancelled', key end
+  if not config.multiWindowMode and key:match('^[a-z]$') then M.hide(); return 'cancelled', key end
   local normalized = key == '\r' and '<CR>' or key:upper()
   local is_cancel = false
   for _, cancel in ipairs(config.cancelKeys) do
     is_cancel = is_cancel or normalized == (cancel == '\r' and '<CR>' or cancel:upper())
   end
+  if config.multiWindowMode and is_cancel then M.hide(); return 'cancelled', key end
   local prefix = state.prefix .. key
   local matches = {}
   for _, target in ipairs(state.targets) do

@@ -13,6 +13,8 @@ items are verified.
 - Hint assignment: distance order, current-window cursor exclusion, UTF-8 byte
   positions, start/end/both positions.
 - Native extmark display, prefix highlighting, hide/enable/disable/toggle.
+- Window-relative floating hints for multi-window mode, including distinct views
+  of the same buffer; selection closes all owned hint windows and buffers.
 - Input selection and stale-buffer/window validation before jumping.
 - Native motion counters by buffer/key, explicit-count bypass, repeat suppression.
 - Visible-window word detection, fold exclusion, floating-window exclusion,
@@ -26,8 +28,7 @@ callers using display columns must explicitly pass their `byteCol` instead.
 
 ## Not yet complete
 
-Input polling/mapping integration, TinySegmenter, dictionaries, window-specific
-display for the same buffer in multiple windows, full continuous/visual-mode
+Input polling/mapping integration, TinySegmenter, dictionaries, full continuous/visual-mode
 behavior, full configuration validation, and dispatcher compatibility remain.
 The complete S2 stage is not yet finished.
 
