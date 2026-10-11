@@ -39,6 +39,28 @@ def Run()
     assert_equal([3, 7], [line('.'), col('.')])
     feedkeys("\<Esc>", 'xt')
     Runtime.Deactivate()
+    var dictfile = tempname() .. '.json'
+    try
+      writefile(['{"customWords":["beta"]}'], dictfile)
+      Runtime.Setup({dictionaryPath: dictfile, defaultMinWordLength: 8,
+        singleCharKeys: ['A'], motionTimeout: 100})
+      setline(1, 'alpha beta')
+      cursor(1, 1)
+      feedkeys('A', 'nt')
+      assert_equal('jump', Runtime.Show())
+      assert_equal(7, col('.'))
+      writefile(['{"customWords":[123]}'], dictfile)
+      var rejected = false
+      try
+        Runtime.ReloadDictionary()
+      catch /^hellshake-yano:/
+        rejected = true
+      endtry
+      assert_true(rejected)
+      assert_equal(['beta'], Runtime.GetDictionary().customWords)
+    finally
+      delete(dictfile)
+    endtry
     var prior = Runtime.Config()
     try
       Runtime.Setup({motionTimeout: 0})

@@ -1,5 +1,6 @@
 vim9script
 import autoload './segmenter.vim' as Segmenter
+import autoload './dictionary.vim' as Dictionary
 
 # Keep extraction behavior aligned with Lua and the pinned TypeScript fixtures.
 def Japanese(char: string): string
@@ -175,14 +176,18 @@ export def Windows(config: dict<any>): list<number>
 enddef
 
 # Called through win_execute so folds/view are window-local without WinEnter.
-export def InWindow(config: dict<any>, key: string, origin: number, cursor: list<number>): list<dict<any>>
+export def InWindow(config: dict<any>, key: string, origin: number, cursor: list<number>, dictionary: dict<any> = {}): list<dict<any>>
   var result: list<dict<any>> = []
   var win = win_getid()
   for number in range(line('w0'), line('w$'))
     if foldclosed(number) != -1
       continue
     endif
-    for word in Extract(getline(number), number, config, key)
+    var detected = Extract(getline(number), number, config, key)
+    if !empty(dictionary)
+      detected = Dictionary.Apply(detected, [getline(number)], number, dictionary)
+    endif
+    for word in detected
       var directional = get(config, 'directionalHintFilter', false) && win == origin
       var after = number > cursor[0] || (number == cursor[0] && word.col > cursor[1])
       var before = number < cursor[0] || (number == cursor[0] && word.col < cursor[1])
@@ -200,9 +205,9 @@ export def InWindow(config: dict<any>, key: string, origin: number, cursor: list
   return result
 enddef
 
-export def Detect(config: dict<any>, key: string = ''): list<dict<any>>
+export def Detect(config: dict<any>, key: string = '', dictionary: dict<any> = {}): list<dict<any>>
   var result: list<dict<any>> = []
-  var args = string(config) .. ', ' .. string(key) .. ', ' .. win_getid() .. ', ' .. string([line('.'), col('.')])
+  var args = string(config) .. ', ' .. string(key) .. ', ' .. win_getid() .. ', ' .. string([line('.'), col('.')]) .. ', ' .. string(dictionary)
   for win in Windows(config)
     var output = win_execute(win, 'echo json_encode(hellshake_yano#native#words#InWindow(' .. args .. '))', 'silent')
     extend(result, json_decode(output))

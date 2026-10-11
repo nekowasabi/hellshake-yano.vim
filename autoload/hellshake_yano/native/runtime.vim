@@ -3,21 +3,23 @@ import autoload './config.vim' as Settings
 import autoload './core.vim' as Core
 import autoload './words.vim' as Words
 import autoload './motion.vim' as Motion
+import autoload './dictionary.vim' as Dictionary
 
 var config: dict<any> = {}
+var dictionary: dict<any> = {}
 var active = false
 var owned_maps: list<dict<any>> = []
 var owned_commands: dict<string> = {}
 
 export def Setup(options: dict<any> = {})
   var resolved = Settings.Resolve(options)
-  if !empty(get(resolved, 'dictionaryPath', ''))
-    throw 'hellshake-yano: Vim9 dictionary integration is not implemented yet'
-  endif
+  var path = get(resolved, 'dictionaryPath', '')
+  var loaded = empty(path) ? {} : Dictionary.Load(path)
   var reactivate = active
   Core.Setup(resolved)
   Deactivate()
   config = resolved
+  dictionary = loaded
   if reactivate
     Activate()
   endif
@@ -82,7 +84,7 @@ export def Show(key: string = ''): string
   var last_buffer = -1
   while true
     redraw
-    var targets = Core.Show(Words.Detect(config, key))
+    var targets = Core.Show(Words.Detect(config, key, dictionary))
     if empty(targets)
       return 'empty'
     endif
@@ -162,6 +164,7 @@ export def Activate()
   Command('HellshakeYanoEnable', 'Enable(v:true)')
   Command('HellshakeYanoDisable', 'Enable(v:false)')
   Command('HellshakeYanoToggle', 'Toggle()')
+  Command('HellshakeYanoReloadDict', 'ReloadDictionary()')
   var motions = copy(settings.countedMotions)
   if empty(motions) && settings.triggerOnHjkl
     motions = ['h', 'j', 'k', 'l']
@@ -213,4 +216,16 @@ export def Deactivate()
   augroup HellshakeYanoNativeVim9
     autocmd!
   augroup END
+enddef
+
+export def GetDictionary(): dict<any>
+  return deepcopy(dictionary)
+enddef
+
+export def ReloadDictionary(): dict<any>
+  var path = get(Config(), 'dictionaryPath', '')
+  var loaded = empty(path) ? {} : Dictionary.Load(path)
+  dictionary = loaded
+  Hide()
+  return GetDictionary()
 enddef
