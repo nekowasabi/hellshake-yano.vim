@@ -196,3 +196,15 @@ Further source comparison restored the old non-current-window distance penalty
 Configured cancel keys still replay their key. Tests check this distinction and
 the attached UI confirms current-window labels precede the other window's labels.
 S2 is still not declared complete: routing coverage alone is not full parity.
+
+## Regex word/config compatibility follow-through
+
+The regex word detector now follows the checked-out improved detector's hexadecimal
+and binary prefix handling, Japanese/ASCII short tokens, underscore edge cases,
+100-word-per-line cap, and 50-character maximum. Thirty-six pinned cases are
+checked in; 3,042 seeded/configuration comparisons match text and byte positions
+against the original TypeScript extraction followed by its min/max filter.
+
+Default marker/key collections retain the legacy list type; explicitly supplied
+strings remain accepted. Partial snake_case updates are normalized before merging
+with existing camelCase settings, so a previous value cannot mask an update.

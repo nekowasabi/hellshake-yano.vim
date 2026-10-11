@@ -1,0 +1,562 @@
+[
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "xFF",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "123",
+        "line": 1,
+        "col": 13
+      },
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 17
+      }
+    ]
+  },
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "xFF",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "123",
+        "line": 1,
+        "col": 13
+      },
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 17
+      }
+    ]
+  },
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      }
+    ]
+  },
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "xFF",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "123",
+        "line": 1,
+        "col": 13
+      },
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 17
+      }
+    ]
+  },
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "xFF",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "123",
+        "line": 1,
+        "col": 13
+      },
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 17
+      }
+    ]
+  },
+  {
+    "text": "0xFF 0b1010 123 foo",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "b1010",
+        "line": 1,
+        "col": 7
+      }
+    ]
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "日a",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "あい",
+        "line": 1,
+        "col": 6
+      },
+      {
+        "text": "漢",
+        "line": 1,
+        "col": 13
+      },
+      {
+        "text": "a",
+        "line": 1,
+        "col": 16
+      },
+      {
+        "text": "字",
+        "line": 1,
+        "col": 17
+      }
+    ]
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": []
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": []
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "a",
+        "line": 1,
+        "col": 4
+      },
+      {
+        "text": "a",
+        "line": 1,
+        "col": 16
+      }
+    ]
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": []
+  },
+  {
+    "text": "日a あい 漢a字",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": []
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "_foo_",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "aaa",
+        "line": 1,
+        "col": 17
+      },
+      {
+        "text": "bbb",
+        "line": 1,
+        "col": 21
+      }
+    ]
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "_foo_",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "aaa",
+        "line": 1,
+        "col": 17
+      },
+      {
+        "text": "bbb",
+        "line": 1,
+        "col": 21
+      }
+    ]
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "_foo_",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "a",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "b",
+        "line": 1,
+        "col": 9
+      },
+      {
+        "text": "aa",
+        "line": 1,
+        "col": 11
+      },
+      {
+        "text": "bb",
+        "line": 1,
+        "col": 14
+      },
+      {
+        "text": "aaa",
+        "line": 1,
+        "col": 17
+      },
+      {
+        "text": "bbb",
+        "line": 1,
+        "col": 21
+      }
+    ]
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "foo",
+        "line": 1,
+        "col": 2
+      },
+      {
+        "text": "aaa",
+        "line": 1,
+        "col": 17
+      },
+      {
+        "text": "bbb",
+        "line": 1,
+        "col": 21
+      }
+    ]
+  },
+  {
+    "text": "_foo_ a_b aa_bb aaa_bbb",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": []
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "case",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "12",
+        "line": 1,
+        "col": 12
+      },
+      {
+        "text": "beta",
+        "line": 1,
+        "col": 15
+      }
+    ]
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "case",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "beta",
+        "line": 1,
+        "col": 15
+      }
+    ]
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "case",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "12",
+        "line": 1,
+        "col": 12
+      },
+      {
+        "text": "beta",
+        "line": 1,
+        "col": 15
+      }
+    ]
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "case",
+        "line": 1,
+        "col": 7
+      },
+      {
+        "text": "beta",
+        "line": 1,
+        "col": 15
+      }
+    ]
+  },
+  {
+    "text": "snake_case 12 beta",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "snake",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "漢字漢字",
+        "line": 1,
+        "col": 1
+      },
+      {
+        "text": "漢字",
+        "line": 1,
+        "col": 13
+      }
+    ]
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "漢字漢字",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": []
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": []
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": []
+  },
+  {
+    "text": "漢字漢字漢字",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": []
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": true,
+    "minimum": 1,
+    "expected": [
+      {
+        "text": "㐀㐀㐀㐀㐀",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": true,
+    "minimum": 3,
+    "expected": [
+      {
+        "text": "㐀㐀㐀㐀㐀",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": true,
+    "minimum": 5,
+    "expected": [
+      {
+        "text": "㐀㐀㐀㐀㐀",
+        "line": 1,
+        "col": 1
+      }
+    ]
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": false,
+    "minimum": 1,
+    "expected": []
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": false,
+    "minimum": 3,
+    "expected": []
+  },
+  {
+    "text": "㐀㐀㐀㐀㐀",
+    "useJapanese": false,
+    "minimum": 5,
+    "expected": []
+  }
+]

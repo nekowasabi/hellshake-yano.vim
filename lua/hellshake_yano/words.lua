@@ -8,29 +8,66 @@ local function japanese(char)
 end
 
 local function regex_extract(line, number, config, key)
-  local result = {}
-  local minimum = config_module.min_length(config, key or '')
-  local function add(text, col)
-    if vim.fn.strchars(text) >= minimum then result[#result + 1] = {text = text, line = number, col = col} end
-  end
-  local text, start, kind = '', 1, nil
+  -- Match the old improved regex detector before its final min/max filter.
+  local raw, token, start, col = {}, '', 1, 1
   local function flush()
-    if text ~= '' then add(text, start) end
-    text, kind = '', nil
+    if token~='' then raw[#raw+1]={text=token,col=start} end
+    token=''
   end
-  local col = 1
-  for _, char in ipairs(vim.fn.split(line, '\\zs')) do
-    local current = char:match('^[A-Za-z0-9]$') and 'latin' or (config.useJapanese and japanese(char))
-    if not current then
-      flush()
-    else
-      if current ~= kind or (current == 'kanji' and vim.fn.strchars(text) >= 4) then flush() end
-      if text == '' then start = col end
-      text, kind = text .. char, current
-    end
-    col = col + #char
+  for _,char in ipairs(vim.fn.split(line,'\\zs')) do
+    local accepted=char:match('^[A-Za-z0-9]$') or (config.useJapanese and (char=='_' or japanese(char)))
+    if accepted then
+      if token=='' then start=col end
+      token=token..char
+    else flush() end
+    col=col+#char
   end
   flush()
+  local split={}
+  local function add(text,position) split[#split+1]={text=text,line=number,col=position} end
+  for _,word in ipairs(raw) do
+    local text=word.text
+    local snake=text:find('_',1,true) and text:match('^[A-Za-z0-9_]+$')
+      and text:sub(1,1)~='_' and text:sub(-1)~='_' and not text:find('__',1,true)
+    if snake then
+      local offset=word.col
+      for part in text:gmatch('[^_]+') do
+        -- extractWords receives no minimum from RegexWordDetector, hence 3 here.
+        if #part>=3 then add(part,offset) end
+        offset=offset+#part+1
+      end
+    elseif text:match('^0[xX][0-9a-fA-F]+$') or text:match('^0[bB][01]+$') then
+      add(text:sub(2),word.col+1)
+    else
+      local has_japanese=false
+      for _,char in ipairs(vim.fn.split(text,'\\zs')) do
+        local code=vim.fn.char2nr(char)
+        if (code>=0x3040 and code<=0x30ff) or (code>=0x4e00 and code<=0x9faf) then has_japanese=true; break end
+      end
+      if has_japanese and vim.fn.strchars(text)>2 then
+        local part,kind,offset,position='',nil,word.col,word.col
+        local function emit() if part~='' then add(part,position) end; part=''; kind=nil end
+        for _,char in ipairs(vim.fn.split(text,'\\zs')) do
+          local current=char:match('^[A-Za-z0-9]$') and 'latin' or japanese(char)
+          if not current then emit()
+          else
+            if current~=kind or (current=='kanji' and vim.fn.strchars(part)>=4) then emit() end
+            if part=='' then position=offset end
+            part=part..char; kind=current
+          end
+          offset=offset+#char
+        end
+        emit()
+      else add(text,word.col) end
+    end
+  end
+  local result={}
+  local minimum=config_module.min_length(config,key or '')
+  for index,word in ipairs(split) do
+    if index>100 then break end
+    local length=vim.fn.strchars(word.text)
+    if length>=minimum and length<=(config.maxWordLength or 50) then result[#result+1]=word end
+  end
   return result
 end
 

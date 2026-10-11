@@ -2,6 +2,14 @@ vim.opt.runtimepath:prepend(vim.fn.getcwd())
 local words = require('hellshake_yano.words')
 local config = require('hellshake_yano.config')
 local function eq(a, b) assert(vim.deep_equal(a, b), vim.inspect({expected=a, actual=b})) end
+local fixtures=vim.json.decode(table.concat(vim.fn.readfile('tests-lua/fixtures/regex-words.json'),'\n'))
+for _,fixture in ipairs(fixtures) do
+  local options=config.resolve({useJapanese=fixture.useJapanese,enableTinySegmenter=false,
+    wordDetectionStrategy='regex',defaultMinWordLength=fixture.minimum})
+  eq(fixture.expected,words.extract(fixture.text,1,options,''))
+end
+eq(100,#words.extract(('alpha '):rep(110),1,config.resolve(),''))
+eq({},words.extract(('a'):rep(51),1,config.resolve(),''))
 local cfg = config.resolve({defaultMinWordLength=3})
 local found = words.extract('\talpha snake_case 12 beta', 4, cfg, 'w')
 eq({'alpha', 'snake', 'case', 'beta'}, vim.tbl_map(function(w) return w.text end, found))
