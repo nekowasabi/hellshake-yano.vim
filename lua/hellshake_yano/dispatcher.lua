@@ -88,6 +88,7 @@ methods.toggleMultiWindowMode=function()
   runtime().update_config({multiWindowMode=enabled}); return enabled
 end
 methods.updateMultiWindowConfig=function(options)
+  if type(options)~='table' then return end
   local updates={}
   if type(options.multiWindowMode)=='boolean' then updates.multiWindowMode=options.multiWindowMode end
   if type(options.multiWindowExcludeTypes)=='table' then
@@ -122,11 +123,15 @@ methods.visualInit=function() end
 methods.visualGetState=function() return {mode='none',active=false} end
 methods.shouldRedraw=function() return vim.fn['hellshake_yano#core#should_redraw']()~=0 end
 methods.reloadDictionary=function() runtime().reload_dictionary() end
+methods.addToDictionary=function(word,meaning,kind)
+  if type(word)=='string' then runtime().add_dictionary_word(word,meaning,kind) end
+end
+methods.editDictionary=function() runtime().edit_dictionary() end
 methods.isInDictionary=function(word)
   local dictionary=runtime().get_dictionary()
-  return type(word)=='string' and dictionary~=nil and vim.list_contains(dictionary.customWords,word)
+  return type(word)=='string' and dictionary~=nil and (vim.list_contains(dictionary.customWords,word) or vim.list_contains(dictionary.preserveWords,word))
 end
-methods.showDictionary=function() print(vim.inspect(runtime().get_dictionary())) end
+methods.showDictionary=function() runtime().show_dictionary() end
 methods.validateDictionary=function() runtime().reload_dictionary() end
 -- Native detection has no stale-result cache to invalidate.
 methods.clearCache=function() end

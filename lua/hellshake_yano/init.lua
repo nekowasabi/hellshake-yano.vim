@@ -58,6 +58,34 @@ function M.reload_dictionary()
 end
 function M.get_dictionary() return vim.deepcopy(dictionary) end
 
+function M.add_dictionary_word(word,meaning,kind)
+  local path=core.get_config().dictionaryPath or '.hellshake-yano/dictionary.json'
+  local loaded=require('hellshake_yano.dictionary').add(path,word,meaning,kind)
+  if not core.get_config().dictionaryPath then M.update_config({dictionaryPath=path}) end
+  dictionary=loaded
+  core.hide()
+end
+function M.edit_dictionary()
+  local path=vim.fn.expand(core.get_config().dictionaryPath or '.hellshake-yano/dictionary.json')
+  vim.api.nvim_cmd({cmd='edit',args={path},magic={file=false,bar=false}},{})
+end
+
+function M.show_dictionary()
+  local data=vim.deepcopy(dictionary or {customWords={},preserveWords={},hintPatterns={}})
+  for _,pattern in ipairs(data.hintPatterns or {}) do pattern.vimPattern=nil end
+  local buffer=vim.api.nvim_create_buf(false,true)
+  vim.api.nvim_buf_set_lines(buffer,0,-1,false,vim.split(vim.inspect(data),'\n'))
+  vim.bo[buffer].bufhidden='wipe'
+  vim.bo[buffer].filetype='lua'
+  vim.bo[buffer].modifiable=false
+  vim.api.nvim_buf_set_name(buffer,('[HellshakeYano Dictionary %d]'):format(buffer))
+  local ok,err=pcall(function()
+    vim.api.nvim_cmd({cmd='split'},{})
+    vim.api.nvim_win_set_buf(0,buffer)
+  end)
+  if not ok then vim.api.nvim_buf_delete(buffer,{force=true}); error(err) end
+end
+
 local function read_input(config)
   local generation = core.get_generation()
   local deadline = vim.uv.hrtime() / 1e6 + config.motionTimeout
@@ -133,7 +161,9 @@ function M.activate()
   command('HellshakeYanoDisable', M.disable)
   command('HellshakeYanoToggle', M.toggle)
   command('HellshakeYanoReloadDict', M.reload_dictionary)
-  command('HellshakeYanoShowDict', function() print(vim.inspect(dictionary)) end)
+  command('HellshakeYanoEditDict', M.edit_dictionary)
+  command('HellshakeYanoAddWord', function(args) M.add_dictionary_word(unpack(args.fargs)) end, {nargs='+'})
+  command('HellshakeYanoShowDict', M.show_dictionary)
   command('HellshakeYanoValidateDict', function() M.reload_dictionary(); print('Dictionary valid') end)
   command('HellshakeYanoDebug', function() print(vim.inspect(core.get_state())) end)
   command('HellshakeYanoSetHighlight', function(args)

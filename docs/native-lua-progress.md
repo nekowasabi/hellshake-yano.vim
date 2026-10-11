@@ -102,7 +102,7 @@ Lookarounds, lazy quantifiers, multiline regexes and unsupported escapes are
 rejected rather than silently translated. Native assignment preserves the old TypeScript distance-first ordering,
 even when dictionary priority metadata is present. Changing that ordering would
 be a separate behavior change. `mergeRules` and `compoundPatterns` are retained as data but their
-runtime semantics, dictionary writing, and full YAML/ECMAScript compatibility
+runtime semantics, YAML/text dictionary writing, and full YAML/ECMAScript compatibility
 remain S4 gaps. Do not remove denops while those requirements are unresolved.
 
 Config validation covers booleans, integer ranges, per-key values, hint keys,
@@ -161,7 +161,7 @@ native notifications/delayed displays. This does not switch plugin entry files,
 replace `denops#request`, or intercept other plugins. `activate()` and bridge
 activation are independent, so existing mappings need not be overwritten.
 
-The adapter currently covers 59 of the 61 named Neovim dispatcher methods,
+The adapter currently covers all 61 named Neovim dispatcher methods,
 including configuration, byte-coordinate Vim word records, segmentation result
 objects, windows, hide/redraw, input, diagnostics and motion-state operations.
 Unsupported methods raise an explicit error. Existing Neovim Visual-range and
@@ -178,14 +178,14 @@ comparison matched the checked-out TypeScript detector's results and states.
 The public segmentation wrapper's particle/numeric-unit/parenthesis processing
 matched 2,016 comparisons with the old TypeScript wrapper, including merge off.
 
-All 14 native test files pass. Tests cover ordinary denops delegation when opt-in
+All 15 native test files pass. Tests cover ordinary denops delegation when opt-in
 is off, other-plugin isolation, public Vimscript return shapes, async ordering,
 cancellation after bridge disable, and delayed-display invalidation. Diagnostic
 performance values measure dispatcher calls (last 100 per operation), not all
 native direct Lua calls; native detection currently has no result cache.
 
-Remaining dispatcher methods: addToDictionary and editDictionary (dictionary
-mutation/UI are still outside the completed native scope). Low-level display
+All named dispatcher methods now have native routes; this is routing coverage,
+not a claim that every legacy edge case is identical. Low-level display
 methods preserve byte coordinates and do not consume selection input. The
 multi-window display call is non-blocking and does not change global mode.
 `detectWords` carries both display-column `col` and byte-column `byteCol`, unlike
@@ -208,3 +208,20 @@ against the original TypeScript extraction followed by its min/max filter.
 Default marker/key collections retain the legacy list type; explicitly supplied
 strings remain accepted. Partial snake_case updates are normalized before merging
 with existing camelCase settings, so a previous value cannot mask an update.
+
+## Dictionary mutation guardrails
+
+`HellshakeYanoAddWord` / `addToDictionary` support JSON files only. They retain
+unknown JSON fields, keep structured word metadata, and also update `customWords`
+(the field the loader actually consumes). This corrects an old inconsistency:
+the previous writer only persisted `words`, while the loader read `customWords`.
+YAML/text are rejected unchanged; no format conversion is attempted. Corrupt
+JSON, symlinks and changed-on-disk files are also rejected. Writes use an
+exclusive same-directory temporary file, fsync, content recheck and rename.
+Tests simulate a concurrent edit and verify it is not overwritten or followed
+by a leaked temporary file. No real user dictionary was modified in the VM.
+
+`editDictionary` uses structured Ex arguments with filename/bar expansion off,
+so `%`, `#`, spaces and `|` in a path are literal. It does not force-discard
+unsaved buffers. `showDictionary` uses a read-only disposable scratch split.
+Membership checks include both custom and preserve words.

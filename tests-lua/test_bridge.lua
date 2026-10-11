@@ -20,7 +20,7 @@ assert(windows[1].isCurrent)
 local segmented=call('hellshake_yano#japanese#segment','日本語の文章です。')
 assert(segmented.success and #segmented.segments>0)
 assert(not pcall(call,'hellshake_yano#backend#request','hellshake-yano','missingMethod',{}))
-assert(not pcall(call,'hellshake_yano#dictionary#add','newword'),'unported writes must fail explicitly')
+assert(not pcall(call,'hellshake_yano#dictionary#add','   '),'invalid dictionary writes must fail explicitly')
 -- Synchronous request keeps queued hint input in the native input loop.
 vim.api.nvim_win_set_cursor(0,{1,0})
 vim.api.nvim_feedkeys('A','t',false)
@@ -50,6 +50,14 @@ local state=call('hellshake_yano#motion#get_state')
 eq(150,state.timeoutMs)
 eq('',state.lastMotion)
 local dispatcher=require('hellshake_yano.dispatcher')
+local source=table.concat(vim.fn.readfile('denops/hellshake-yano/main.ts'),'\n')
+source=source:sub(assert(source:find('async function initializeNeovimLayer',1,true)))
+local count=0
+for name in source:gmatch('      async ([%w_]+)%(') do
+  assert(dispatcher.supports(name),'missing legacy dispatcher method: '..name)
+  count=count+1
+end
+eq(61,count)
 assert(statistics.performanceStats.hintGeneration.count>=1)
 assert(dispatcher.request('getDebugInfo',{}).timestamp>0)
 dispatcher.request('clearDebugInfo',{})

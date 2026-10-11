@@ -167,4 +167,55 @@ function M.apply(words, lines, first, dictionary)
   end
   return result
 end
+-- Mutation is deliberately JSON-only: never serialize parsed YAML back as JSON.
+local function read_source(path)
+  local file=assert(io.open(path,'rb'))
+  local source=file:read('*a'); file:close()
+  return source
+end
+function M.add(path,word,meaning,kind)
+  assert(type(word)=='string' and vim.trim(word)~='', 'dictionary word must not be empty')
+  path=vim.fn.fnamemodify(vim.fn.expand(path),':p')
+  assert(path:match('%.json$'), 'native dictionary addition only supports JSON; edit YAML/text manually')
+  local stat=vim.uv.fs_lstat(path)
+  assert(not stat or stat.type=='file','dictionary must be a regular file (symlinks are not rewritten)')
+  assert(not stat or stat.size<=1024*1024,'dictionary exceeds 1 MiB')
+  local original=stat and read_source(path) or nil
+  local data=original and vim.json.decode(original) or {
+    customWords={},words={},patterns={},meta={version='1.0.0',created=os.date('!%Y-%m-%dT%H:%M:%SZ'),
+      description='User dictionary for hellshake-yano.vim'},
+  }
+  M.parse(original or vim.json.encode(data),'json') -- Validate without adding internal compiled fields to data.
+  data.customWords=data.customWords or {}
+  data.words=data.words or {}
+  assert(vim.islist(data.words),'dictionary words must be a list')
+  word=vim.trim(word)
+  if not vim.list_contains(data.customWords,word) then data.customWords[#data.customWords+1]=word end
+  local entry={word=word,meaning=type(meaning)=='string' and vim.trim(meaning) or '',
+    type=type(kind)=='string' and vim.trim(kind) or '',added=os.date('!%Y-%m-%dT%H:%M:%SZ')}
+  if entry.meaning=='' then entry.meaning=word end
+  if entry.type=='' then entry.type='unknown' end
+  local found=false
+  for index,value in ipairs(data.words) do
+    if type(value)=='table' and value.word==word then data.words[index]=entry; found=true; break end
+  end
+  if not found then data.words[#data.words+1]=entry end
+  local output=vim.json.encode(data)..'\n'
+  assert(#output<=1024*1024,'updated dictionary exceeds 1 MiB')
+  vim.fn.mkdir(vim.fn.fnamemodify(path,':h'),'p')
+  local temporary=path..'.hellshake-yano-'..vim.fn.getpid()..'-'..tostring(vim.uv.hrtime())
+  local descriptor=assert(vim.uv.fs_open(temporary,'wx',stat and stat.mode%512 or 384))
+  local ok,err=pcall(function()
+    assert(vim.uv.fs_write(descriptor,output,0)==#output,'incomplete dictionary write')
+    assert(vim.uv.fs_fsync(descriptor))
+    assert(vim.uv.fs_close(descriptor)); descriptor=nil
+    local current=vim.uv.fs_lstat(path)
+    assert((not current and not original) or (current and current.type=='file' and original and read_source(path)==original),
+      'dictionary changed while editing; original file was not replaced')
+    assert(vim.uv.fs_rename(temporary,path))
+  end)
+  if descriptor then vim.uv.fs_close(descriptor) end
+  if not ok then vim.uv.fs_unlink(temporary); error(err) end
+  return M.load(path)
+end
 return M
