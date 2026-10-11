@@ -109,6 +109,19 @@ try:
     assert "Alpha" in screen and "Blpha" in screen, screen
     nvim.lua("require('hellshake_yano.core').hide()")
     assert nvim.lua("return #vim.api.nvim_list_wins()") == 2, "hint windows leaked"
+    # Exercise real redraw after repeated prefix cancellation, not only API counts.
+    baseline = nvim.lua("return {#vim.api.nvim_list_wins(), #vim.api.nvim_list_bufs()}")
+    for _ in range(10):
+        nvim.lua("""
+          local core=require('hellshake_yano.core')
+          core.setup({multiWindowMode=true,singleCharKeys='/',multiCharKeys='BC'})
+          core.show(require('hellshake_yano.words').detect(core.get_config(),''))
+          core.input('B')
+        """)
+        nvim.screen()
+        assert nvim.lua("return require('hellshake_yano.core').input(string.char(27))") == "cancelled"
+        assert "alpha beta" in nvim.screen(), "cancel did not restore source text"
+        assert nvim.lua("return {#vim.api.nvim_list_wins(), #vim.api.nvim_list_bufs()}") == baseline
     assert nvim.lua("return vim.v.errmsg") == ""
     print("PASS: attached UI horizontal viewport, Japanese byte positions, visible labels, same-buffer splits, cleanup")
 finally:

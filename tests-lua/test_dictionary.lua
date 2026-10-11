@@ -34,7 +34,7 @@ assert(#extracted==1 and extracted[1].text=='非同期処理' and extracted[1].c
 local hints=require('hellshake_yano.hints')
 local assigned=hints.assign({{line=1,col=8,text='near'},{line=3,col=1,text='important',hintPriority=20}},
   {'A','BB'},{line=1,col=1,winid=1},{})
-eq('important',assigned[1].text)
+eq('near',assigned[1].text) -- Legacy assignment remains distance-first.
 local tmp=vim.fn.tempname()..'.yaml'
 vim.fn.writefile(vim.split(yaml,'\n'),tmp)
 eq(parsed,dictionary.load(tmp))
@@ -69,6 +69,18 @@ pattern_priority('^\\s*-\\s*\\[\\s\\]\\s+(.)','- [ ] task',7,'task')
 pattern_priority('\\bfunction\\s+(\\w+)','function hello',10,'hello')
 pattern_priority('x=(\\w+)','x=hello',3,'hello')
 pattern_priority('^>\\s*(.)','> quote',3,'quote')
+pattern_priority('\\b(word)\\b','éwordé',3,'word')
+pattern_priority('([\\d]+)','123',1,'123')
+pattern_priority('([\\w]+)','hello',1,'hello')
+pattern_priority('[\\s]+(hello)',' '..'hello',2,'hello')
+pattern_priority('\\s+(hello)',' hello',3,'hello')
+pattern_priority('\\_s(hello)','_shello',3,'hello')
+vim.o.ignorecase=true
+local case_dictionary=dictionary.parse('{"hintPatterns":[{"pattern":"hello","priority":9}]}','json')
+eq(nil,dictionary.apply({{line=1,col=1,text='HELLO'}},{'HELLO'},1,case_dictionary)[1].hintPriority)
+vim.o.ignorecase=false
+assert(not pcall(dictionary.parse,'{"hintPatterns":[{"pattern":"[\\\\D]"}]}','json'),
+  'unsupported complement in a class must be explicit')
 print('PASS: native YAML/JSON/text dictionaries, capture targets, schema errors, explicit unsupported syntax')
 assert(vim.v.errmsg=='',vim.v.errmsg)
 vim.cmd('qa!')

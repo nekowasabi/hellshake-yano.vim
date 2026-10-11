@@ -139,3 +139,14 @@ Cross-window Visual review: both the old `win_gotoid()` route and the native
 buffer. The selection anchor's coordinates carry over. No destructive operator
 was run. Whether this should be blocked or exit Visual mode is a behavior choice
 for review; same-window Visual anchor preservation is regression-tested.
+
+## Additional compatibility checks
+
+Dictionary regex translation is explicitly case-sensitive, independent of the
+editor's `ignorecase` option. Character-class `\d`, `\w`, and `\s` expansions,
+ECMAScript whitespace, ASCII word boundaries, and escaped underscores have
+regressions. A 513-case comparison with Node's RegExp matched for the checked
+subset. This does not establish full ECMAScript compatibility; complement
+escapes inside a character class are rejected rather than misinterpreted.
+Attached-grid tests also repeat prefix/ESC cancellation ten times and verify
+source text restoration and stable window/buffer counts after every cycle.

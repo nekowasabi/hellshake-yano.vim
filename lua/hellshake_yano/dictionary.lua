@@ -7,6 +7,13 @@ end
 
 -- Support the common ECMAScript subset used by dictionary hint patterns.
 -- Do not silently reinterpret lookarounds, Unicode property escapes or flags.
+-- ECMAScript WhiteSpace/LineTerminator codepoints; buffer lines never contain LF.
+local whitespace = ' \t\r\v\f' .. vim.fn.nr2char(0x00a0) .. vim.fn.nr2char(0x1680)
+for code = 0x2000, 0x200a do whitespace = whitespace .. vim.fn.nr2char(code) end
+for _, code in ipairs({0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff}) do
+  whitespace = whitespace .. vim.fn.nr2char(code)
+end
+local classes = {d = '0-9', w = 'A-Za-z0-9_', s = whitespace}
 local function regex(pattern)
   assert(type(pattern) == 'string', 'dictionary pattern must be a string')
   assert(not pattern:find('\\n', 1, true) and not pattern:find('\n', 1, true), 'multiline dictionary regex is not supported')
@@ -17,7 +24,13 @@ local function regex(pattern)
       local next_char = pattern:sub(index + 1, index + 1)
       assert(next_char ~= '' and (not next_char:match('[A-Za-z]') or next_char:match('[dDwWsStfrvb]')),
         'unsupported ECMAScript regex escape')
-      if next_char == 'b' and not in_class then result[#result + 1] = '%(<|>)'
+      local class = classes[next_char:lower()]
+      if class then
+        local negative = next_char ~= next_char:lower()
+        assert(not (in_class and negative), 'complement escapes inside character classes are unsupported')
+        result[#result + 1] = in_class and class or ('[' .. (negative and '^' or '') .. class .. ']')
+      elseif next_char == '_' then result[#result + 1] = '_' -- JS identity escape; Vim backslash-underscore introduces multiline atoms.
+      elseif next_char == 'b' and not in_class then result[#result + 1] = '%([A-Za-z0-9_]@<![A-Za-z0-9_]@=|[A-Za-z0-9_]@<=[A-Za-z0-9_]@!)'
       elseif next_char == 'b' then result[#result + 1] = string.char(8)
       elseif next_char == 'f' then result[#result + 1] = string.char(12)
       elseif next_char == 'v' then result[#result + 1] = string.char(11)
@@ -39,7 +52,7 @@ local function regex(pattern)
       index = index + 1
     end
   end
-  local translated = '\\v' .. table.concat(result)
+  local translated = '\\C\\v' .. table.concat(result)
   vim.regex(translated) -- Compile during load, not the input/display hot path.
   return translated
 end
