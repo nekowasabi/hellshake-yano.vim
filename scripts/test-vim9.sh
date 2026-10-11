@@ -8,7 +8,7 @@ command -v "$BIN" >/dev/null || { echo "$BIN not found" >&2; exit 2; }
 for test in tests-vim9/test_*.vim; do
   echo "[TEST] $test"
   log=$(mktemp "${TMPDIR:-/tmp}/hellshake-yano-vim9.XXXXXX")
-  if ! timeout "${TEST_TIMEOUT:-60}" "$BIN" -N -u NONE -i NONE -n -es -V1"$log" -S "$test"; then
+  if ! timeout "${TEST_TIMEOUT:-60}" "$BIN" -N -u NONE -i NONE -n -es -V1"$log" --cmd "set rtp^=$ROOT" -S "$test"; then
     cat "$log" >&2
     exit 1
   fi
