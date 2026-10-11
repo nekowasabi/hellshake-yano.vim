@@ -1,3 +1,8 @@
+" Explicit native startup owns initialization only when opted in.
+if get(g:, 'hellshake_yano_native', v:false)
+  finish
+endif
+
 " hellshake-yano.vim - denops-based hit-a-hint plugin
 " Author: hellshake-yano
 " License: MIT

@@ -2,10 +2,10 @@
 
 Base: `7ff640a` on `feat/remove-denops`.
 
-The native modules are opt-in while S2 is under construction. The existing plugin
-entry points and denops implementation are unchanged; public autoload wrappers
-now use a default-preserving transport, loading the repository does
-not activate the new core. S3 must not delete denops until the remaining parity
+The native modules remain opt-in. Set `g:hellshake_yano_native = v:true` before
+plugin loading to select native startup; without that flag the existing startup
+path is preserved. The denops implementation remains present. Public autoload
+wrappers use a default-preserving transport. S3 must not delete denops until the remaining parity
 items are verified.
 
 ## Implemented foundation
@@ -76,7 +76,7 @@ and remain to be completed.
 `require('hellshake_yano').setup(options)` configures the opt-in runtime;
 `activate()` installs commands and motion mappings only where no mapping/command
 already exists. `deactivate()` removes only owned definitions. The existing
-plugin entry files still do not call these functions automatically.
+native plugin entry calls these functions only with the explicit startup flag.
 
 Motion mappings use a `<Cmd>` suffix after the original motion, rather than a
 scheduled callback, so queued hint keys cannot run as normal editing commands.

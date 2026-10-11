@@ -11,7 +11,9 @@ from checksum-verified Debian packages. S3 now has a tested, explicit opt-in Vim
 runtime and Vimscript bridge. See `docs/native-vim-progress.md` for current scope,
 test commands and the exact cutover gates. These additional commits are local at
 this checkpoint; publication of the original 16 commits does not mean all later
-work has reached the remote. Plugin entry files and denops remain unchanged.
+work has reached the remote. A default-OFF `g:hellshake_yano_native` startup
+flag now selects native setup/bridge/activation and guards the three old entry
+files only when explicitly enabled. Default startup and denops remain intact.
 
 The user's actual init.vim is still unavailable here. Synthetic Neovim and Vim
 profiles record rtp/scriptnames but do not complete that final requirement.

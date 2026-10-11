@@ -17,6 +17,20 @@
 
 ## 明示的な試用
 
+Vim9 / Neovim 0.10+ の共通 opt-in 起動も利用できる。プラグインが読み込まれる前に設定する。
+
+```vim
+let g:hellshake_yano_native = v:true
+let g:hellshake_yano = {'useJapanese': v:true}
+```
+
+`plugin/hellshake-yano-native.vim` が環境に応じた setup / bridge / activate を行い、旧3エントリの初期化を避ける。
+既定値は OFF。未指定なら従来の起動経路を維持する。設定エラーは表示し、Denops への黙った fallback は行わない。
+`g:hellshake_yano_native_error` に原因を記録し、修正後の再 source を許す。読み込み済みなら重複初期化しない。
+試用設定は `g:hellshake_yano` を使う。旧 `g:hellshake_yano_vim_config` の全項目を自動移行するものではない。
+
+以下は plugin 起動を使わない低レベルの試用方法。
+
 既存プラグインの command/mapping と混在させず、`vim -N -u NONE -i NONE -n` で試す。
 リポジトリを runtimepath に追加した後、以下を実行する。
 
@@ -36,7 +50,7 @@ call hellshake_yano#native#runtime#Deactivate()
 ```
 
 この bridge は Neovim の `require('hellshake_yano').enable_bridge()` とは別。
-`plugin/*.vim` の自動起動、既存 `HellshakeYano*` command の置換、通常の Vim 設定への導入はまだ切り替えていない。
+明示的 opt-in 起動以外では自動有効化しない。既存 `HellshakeYano*` command を上書きしない。
 
 ## 検証
 
@@ -49,10 +63,10 @@ python3 scripts/test-vim-gate.py
 ```
 
 - Debian 公式 Vim 9.1 パッケージと runtime を作業フォルダ内に展開し、それぞれ公開 SHA-256 と照合。システム設定は変更していない。パッケージ版は `9.1.1230-2`、含まれるパッチは `1-948, 950-1230, 1242, 1244`。
-- 12 個の Vim9 単体スイート、4 個の実端末 UI スイート。100x30 の実 PTY 上で描画・日本語・同一 buffer の複数ウィンドウ・Normal/Visual の queued motion・辞書・設定プロファイルを検証。
+- 12 個の Vim9 単体スイート、5 個の実端末 UI スイート。100x30 の実 PTY 上で描画・日本語・同一 buffer の複数ウィンドウ・Normal/Visual の queued motion・辞書・設定プロファイルを検証。
 - 既存 TypeScript / upstream を参照した比較: ヒント 500、TinySegmenter 1,000、後処理 2,016、単語抽出 3,042、正規表現部分集合 513、旧 dispatcher motion 1,000 ケース。一部をチェックイン済み fixture として継続実行。
 - 旧 Vim / Neovim gate はいずれも PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13。既知失敗を削除・拡張していない。
-- Lua 15 スイートと実画面検証も継続実行。Vim9 移植中に確認した「YAML の二重 single quote の後に # / : / comma がある」読込不具合は両実装で修正。
+- Lua 16 スイートと実画面検証も継続実行。Vim9 移植中に確認した「YAML の二重 single quote の後に # / : / comma がある」読込不具合は両実装で修正。
 - `profile-ui.vim` は既存資料から転記した合成設定。`HY_EVIDENCE_DIR` 指定時は Vim の runtimepath / scriptnames を記録する。実際のユーザー init.vim の検証ではない。
 
 ## 切替前に残る確認・判断
@@ -63,7 +77,7 @@ python3 scripts/test-vim-gate.py
 4. ウィンドウ選別（現在 tab、現在 window 優先で上限適用）、TinySegmenter threshold、辞書 literal の独立ターゲット化など、Lua チェックポイントで記録した差異は引き続き要確認。
 5. Vim の旧 Visual dispatcher は古い `<` / `>` marks を読む構造と block-mode 判定の問題がある。本変更は黙って意味を変えていない。新 runtime の同一 window Visual anchor はテスト済み。別 buffer にまたがる Visual 操作の UX は未決定。
 6. 診断値はネイティブ dispatcher の測定範囲のみ。キャッシュ統計は未使用を示す 0。旧 motion timestamp は Vim の単調増加時計、debug timestamp は秒精度の Unix 時刻を ms 単位にした値。旧 Deno の時刻・測定履歴を再現するものではない。
-7. `plugin/` の起動順・公開共通 `hellshake_yano#*` と Vim 専用 namespace の統合、通常起動での有効化、denops の物理削除、README の最終切替は未実施。
+7. plugin の明示的 opt-in 起動順と再初期化はテスト済み。公開共通 `hellshake_yano#*` と Vim 専用 namespace の全面統合、デフォルト有効化、denops の物理削除、README の最終切替は未実施。
 8. 実ユーザー init.vim の許可されたコピーが VM にない。最終 rtp / scriptnames 条件は合成設定だけでは満たさない。
 
 これらは未完了の移行条件であり、API 名の対応数や単体テスト成功だけで S3/S4 完了とはしない。

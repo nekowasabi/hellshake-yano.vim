@@ -147,11 +147,11 @@ export def Wipe(buffer: number)
   endfor
 enddef
 
-def Command(name: string, action: string)
+def Command(name: string, action: string, arguments: string = '')
   if exists(':' .. name) == 2
     return
   endif
-  execute 'command ' .. name .. ' call hellshake_yano#native#runtime#' .. action
+  execute 'command ' .. arguments .. ' ' .. name .. ' call hellshake_yano#native#runtime#' .. action
   owned_commands[name] = execute('silent command ' .. name)
 enddef
 
@@ -168,6 +168,12 @@ export def Activate()
   Command('HellshakeYanoEnable', 'Enable(v:true)')
   Command('HellshakeYanoDisable', 'Enable(v:false)')
   Command('HellshakeYanoToggle', 'Toggle()')
+  Command('HellshakeYanoSetCount', "SetNumber('count', <q-args>)", '-nargs=1')
+  Command('HellshakeYanoSetTimeout', "SetNumber('timeout', <q-args>)", '-nargs=1')
+  Command('HellshakeYanoSetHighlight', 'SetHighlight(<f-args>)', '-nargs=+')
+  Command('HellshakeYanoSetCountedMotions', 'SetMotions([<f-args>])', '-nargs=+')
+  Command('HellshakeYanoDebug', 'Debug(v:false)')
+  Command('HellshakeYanoDebugConfig', 'Debug(v:true)')
   Command('HellshakeYanoReloadDict', 'ReloadDictionary()')
   Command('HellshakeYanoValidateDict', 'ReloadDictionary()')
   Command('HellshakeYanoEditDict', 'EditDictionary()')
@@ -294,4 +300,31 @@ export def ShowDictionary()
   execute 'file [HellshakeYano Dictionary ' .. bufnr() .. ']'
   setline(1, json_encode(data))
   setlocal filetype=json nomodifiable
+enddef
+
+# Command arguments remain data; settings validation is shared with Setup().
+export def SetNumber(kind: string, value: string)
+  if value !~# '^\d\+$'
+    throw 'hellshake-yano: expected a positive integer'
+  endif
+  var number = str2nr(value)
+  if kind ==# 'count'
+    Update({motionCount: number, defaultMotionCount: number})
+  elseif kind ==# 'timeout'
+    Update({motionTimeout: number})
+  else
+    throw 'hellshake-yano: unknown numeric setting'
+  endif
+enddef
+
+export def SetHighlight(marker: string, current: string)
+  Update({highlightHintMarker: marker, highlightHintMarkerCurrent: current})
+enddef
+
+export def SetMotions(motions: list<string>)
+  Update({countedMotions: motions})
+enddef
+
+export def Debug(configuration: bool)
+  echo configuration ? Config() : Core.State()
 enddef
