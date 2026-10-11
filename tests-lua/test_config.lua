@@ -3,6 +3,7 @@ local config=require('hellshake_yano.config')
 local runtime=require('hellshake_yano')
 local function eq(a,b) assert(vim.deep_equal(a,b),vim.inspect({expected=a,actual=b})) end
 assert(config.validate({}).valid)
+assert(vim.islist(config.resolve().singleCharKeys),'default key collections must retain the legacy list type')
 for _, invalid in ipairs({{enabled=1},{maxHints=0},{motionTimeout=20},{perKeyMinLength={w='3'}},
   {multiWindowMaxWindows=-1},{singleCharKeys='AA'},{singleCharKeys=' '},{multiCharKeys='B/'},
   {hintPosition='unknown'},{wordDetectionStrategy='unknown'},{highlightHintMarker='bad group'},
@@ -19,6 +20,10 @@ eq(false,config.resolve({directional_hint_filter=0}).directionalHintFilter)
 eq(true,config.resolve({directional_hint_filter='true'}).directionalHintFilter)
 eq(5,config.resolve({motionCount=5,motion_count=2}).motionCount)
 runtime.setup({singleCharKeys='/',highlightHintMarker={bg='black',fg='#57FD14'}})
+runtime.update_config({motion_count=4})
+eq(4,runtime.get_config().defaultMotionCount)
+runtime.update_config({highlightHintMarker={ctermfg='Red',ctermbg='NONE'}})
+eq(9,vim.api.nvim_get_hl(0,{name='HellshakeYanoNativeHint'}).ctermfg)
 runtime.activate()
 assert(not pcall(runtime.setup,{singleCharKeys='AA'}))
 eq('/',runtime.get_config().singleCharKeys)

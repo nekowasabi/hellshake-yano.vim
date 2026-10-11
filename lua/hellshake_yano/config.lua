@@ -1,11 +1,12 @@
 local M = {}
 -- Keep these defaults aligned with common/types/config.ts until S3 removes it.
 M.defaults = {
-  enabled = true, markers = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', motionCount = 3,
+  enabled = true, markers = vim.fn.split('ABCDEFGHIJKLMNOPQRSTUVWXYZ', '\\zs'), motionCount = 3,
   motionTimeout = 2000, hintPosition = 'start', triggerOnHjkl = true,
   countedMotions = {}, maxHints = 336, debounceDelay = 50, useNumbers = false,
   directionalHintFilter = false, highlightSelected = false, debugCoordinates = false,
-  singleCharKeys = 'ASDFGHJKLNM0123456789', multiCharKeys = 'BCEIOQRTUVWXYZ',
+  singleCharKeys = vim.fn.split('ASDFGHJKLNM0123456789', '\\zs'),
+  multiCharKeys = vim.fn.split('BCEIOQRTUVWXYZ', '\\zs'),
   maxSingleCharHints = 21, cancelKeys = {}, useHintGroups = true,
   continuousHintMode = false, recenterCommand = 'normal! zz', maxContinuousJumps = 50,
   highlightHintMarker = 'DiffAdd', highlightHintMarkerCurrent = 'DiffText',
@@ -30,7 +31,7 @@ local aliases = {
   counted_motions = 'countedMotions', highlight_hint_marker = 'highlightHintMarker',
   highlight_hint_marker_current = 'highlightHintMarkerCurrent',
 }
-function M.resolve(options)
+function M.normalize(options)
   assert(options == nil or type(options) == 'table', 'configuration must be a table')
   options = vim.deepcopy(options or {})
   if options.directionalHintFilter == nil and options.directional_hint_filter ~= nil then
@@ -46,6 +47,10 @@ function M.resolve(options)
   if options.defaultMotionCount == nil and options.motionCount ~= nil then
     options.defaultMotionCount = options.motionCount
   end
+  return options
+end
+function M.resolve(options)
+  options = M.normalize(options)
   local resolved = vim.tbl_extend('force', vim.deepcopy(M.defaults), options)
   local validation = M.validate(resolved)
   assert(validation.valid, table.concat(validation.errors, '; '))

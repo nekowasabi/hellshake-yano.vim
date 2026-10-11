@@ -46,7 +46,7 @@ function M.toggle()
 end
 function M.get_config() return core.get_config() end
 function M.update_config(options)
-  return M.setup(vim.tbl_extend('force', core.get_config(), options))
+  return M.setup(vim.tbl_extend('force', core.get_config(), require('hellshake_yano.config').normalize(options)))
 end
 
 function M.reload_dictionary()
