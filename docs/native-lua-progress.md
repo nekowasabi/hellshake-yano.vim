@@ -28,8 +28,7 @@ callers using display columns must explicitly pass their `byteCol` instead.
 
 ## Not yet complete
 
-Advanced dictionary compatibility, full continuous/visual-mode
-behavior, full configuration validation, and dispatcher compatibility remain.
+Advanced dictionary compatibility, cross-window visual-mode behavior, full configuration validation, and dispatcher compatibility remain.
 The complete S2 stage is not yet finished.
 
 ## Verification
@@ -40,7 +39,7 @@ Tests use `-u NONE` and no downloaded test plugins. Also run
 
 Initial VM validation with official Neovim 0.10.4:
 
-- Lua core: 10 cases pass; word/window and motion suites pass.
+- Lua core: 11 cases pass; word/window and motion suites pass.
 - Existing Neovim gate: PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13.
 - Gate unit tests: 6 pass.
 - Full Vim is unavailable in this VM; `vim.tiny` cannot validate popup/Vim9 parity.
@@ -113,3 +112,25 @@ configuration is rejected before an active native runtime is deactivated.
 A differential check against the checked-out TypeScript hint generator passed
 500 seeded configurations. It caught and fixed the marker-fallback case where
 `maxSingleCharHints` and numeric overflow must not apply.
+
+## Latest checkpoint: 2026-10-11
+
+- All 10 native Lua test files pass, including the synthetic user profile in
+  `tests-lua/test_user_profile.lua` (Japanese, dictionary priority, two windows,
+  configured colors, per-key mappings, and toggle).
+- Actual-grid UI integration passes; repeated multi-window display/prefix/hide
+  cycles release their scratch buffers and windows.
+- The normal and Visual motion mappings preserve queued input and the Visual
+  anchor. Continuous mode stops at its configured bound.
+- Existing Neovim gate is still PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13. Known
+  failures have not been erased or expanded. Gate unit tests remain 6/6.
+- `bash -n scripts/test-lua.sh`, Python compilation, and `git diff --check` pass.
+
+`HY_EVIDENCE_DIR=/path/to/output scripts/test-lua.sh` records runtimepath and
+scriptnames for the synthetic profile. This is not the user's actual init.vim:
+that final handoff check still requires an authorized copy in the VM.
+
+S3 is deliberately not started: this VM only has `vim.tiny` with `-eval` and
+`-popupwin`. Adding full Vim requires separate approval. The native runtime is
+still opt-in; no plugin entry was switched and no denops files were deleted.
+Full migration completion must not be inferred from the native tests passing.

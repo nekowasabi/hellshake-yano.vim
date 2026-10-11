@@ -1,4 +1,4 @@
--- Explicitly initialized native core. Plugin entry routing is switched in S3.
+-- Explicitly initialized native core. Plugin entry routing will be switched in S3.
 local hints = require('hellshake_yano.hints')
 local M = {namespace = vim.api.nvim_create_namespace('hellshake_yano_native')}
 local config_module = require('hellshake_yano.config')
@@ -35,7 +35,9 @@ local function highlight(name, value)
     vim.api.nvim_set_hl(0, name, {link = value})
   else
     local opts = {}
-    for _, key in ipairs({'fg', 'bg', 'ctermfg', 'ctermbg'}) do opts[key] = value[key] end
+    for _, key in ipairs({'fg', 'bg', 'ctermfg', 'ctermbg'}) do
+      opts[key] = key:match('^cterm') and tonumber(value[key]) or value[key]
+    end
     vim.api.nvim_set_hl(0, name, opts)
   end
 end

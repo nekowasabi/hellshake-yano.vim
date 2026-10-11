@@ -4,3 +4,24 @@ Done: S1 (Claude Code, f5c8155) parity table docs/denops-parity.md + scripts/tes
 Resolved before S2 (hy-critique, measured on box vim 9.1 / nvim 0.10.4): (1) KNOWN 20 > main failures 17/18 is fine: running main d8fe9db with the new gate gives the same 20 known failures; the old script counted tests as PASS even when an assert_* failed inside them (e.g. test_jump_multi.vim). (2) The gate exits 1 when a test not in the list breaks (checked by breaking test_jump_multi.vim line 56). (3) scripts/test-vim-gate.py is the unit test for the gate itself (scripts/vim-test-gate.py); renaming it is optional.
 Next: S2 Lua core for Neovim (Codex), S3 Vim9 + plugin entry switch + delete denops/ (Grok Build, still unused), S4 gaps + README. Final check: user nvim config with plugged removed from rtp, log &rtp and :scriptnames.
 Evidence: dispatch.tsv, logs/S1, logs/S2. Local execution on takets-pc drops ~11 min after app start; keep CLI runs <10 min, push each.
+
+## S2 native checkpoint (dot VM, 2026-10-11)
+
+Continued from remote `7ff640a` using Astra in the dot VM only. The new native Lua
+runtime is opt-in (`require('hellshake_yano').setup(); require('hellshake_yano').activate()`).
+See `docs/native-lua-progress.md` for API scope, verification, and explicit gaps.
+No existing plugin entry changed; denops has not been deleted. No push/PR/merge.
+
+Verified with official Neovim 0.10.4: all 10 Lua suites, actual-grid UI integration,
+synthetic user-profile E2E, old gate PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13, and all
+6 gate unit tests. TinySegmenter: 27 pinned upstream fixtures plus 1,000 seeded
+random cases match; hint generation: 500 seeded cases match existing TypeScript.
+Runtimepath and scriptnames were recorded for the synthetic profile, not the
+user's real init.vim. Do not describe the final live-config check as completed.
+
+Next: review the explicit dictionary/YAML/regex compatibility gaps and input
+behavior differences before cutover; verify cross-window Visual behavior and
+remaining public bridges. S3 needs approved full Vim in the VM (`vim.tiny` has
+`-eval`/`-popupwin`), then Vim9/entry routing and removal. Do not install full Vim,
+publish, or use the user's computer based on this handoff alone. The current user
+request restricts all execution to the dot VM.

@@ -6,7 +6,7 @@ assert(config.validate({}).valid)
 for _, invalid in ipairs({{enabled=1},{maxHints=0},{motionTimeout=20},{perKeyMinLength={w='3'}},
   {multiWindowMaxWindows=-1},{singleCharKeys='AA'},{singleCharKeys=' '},{multiCharKeys='B/'},
   {hintPosition='unknown'},{wordDetectionStrategy='unknown'},{highlightHintMarker='bad group'},
-  {highlightHintMarker={fg='not-a-color'}}}) do
+  {highlightHintMarker={fg='not-a-color'}},{highlightHintMarker={ctermfg='LightSalmon'}},{singleCharKeys=''},{markers={}}}) do
   assert(not config.validate(invalid).valid,vim.inspect(invalid))
   assert(not pcall(config.resolve,invalid))
 end

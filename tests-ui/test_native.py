@@ -63,7 +63,11 @@ class Neovim:
 
     def close(self):
         self.process.terminate()
-        self.process.wait(timeout=5)
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait(timeout=5)
 
 
 nvim = Neovim()

@@ -38,6 +38,15 @@ local status,replay=core.input('A')
 eq('cancelled',status)
 eq('A',replay)
 eq({1,0},vim.api.nvim_win_get_cursor(first))
+-- Repeated display/prefix/hide cycles must release scratch buffers too.
+core.setup({multiWindowMode=true,singleCharKeys='/',multiCharKeys='BC'})
+local before_buffers=#vim.api.nvim_list_bufs()
+for _=1,20 do
+  core.show({{line=1,col=7,text='beta'},{line=1,col=12,text='gamma'}})
+  core.input('B')
+  core.hide()
+end
+eq(before_buffers,#vim.api.nvim_list_bufs())
 print('PASS: same-buffer multi-window rendering, jumping, cleanup, stale windows, cancel precedence')
 assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

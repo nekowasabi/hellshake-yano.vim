@@ -27,7 +27,8 @@ local aliases = {
   directional_hint_filter = 'directionalHintFilter', both_min_word_length = 'bothMinWordLength',
   suppress_on_key_repeat = 'suppressOnKeyRepeat', key_repeat_threshold = 'keyRepeatThreshold',
   key_repeat_reset_delay = 'keyRepeatResetDelay', trigger_on_hjkl = 'triggerOnHjkl',
-  counted_motions = 'countedMotions',
+  counted_motions = 'countedMotions', highlight_hint_marker = 'highlightHintMarker',
+  highlight_hint_marker_current = 'highlightHintMarkerCurrent',
 }
 function M.resolve(options)
   assert(options == nil or type(options) == 'table', 'configuration must be a table')
@@ -82,10 +83,14 @@ function M.validate(config)
     if value ~= nil then
       local list = value
       local char_keys = key == 'singleCharKeys' or key == 'multiCharKeys' or key == 'markers'
-      if char_keys and type(value) == 'string' then list = vim.fn.split(value, '\\zs') end
+      if char_keys and type(value) == 'string' then
+        check(value ~= '', key .. ' must not be an empty string')
+        list = vim.fn.split(value, '\\zs')
+      end
       local is_list = type(list) == 'table' and vim.islist(list)
       check(is_list, key .. ' must be a list' .. (char_keys and ' or string' or ''))
       if is_list then
+        if key == 'markers' then check(#list > 0, 'markers must not be empty') end
         local seen = {}
         for _, item in ipairs(list) do
           local valid = type(item) == 'string' and #item > 0
@@ -120,6 +125,19 @@ function M.validate(config)
           if name ~= nil then
             check(type(name) == 'string' and (name:upper() == 'NONE' or vim.api.nvim_get_color_by_name(name) >= 0),
               key .. '.' .. color .. ' is not a recognized color')
+          end
+        end
+        local cterm_names = {'black','darkblue','darkgreen','darkcyan','darkred','darkmagenta',
+          'brown','darkyellow','lightgray','lightgrey','gray','grey','darkgray','darkgrey',
+          'blue','lightblue','green','lightgreen','cyan','lightcyan','red','lightred',
+          'magenta','lightmagenta','yellow','lightyellow','white'}
+        for _, color in ipairs({'ctermfg', 'ctermbg'}) do
+          local name = value[color]
+          if name ~= nil then
+            local number = tonumber(name)
+            check((number and number >= 0 and number <= 255 and number == math.floor(number))
+              or (type(name) == 'string' and (name:upper() == 'NONE' or vim.list_contains(cterm_names, name:lower()))),
+              key .. '.' .. color .. ' must be a terminal color')
           end
         end
       else check(false, key .. ' must be a highlight group or color table') end
