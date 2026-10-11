@@ -98,10 +98,9 @@ larger than 1 MiB are rejected. Failed setup/reload retains the previous diction
 `customWords` and `preserveWords` provide literal whole-word targets; `hintPatterns`
 support start/end/capture positions and a checked common ECMAScript regex subset.
 Lookarounds, lazy quantifiers, multiline regexes and unsupported escapes are
-rejected rather than silently translated. Native hint assignment now honors
-`hintPriority` before distance; the old TypeScript assignment's distance sort
-could discard the dictionary ordering. This intentional behavior improvement
-needs review. `mergeRules` and `compoundPatterns` are retained as data but their
+rejected rather than silently translated. Native assignment preserves the old TypeScript distance-first ordering,
+even when dictionary priority metadata is present. Changing that ordering would
+be a separate behavior change. `mergeRules` and `compoundPatterns` are retained as data but their
 runtime semantics, dictionary writing, and full YAML/ECMAScript compatibility
 remain S4 gaps. Do not remove denops while those requirements are unresolved.
 

@@ -56,8 +56,7 @@ function M.assign(words, labels, cursor, config)
     end
   end
   table.sort(sorted, function(a, b)
-    local pa, pb = a.word.hintPriority or 0, b.word.hintPriority or 0
-    if pa ~= pb then return pa > pb end
+    -- Preserve the legacy assignment contract: distance precedes dictionary priority.
     if a.distance ~= b.distance then return a.distance < b.distance end
     if a.word.line ~= b.word.line then return a.word.line < b.word.line end
     if a.word.col ~= b.word.col then return a.word.col < b.word.col end

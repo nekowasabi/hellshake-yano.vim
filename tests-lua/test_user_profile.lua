@@ -31,7 +31,8 @@ vim.api.nvim_buf_set_lines(0,0,-1,false,{'another target','日本語の文章を
 local detected=require('hellshake_yano.words').detect(core.get_config(),'',runtime.get_dictionary())
 local targets=core.show(detected)
 assert(#targets>1 and targets[1].hint=='/')
-assert(targets[1].hintPriority==110,'dictionary priority not carried to assignment')
+assert(vim.iter(targets):any(function(target) return target.hintPriority==110 end),
+  'dictionary priority metadata not carried to assignment')
 local selected=targets[1]
 core.hide()
 vim.api.nvim_feedkeys('/','t',false)
