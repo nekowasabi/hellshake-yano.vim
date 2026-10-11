@@ -1,5 +1,6 @@
 vim9script
 import autoload '../autoload/hellshake_yano/native/runtime.vim' as Runtime
+import autoload '../autoload/hellshake_yano/native/core.vim' as Core
 
 def Run()
   try
@@ -57,6 +58,37 @@ def Run()
     assert_equal(7, col('.'))
     assert_false(exists('g:hellshake_yano_native_error'))
     assert_equal([], popup_list())
+    assert_true(hellshake_yano#utils#is_denops_ready())
+    hellshake_yano#disable()
+    assert_false(Runtime.Config().enabled)
+    hellshake_yano#toggle()
+    assert_true(Runtime.Config().enabled)
+    hellshake_yano#config#set_count(2)
+    assert_equal(2, Runtime.Config().defaultMotionCount)
+    assert_equal(['A', 'S'], hellshake_yano#hint_generator#generate(2))
+    assert_equal(2, len(hellshake_yano#word_detector#detect_visible()))
+    assert_false(hellshake_yano#state#is_hints_visible())
+    cursor(1, 1)
+    assert_equal('j', hellshake_yano#motion('j'))
+    assert_match('native#runtime#Show', hellshake_yano#visual_motion('j'))
+    feedkeys('A', 'nt')
+    hellshake_yano#backend#request('hellshake-yano', 'showHintsWithKey', ['w', 'normal'])
+    assert_equal(7, col('.'))
+    cursor(1, 1)
+    Core.Show([{text: 'beta', line: 1, col: 7}])
+    hellshake_yano#show()
+    sleep 20m
+    assert_true(Core.State().visible)
+    assert_equal(1, len(popup_list()))
+    assert_true(hellshake_yano#state#is_hints_visible())
+    assert_true(hellshake_yano#backend#request('hellshake-yano', 'getDebugInfo', []).hintsVisible)
+    hellshake_yano#hide()
+    sleep 20m
+    assert_equal([], popup_list())
+    hellshake_yano#backend#notify('hellshake-yano', 'disable', [])
+    Runtime.DisableBridge()
+    sleep 20m
+    assert_true(Runtime.Config().enabled)
   catch
     add(v:errors, v:exception .. ' at ' .. v:throwpoint)
   finally

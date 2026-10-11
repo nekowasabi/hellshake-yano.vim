@@ -75,6 +75,22 @@ def Dispatch(method: string, args: list<any>): any
     Runtime.Enable(method ==# 'enable')
   elseif method ==# 'toggle'
     Runtime.Toggle()
+  elseif method ==# 'setCount'
+    if type(get(args, 0, v:null)) == v:t_number
+      Runtime.Update({motionCount: args[0], defaultMotionCount: args[0]})
+    endif
+  elseif method ==# 'setTimeout'
+    if type(get(args, 0, v:null)) == v:t_number
+      Runtime.Update({motionTimeout: args[0]})
+    endif
+  elseif method ==# 'showHints'
+    # The legacy common API redraws existing labels; it does not detect/input.
+    Core.Refresh()
+  elseif method ==# 'showHintsWithKey' || method ==# 'showHintsInternal'
+    var key = get(args, 0, '')
+    Runtime.Show(type(key) == v:t_string ? key : '')
+  elseif method ==# 'hideHints' || method ==# 'hideHintsMultiWindow'
+    Runtime.Hide()
   elseif method ==# 'generateHints'
     return Hints.Generate(type(get(args, 0, 0)) == v:t_number ? get(args, 0, 0) : 0, cfg)
   elseif method ==# 'detectWordsVisible' || method ==# 'detectWordsMultiWindow'
@@ -145,7 +161,9 @@ def Dispatch(method: string, args: list<any>): any
     return index(get(dictionary, 'customWords', []) + get(dictionary, 'preserveWords', []), get(args, 0, v:null)) >= 0
   elseif method ==# 'getStatistics'
     return Statistics()
-  elseif method ==# 'debug'
+  elseif method ==# 'clearDebugInfo' || method ==# 'clearPerformanceLog'
+    measurements = {}
+  elseif method ==# 'debug' || method ==# 'getDebugInfo'
     return Debug()
   elseif method ==# 'getVisualRange'
     return VisualRange()

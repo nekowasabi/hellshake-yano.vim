@@ -40,6 +40,9 @@ endfunction
 " ヒント表示状態の取得
 function! hellshake_yano#state#is_hints_visible() abort
   if hellshake_yano#backend#is_native()
+    if !has('nvim')
+      return hellshake_yano#native#core#State().visible
+    endif
     return luaeval("require('hellshake_yano.core').get_state().visible")
   endif
   return g:hellshake_yano_internal.hints_visible

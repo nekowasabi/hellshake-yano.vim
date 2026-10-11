@@ -10,6 +10,7 @@
 - popup はウィンドウごとに作成。同じ buffer の複数表示でもラベルを分離。取消、古い changedtick、閉じたウィンドウ、UTF-8 継続バイトへの移動を検査。
 - 連続ジャンプは回数制限付き。入力待ちはタイムアウトと取消に対応。通常キーだけでなく矢印などの特殊キーも回帰テスト。
 - マッピングとコマンドは未定義の場合だけ作成。解除時も自分の定義と一致するものだけ削除。
+- 共通 `hellshake_yano#*` の show/hide、enable/disable/toggle、motion/visual_motion、設定、単語・ヒント生成も opt-in transport へ接続。show は旧契約どおり既存ラベルの再描画で、キー付き表示が検出と入力を行う。専用 namespace と通知取消を共有する。全共通 dispatcher の移植完了を意味しない。
 - `autoload/hellshake_yano_vim/*` の既存関数は別の opt-in transport から呼び出せる。未指定時と他プラグイン宛ての呼出しは従来の Denops に委譲。
 - Vim の旧 dispatcher の display API は、Neovim と異なる「指定ラベル以外を閉じる」部分一致処理を維持。新 runtime の prefix 表示とは分離している。
 - 辞書は JSON、text、および Lua と同じデータ専用 YAML 部分集合を読込。書込みは JSON のみ。未知フィールドを保持し、非 regular file、破損、容量超過、観測した同時変更を拒否。独立した private staging directory と fsync 後の rename を使う。変更比較と rename は OS の atomic compare-and-swap ではないため、すべての外部競合を防げるとは主張しない。

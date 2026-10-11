@@ -52,6 +52,9 @@ endfunction
 " モーション処理の統合関数
 function! hellshake_yano#motion#process(key) abort
   if hellshake_yano#backend#is_native()
+    if !has('nvim')
+      return hellshake_yano#native#runtime#Expression(a:key)
+    endif
     return luaeval("require('hellshake_yano').motion_expression(_A)", a:key)
   endif
   let start_time = hellshake_yano#utils#get_elapsed_time()

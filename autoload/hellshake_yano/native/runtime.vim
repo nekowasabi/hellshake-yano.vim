@@ -45,6 +45,9 @@ export def Enable(enabled: bool)
     Setup()
   endif
   config.enabled = enabled
+  if get(g:, 'hellshake_yano_vim_native_bridge', false)
+    g:hellshake_yano = Config()
+  endif
   Motion.Reset()
   if !enabled
     Hide()
@@ -249,6 +252,7 @@ enddef
 
 def SyncBridge()
   g:hellshake_yano = Config()
+  hellshake_yano#config#clear_motion_count_cache()
   hellshake_yano_vim#hint_generator#clear_cache()
   hellshake_yano_vim#word_detector#clear_cache()
   silent call hellshake_yano_vim#dictionary#clear_cache()
