@@ -38,6 +38,9 @@ let s:highlight_initialized = v:false
 
 " Denops 利用可能性チェック（Phase 2.2 統合）
 function! hellshake_yano_vim#display#has_denops() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   if !exists('*denops#plugin#is_loaded')
     return v:false
   endif
@@ -172,7 +175,7 @@ function! hellshake_yano_vim#display#show_hint(lnum, col, hint) abort
   " Phase 2.2: Denops優先パス
   if hellshake_yano_vim#display#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'displayShowHint', [a:lnum, a:col, a:hint])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'displayShowHint', [a:lnum, a:col, a:hint])
       if type(l:result) == v:t_number && l:result >= 0
         " Denops側でpopup_ids管理するので、VimScript側にも記録
         call add(s:popup_ids, {'id': l:result, 'hint': a:hint})
@@ -297,7 +300,7 @@ function! hellshake_yano_vim#display#show_hint_with_window(winid, lnum, col, hin
   " Phase 2.2: Denops優先パス
   if hellshake_yano_vim#display#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'displayShowHintWithWindow', [a:winid, a:lnum, a:col, a:hint])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'displayShowHintWithWindow', [a:winid, a:lnum, a:col, a:hint])
       if type(l:result) == v:t_number && l:result >= 0
         call add(s:popup_ids, {'id': l:result, 'hint': a:hint, 'winid': a:winid})
         return l:result
@@ -393,7 +396,7 @@ function! hellshake_yano_vim#display#hide_all() abort
   " Phase 2.2: Denops優先パス
   if hellshake_yano_vim#display#has_denops()
     try
-      call denops#request('hellshake-yano', 'displayHideAll', [])
+      call hellshake_yano_vim#backend#request('hellshake-yano', 'displayHideAll', [])
       " Denops側でクリアされるが、VimScript側の状態もクリア
       let s:popup_ids = []
       return
@@ -471,7 +474,7 @@ function! hellshake_yano_vim#display#highlight_partial_matches(matches) abort
   " Phase 2.2: Denops優先パス
   if hellshake_yano_vim#display#has_denops()
     try
-      call denops#request('hellshake-yano', 'displayHighlightPartialMatches', [a:matches])
+      call hellshake_yano_vim#backend#request('hellshake-yano', 'displayHighlightPartialMatches', [a:matches])
       " Denops側でフィルタリングされるが、VimScript側の状態も更新
       let l:new_popup_ids = []
       for l:popup_info in s:popup_ids

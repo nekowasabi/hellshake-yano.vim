@@ -36,7 +36,7 @@ function! hellshake_yano#core#init() abort
   " Denops側コアを有効化（enable dispatcher: 共通）
   " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
-    silent! call denops#notify('hellshake-yano', 'enable', [])
+    silent! call hellshake_yano#backend#notify('hellshake-yano', 'enable', [])
   endif
 endfunction
 
@@ -229,7 +229,7 @@ function! hellshake_yano#core#hide() abort
     call hellshake_yano#hint#hide()
   else
     " Vim8: displayHideAll (popup対応) - C-02制約
-    call denops#request('hellshake-yano', 'displayHideAll', [])
+    call hellshake_yano#backend#request('hellshake-yano', 'displayHideAll', [])
     call hellshake_yano#state#set_hints_visible(v:false)
   endif
 endfunction
@@ -240,7 +240,7 @@ endfunction
 function! hellshake_yano#core#show_delayed(delay) abort
   if hellshake_yano#utils#is_denops_ready()
     " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
-    silent! call denops#notify('hellshake-yano', 'showDelayed', [a:delay])
+    silent! call hellshake_yano#backend#notify('hellshake-yano', 'showDelayed', [a:delay])
   else
     call timer_start(a:delay, {-> hellshake_yano#core#show()})
   endif
@@ -251,7 +251,7 @@ endfunction
 " @return Dictionary コア状態
 function! hellshake_yano#core#get_state() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'getStatistics', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'getStatistics', [])
   endif
   return {}
 endfunction
@@ -261,7 +261,7 @@ endfunction
 " @return List 固定位置リスト
 function! hellshake_yano#core#get_fixed_positions() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'getFixedPositions', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'getFixedPositions', [])
   endif
   return []
 endfunction

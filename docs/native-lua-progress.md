@@ -1,0 +1,267 @@
+# Neovim Lua core: S2 work in progress
+
+Base: `7ff640a` on `feat/remove-denops`.
+
+The native modules remain opt-in. Set `g:hellshake_yano_native = v:true` before
+plugin loading to select native startup; without that flag the existing startup
+path is preserved. The denops implementation remains present. Public autoload
+wrappers use a default-preserving transport. S3 must not delete denops until the remaining parity
+items are verified.
+
+## Implemented foundation
+
+- Hint labels: configured single/multi-character keys, numeric overflow, capacity.
+- Hint assignment: distance order, current-window cursor exclusion, UTF-8 byte
+  positions, start/end/both positions.
+- Native extmark display, prefix highlighting, hide/enable/disable/toggle.
+- Window-relative floating hints for multi-window mode, including distinct views
+  of the same buffer; selection closes all owned hint windows and buffers.
+- Input selection and stale-buffer/window validation before jumping.
+- Native motion counters by buffer/key, explicit-count bypass, repeat suppression.
+- Visible-window word detection, fold exclusion, floating-window exclusion,
+  directional filtering, per-key minimum lengths.
+- Configuration aliases and defaults carried forward from the TypeScript core.
+
+`require('hellshake_yano.core').show(words)` accepts `{text, line, col, bufnr?,
+winid?}` entries. `line` and `col` are **1-based UTF-8 byte coordinates**. The Lua
+boundary intentionally does not overload `col` with screen columns. Existing TS
+callers using display columns must explicitly pass their `byteCol` instead.
+
+## Not yet complete
+
+Advanced dictionary compatibility, cross-window visual-mode behavior, full configuration validation, and dispatcher compatibility remain.
+The complete S2 stage is not yet finished.
+
+## Verification
+
+Run `NVIM_BIN=/path/to/nvim scripts/test-lua.sh` with Neovim 0.10 or later.
+Tests use `-u NONE` and no downloaded test plugins. Also run
+`scripts/test-nvim.sh` and `python3 scripts/test-vim-gate.py`.
+
+Initial VM validation with official Neovim 0.10.4:
+
+- Lua core: 12 cases pass; word/window and motion suites pass.
+- Existing Neovim gate: PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13.
+- Gate unit tests: 6 pass.
+- Full Vim is unavailable in this VM; `vim.tiny` cannot validate popup/Vim9 parity.
+
+The old input paths disagree: single-window input returns lowercase letters to
+normal editing, whereas multi-window input does exact matching and gives
+configured cancel keys precedence. PLAN-memo.md's blanket statement that input
+is case-insensitive is not a reliable specification. Preserve each path until a
+behavior change is intentionally reviewed.
+
+## TinySegmenter port
+
+The Lua segmenter embeds the same model as the former dependency
+`@birchill/tiny-segmenter@1.0.0`, retaining Taku Kudo's copyright and complete
+BSD license in `licenses/TinySegmenter.txt`. There is no runtime network access,
+Deno, Node, or npm dependency.
+
+Source: https://github.com/birchill/tiny-segmenter (npm version 1.0.0).
+Package integrity verified before extracting coefficients:
+`sha512-jcWdeRt8N/PLfqNbXFNXB0YrFr8+KV2EXkM0z5FZvhb0vH8G2Nnz8BME1oF8fdMhtdyX+jFKfoJVzPv1rOwo7g==`.
+Original license: http://chasen.org/~taku/software/TinySegmenter/LICENCE.txt .
+
+The checked-in 27 golden cases were produced with the pinned upstream package.
+An additional 1,000 seeded randomized BMP-input comparisons passed against that
+package in the VM. The Lua port iterates complete UTF-8 codepoints so non-BMP
+characters are preserved rather than split into JavaScript surrogate halves.
+Word extraction supports regex/tinysegmenter/hybrid selection, Japanese minimum
+length, and the existing particle-merging list. Dictionary rules are separate
+and remain to be completed.
+
+## Native runtime integration
+
+`require('hellshake_yano').setup(options)` configures the opt-in runtime;
+`activate()` installs commands and motion mappings only where no mapping/command
+already exists. `deactivate()` removes only owned definitions. The existing
+native plugin entry calls these functions only with the explicit startup flag.
+
+Motion mappings use a `<Cmd>` suffix after the original motion, rather than a
+scheduled callback, so queued hint keys cannot run as normal editing commands.
+The input loop is bounded by `motionTimeout`; disable/reinitialization invalidates
+an older loop. Continuous mode is iterative and stops at its jump limit.
+
+Additional UI check (Python `msgpack` is required):
+`NVIM_BIN=/path/to/nvim python3 tests-ui/test_native.py`.
+This attaches an actual Neovim grid UI and checks visible Japanese hint positions,
+horizontal scrolling, two views of one buffer, and cleanup. Headless word tests
+alone do not validate rendered viewport coordinates.
+
+## Dictionary scope and review limits
+
+JSON, text, and a data-only YAML subset are loaded without Deno. Supported YAML:
+indented mappings/sequences, flow collections, quoted/plain scalars, and comments.
+Aliases, tags, block scalars and duplicate keys are rejected explicitly. Files
+larger than 1 MiB are rejected. Failed setup/reload retains the previous dictionary.
+
+`customWords` and `preserveWords` provide literal whole-word targets; `hintPatterns`
+support start/end/capture positions and a checked common ECMAScript regex subset.
+Lookarounds, lazy quantifiers, multiline regexes and unsupported escapes are
+rejected rather than silently translated. Native assignment preserves the old TypeScript distance-first ordering,
+even when dictionary priority metadata is present. Changing that ordering would
+be a separate behavior change. `mergeRules` and `compoundPatterns` are retained as data but their
+runtime semantics, YAML/text dictionary writing, and full YAML/ECMAScript compatibility
+remain S4 gaps. Do not remove denops while those requirements are unresolved.
+
+Config validation covers booleans, integer ranges, per-key values, hint keys,
+colors, enums and collection types; snake_case aliases are accepted. Invalid
+configuration is rejected before an active native runtime is deactivated.
+
+A differential check against the checked-out TypeScript hint generator passed
+500 seeded configurations. It caught and fixed the marker-fallback case where
+`maxSingleCharHints` and numeric overflow must not apply.
+
+## Latest checkpoint: 2026-10-11
+
+- All 10 native Lua test files pass, including the synthetic user profile in
+  `tests-lua/test_user_profile.lua` (Japanese, dictionary priority, two windows,
+  configured colors, per-key mappings, and toggle).
+- Actual-grid UI integration passes; repeated multi-window display/prefix/hide
+  cycles release their scratch buffers and windows.
+- The normal and Visual motion mappings preserve queued input and the Visual
+  anchor. Continuous mode stops at its configured bound.
+- Existing Neovim gate is still PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13. Known
+  failures have not been erased or expanded. Gate unit tests remain 6/6.
+- `bash -n scripts/test-lua.sh`, Python compilation, and `git diff --check` pass.
+
+`HY_EVIDENCE_DIR=/path/to/output scripts/test-lua.sh` records runtimepath and
+scriptnames for the synthetic profile. This is not the user's actual init.vim:
+that final handoff check still requires an authorized copy in the VM.
+
+At that earlier checkpoint S3 had not started because only `vim.tiny` was
+available. Full Vim was subsequently approved and installed; the current S3
+opt-in implementation is documented in `docs/native-vim-progress.md`. The native runtime is
+still opt-in; no plugin entry was switched and no denops files were deleted.
+Full migration completion must not be inferred from the native tests passing.
+
+Cross-window Visual review: both the old `win_gotoid()` route and the native
+`nvim_set_current_win()` route keep Visual mode active when entering another
+buffer. The selection anchor's coordinates carry over. No destructive operator
+was run. Whether this should be blocked or exit Visual mode is a behavior choice
+for review; same-window Visual anchor preservation is regression-tested.
+
+## Additional compatibility checks
+
+Dictionary regex translation is explicitly case-sensitive, independent of the
+editor's `ignorecase` option. Character-class `\d`, `\w`, and `\s` expansions,
+ECMAScript whitespace, ASCII word boundaries, and escaped underscores have
+regressions. A 513-case comparison with Node's RegExp matched for the checked
+subset. This does not establish full ECMAScript compatibility; complement
+escapes inside a character class are rejected rather than misinterpreted.
+Attached-grid tests also repeat prefix/ESC cancellation ten times and verify
+source text restoration and stable window/buffer counts after every cycle.
+
+## Opt-in legacy API transport
+
+After native `setup()`, call `require('hellshake_yano').enable_bridge()` to route
+`autoload/hellshake_yano/*` requests/notifications to the Lua dispatcher.
+`disable_bridge()` restores ordinary denops forwarding and invalidates queued
+native notifications/delayed displays. This does not switch plugin entry files,
+replace `denops#request`, or intercept other plugins. `activate()` and bridge
+activation are independent, so existing mappings need not be overwritten.
+
+The adapter currently covers all 61 named Neovim dispatcher methods,
+including configuration, byte-coordinate Vim word records, segmentation result
+objects, windows, hide/redraw, input, diagnostics and motion-state operations.
+Unsupported methods raise an explicit error. Existing Neovim Visual-range and
+partial-match stubs remain stubs rather than acquiring speculative behavior.
+The legacy `showHints` dispatcher redraws existing hints; `showHintsWithKey` and
+`showHintsInternal` enter detection/input. These were distinct in the old code.
+
+Public enable/disable/toggle, count/timeout setters and expr-motion wrappers are
+connected only while the native bridge is enabled. Global configuration and the
+native enabled state stay synchronized; queued motion+hint keys are tested.
+Dispatcher motion detection preserves the old consecutive-key state machine,
+which differs from the native mapping's per-buffer/per-key counter. A 1,000-event
+comparison matched the checked-out TypeScript detector's results and states.
+The public segmentation wrapper's particle/numeric-unit/parenthesis processing
+matched 2,016 comparisons with the old TypeScript wrapper, including merge off.
+
+All 15 native test files pass. Tests cover ordinary denops delegation when opt-in
+is off, other-plugin isolation, public Vimscript return shapes, async ordering,
+cancellation after bridge disable, and delayed-display invalidation. Diagnostic
+performance values measure dispatcher calls (last 100 per operation), not all
+native direct Lua calls; native detection currently has no result cache.
+
+All named dispatcher methods now have native routes; this is routing coverage,
+not a claim that every legacy edge case is identical. Low-level display
+methods preserve byte coordinates and do not consume selection input. The
+multi-window display call is non-blocking and does not change global mode.
+`detectWords` carries both display-column `col` and byte-column `byteCol`, unlike
+the public Vim record adapter whose `col` is a byte offset.
+
+Further source comparison restored the old non-current-window distance penalty
+(10000 lines) and the old multi-window behavior of discarding unmatched input.
+Configured cancel keys still replay their key. Tests check this distinction and
+the attached UI confirms current-window labels precede the other window's labels.
+S2 is still not declared complete: routing coverage alone is not full parity.
+
+## Regex word/config compatibility follow-through
+
+The regex word detector now follows the checked-out improved detector's hexadecimal
+and binary prefix handling, Japanese/ASCII short tokens, underscore edge cases,
+100-word-per-line cap, and 50-character maximum. Thirty-six pinned cases are
+checked in; 3,042 seeded/configuration comparisons match text and byte positions
+against the original TypeScript extraction followed by its min/max filter.
+
+Default marker/key collections retain the legacy list type; explicitly supplied
+strings remain accepted. Partial snake_case updates are normalized before merging
+with existing camelCase settings, so a previous value cannot mask an update.
+
+## Dictionary mutation guardrails
+
+`HellshakeYanoAddWord` / `addToDictionary` support JSON files only. They retain
+unknown JSON fields, keep structured word metadata, and also update `customWords`
+(the field the loader actually consumes). This corrects an old inconsistency:
+the previous writer only persisted `words`, while the loader read `customWords`.
+YAML/text are rejected unchanged; no format conversion is attempted. Corrupt
+JSON, symlinks and changed-on-disk files are also rejected. Writes use an
+exclusive same-directory temporary file, fsync, content recheck and rename.
+Tests simulate a concurrent edit and verify it is not overwritten or followed
+by a leaked temporary file. No real user dictionary was modified in the VM.
+
+`editDictionary` uses structured Ex arguments with filename/bar expansion off,
+so `%`, `#`, spaces and `|` in a path are literal. It does not force-discard
+unsaved buffers. `showDictionary` uses a read-only disposable scratch split.
+Membership checks include both custom and preserve words.
+
+## Final bounded review
+
+An opt-out during native input previously waited until timeout. A timer-driven
+regression now proves that `disable_bridge()` hides hints and invalidates the
+active input loop immediately. The dispatcher-name coverage test also fixes its
+substring extraction (Lua's multiple return values had truncated the source).
+The entire 15-file suite was rerun successfully after both fixes, followed by
+the real UI, unchanged Neovim gate and six gate-unit tests.
+
+Specific S4 parity questions, beyond supported-method names:
+
+- Native dictionary loading uses the explicit configured path. The old loader
+  searched its three standard locations before the explicit path.
+- Native visible-window enumeration excludes floating windows, limits itself to
+  the current tab, and prioritizes the current window before the limit. The old
+  helper used `getwininfo()` and applied its limit before current-window sorting.
+- Native multi-window generation honors the configured limits/numeric overflow;
+  the old display-only route initially passed only key sets and markers to its
+  generator. Edge-case label capacity/both-position parity is not established.
+- Native word selection honors the configured segmenter threshold; the old
+  detector's threshold was included in cache keys but not clearly enforced by
+  its strategy-selection path.
+- Dictionary custom/preserve literals become whole targets in the native
+  detector. Complete legacy dictionary merge/compound semantics are not ported.
+
+These are review items, not reasons to switch defaults or remove denops now.
+
+
+## Subsequent Vim9 checkpoint
+
+The first 16 Lua/bridge commits are now published (equivalent final tree at
+`0135632`; original local `265f393`). See `docs/native-vim-progress.md` for the
+workspace-local full-Vim installation, Vim9 implementation and remaining
+cutover conditions. A subsequent regression fixes doubled single quotes in YAML
+scalars containing comment markers or separators in both native readers.
+`mergeRules` and `compoundPatterns` remain stored data; a fresh whole-tree search
+found no old execution use beyond declarations/loading/empty initialization, so
+this is not evidence by itself of a working legacy feature being removed.

@@ -1,3 +1,8 @@
+" Explicit native startup owns initialization only when opted in.
+if get(g:, 'hellshake_yano_native', v:false)
+  finish
+endif
+
 " hellshake-yano-vim.vim - Pure VimScript implementation of hit-a-hint plugin
 " Phase A-1: MVP implementation with TDD approach
 " Author: hellshake-yano

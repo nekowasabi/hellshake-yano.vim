@@ -6,7 +6,7 @@
 function! hellshake_yano#visual#init() abort
   if hellshake_yano#utils#is_denops_ready()
     " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
-    silent! call denops#notify('hellshake-yano', 'visualInit', [])
+    silent! call hellshake_yano#backend#notify('hellshake-yano', 'visualInit', [])
   endif
 endfunction
 
@@ -14,7 +14,7 @@ endfunction
 " @return Dictionary ビジュアル状態
 function! hellshake_yano#visual#get_state() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'visualGetState', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'visualGetState', [])
   endif
   return {'mode': 'none', 'active': v:false}
 endfunction
@@ -23,7 +23,7 @@ endfunction
 " @return List 検出された単語リスト
 function! hellshake_yano#visual#show() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'detectWordsInVisualRange', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'detectWordsInVisualRange', [])
   endif
   return []
 endfunction

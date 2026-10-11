@@ -5,6 +5,10 @@ let s:last_buftype = ''
 
 " プラグインを有効化
 function! hellshake_yano#plugin#enable() abort
+  if hellshake_yano#backend#is_native()
+    call hellshake_yano#backend#request('hellshake-yano', 'enable', [])
+    return
+  endif
   let g:hellshake_yano.enabled = v:true
 
   " マッピングを再設定
@@ -17,6 +21,10 @@ endfunction
 
 " プラグインを無効化
 function! hellshake_yano#plugin#disable() abort
+  if hellshake_yano#backend#is_native()
+    call hellshake_yano#backend#request('hellshake-yano', 'disable', [])
+    return
+  endif
   let g:hellshake_yano.enabled = v:false
 
   " マッピングを解除（内部関数を直接呼べないため、公開関数経由で呼ぶ）

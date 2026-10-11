@@ -7,7 +7,7 @@ function! hellshake_yano#denops#call_function(function_name, args, context) abor
 
   try
     " Why: silent! as belt-and-suspenders with try-catch — denops#notify is fire-and-forget
-    silent! call denops#notify('hellshake-yano', a:function_name, a:args)
+    silent! call hellshake_yano#backend#notify('hellshake-yano', a:function_name, a:args)
     return v:true
   catch
     call hellshake_yano#utils#show_error(printf('[hellshake-yano] Error: %s failed: %s',
