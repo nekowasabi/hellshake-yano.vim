@@ -73,3 +73,6 @@ manual_*.vim
 verify_*.vim
 *_output.txt
 run_*.sh
+
+# Native Vim9 regression suites
+!tests-vim9/test_*.vim
