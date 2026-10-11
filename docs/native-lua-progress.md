@@ -28,7 +28,7 @@ callers using display columns must explicitly pass their `byteCol` instead.
 
 ## Not yet complete
 
-Input polling/mapping integration, dictionaries, full continuous/visual-mode
+Dictionaries, full continuous/visual-mode
 behavior, full configuration validation, and dispatcher compatibility remain.
 The complete S2 stage is not yet finished.
 
@@ -70,3 +70,21 @@ characters are preserved rather than split into JavaScript surrogate halves.
 Word extraction supports regex/tinysegmenter/hybrid selection, Japanese minimum
 length, and the existing particle-merging list. Dictionary rules are separate
 and remain to be completed.
+
+## Native runtime integration
+
+`require('hellshake_yano').setup(options)` configures the opt-in runtime;
+`activate()` installs commands and motion mappings only where no mapping/command
+already exists. `deactivate()` removes only owned definitions. The existing
+plugin entry files still do not call these functions automatically.
+
+Motion mappings use a `<Cmd>` suffix after the original motion, rather than a
+scheduled callback, so queued hint keys cannot run as normal editing commands.
+The input loop is bounded by `motionTimeout`; disable/reinitialization invalidates
+an older loop. Continuous mode is iterative and stops at its jump limit.
+
+Additional UI check (Python `msgpack` is required):
+`NVIM_BIN=/path/to/nvim python3 tests-ui/test_native.py`.
+This attaches an actual Neovim grid UI and checks visible Japanese hint positions,
+horizontal scrolling, two views of one buffer, and cleanup. Headless word tests
+alone do not validate rendered viewport coordinates.

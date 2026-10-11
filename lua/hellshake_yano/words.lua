@@ -112,6 +112,11 @@ function M.detect(config, key)
     local found = vim.api.nvim_win_call(win, function()
       local words = {}
       local first, last = vim.fn.line('w0'), vim.fn.line('w$')
+      -- A headless Neovim has no rendered bottom row after cursor invalidation.
+      -- This fallback is only for clients without a UI, never a visible window.
+      if last < first and #vim.api.nvim_list_uis() == 0 then
+        last = math.min(vim.api.nvim_buf_line_count(buffer), first + vim.api.nvim_win_get_height(win) - 1)
+      end
       local lines = vim.api.nvim_buf_get_lines(buffer, first - 1, last, false)
       for offset, line in ipairs(lines) do
         local number = first + offset - 1
@@ -122,7 +127,8 @@ function M.detect(config, key)
             local after = number > cursor[1] or (number == cursor[1] and word.col > cursor[2] + 1)
             local before = number < cursor[1] or (number == cursor[1] and word.col < cursor[2] + 1)
             if not directional or (key ~= 'j' and key ~= 'k') or (key == 'j' and after) or (key == 'k' and before) then
-              words[#words + 1] = word
+              local screen = #vim.api.nvim_list_uis() > 0 and vim.fn.screenpos(win, number, word.col) or nil
+              if not screen or (screen.row > 0 and screen.col > 0) then words[#words + 1] = word end
             end
           end
         end

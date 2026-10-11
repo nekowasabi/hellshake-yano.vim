@@ -24,4 +24,5 @@ cfg.enabled = false
 assert(not motion.record(1, 'j', 1, cfg, 700))
 assert(not motion.record(1, 'j', 1, cfg, 800))
 print('PASS: native per-buffer/per-key motion counters, counts, timeout, repeat suppression')
+assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

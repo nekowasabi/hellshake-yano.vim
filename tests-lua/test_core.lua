@@ -117,4 +117,5 @@ test('stale or invalid targets never jump or leak marks', function()
 end)
 
 print(('PASS: %d Lua core tests'):format(passed))
+assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

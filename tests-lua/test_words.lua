@@ -50,4 +50,5 @@ for _, w in ipairs(found) do
   assert(w.winid ~= before or w.line > 1 or w.col > 9, 'direction filter')
 end
 print('PASS: native word detection, coordinates, folds, windows, per-key config')
+assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

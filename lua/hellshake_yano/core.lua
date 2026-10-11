@@ -6,9 +6,12 @@ local config = config_module.resolve()
 local state = {visible = false, targets = {}, prefix = ''}
 local buffers = {}
 local floats = {}
+local generation = 0
 
 local function clear_display()
-  for _, float in ipairs(floats) do
+  local old_floats = floats
+  floats = {}
+  for _, float in ipairs(old_floats) do
     if vim.api.nvim_win_is_valid(float.win) then vim.api.nvim_win_close(float.win, true) end
     if vim.api.nvim_buf_is_valid(float.buf) then vim.api.nvim_buf_delete(float.buf, {force = true}) end
   end
@@ -22,8 +25,9 @@ local function clear_display()
 end
 
 function M.hide()
-  clear_display()
+  generation = generation + 1
   state = {visible = false, targets = {}, prefix = ''}
+  clear_display()
 end
 
 local function highlight(name, value)
@@ -45,6 +49,7 @@ function M.setup(options)
 end
 
 function M.get_config() return vim.deepcopy(config) end
+function M.get_generation() return generation end
 function M.get_state() return vim.deepcopy(state) end
 function M.enable() config.enabled = true end
 function M.disable() config.enabled = false; M.hide() end

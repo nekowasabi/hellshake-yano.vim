@@ -21,4 +21,5 @@ cfg.wordDetectionStrategy = 'hybrid'
 found = words.extract('私の名前は中野です', 1, cfg, '')
 assert(#found >= 3)
 print(('PASS: %d TinySegmenter upstream fixtures and UTF-8 preservation'):format(#fixtures))
+assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

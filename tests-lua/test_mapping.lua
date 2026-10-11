@@ -1,0 +1,18 @@
+vim.opt.runtimepath:prepend(vim.fn.getcwd())
+local runtime = require('hellshake_yano')
+vim.api.nvim_buf_set_lines(0,0,-1,false,{'alpha beta','second line','third target','fourth target'})
+vim.api.nvim_win_set_cursor(0,{1,0})
+runtime.setup({countedMotions={'j'},triggerOnHjkl=false,perKeyMotionCount={j=2},
+  suppressOnKeyRepeat=false,singleCharKeys='AS',motionTimeout=50})
+runtime.activate()
+vim.api.nvim_feedkeys('jjA','xt',false)
+assert(vim.deep_equal({3,6},vim.api.nvim_win_get_cursor(0)),vim.inspect(vim.api.nvim_win_get_cursor(0)))
+assert(vim.api.nvim_get_mode().mode=='n','hint input must not execute normal A')
+-- Explicit counts execute the original motion and do not enter hint input.
+vim.api.nvim_win_set_cursor(0,{1,0})
+vim.api.nvim_feedkeys('2j','xt',false)
+assert(vim.deep_equal({3,0},vim.api.nvim_win_get_cursor(0)))
+runtime.deactivate()
+print('PASS: mapped motions finish before hint input; queued keys and counts retain semantics')
+assert(vim.v.errmsg == '', vim.v.errmsg)
+vim.cmd('qa!')
