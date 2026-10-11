@@ -14,3 +14,7 @@ for test in tests-vim9/test_*.vim; do
   fi
   rm "$log"
 done
+for test in tests-vim9/*ui.vim; do
+  echo "[UI] $test"
+  VIM_BIN="$BIN" python3 tests-ui/test_vim_native.py "$test"
+done

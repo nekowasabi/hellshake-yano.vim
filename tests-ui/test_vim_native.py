@@ -6,6 +6,7 @@ from pathlib import Path
 import pty
 import select
 import struct
+import sys
 import subprocess
 import tempfile
 import termios
@@ -20,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="hy-vim9-ui-") as directory:
     env = dict(os.environ, TERM="xterm-256color", HY_VIM9_UI_RESULT=str(result))
     process = subprocess.Popen(
         [binary, "-N", "-u", "NONE", "-i", "NONE", "-n", "--cmd",
-         f"set rtp^={root}", "-S", "tests-vim9/ui.vim"],
+         f"set rtp^={root}", "-S", sys.argv[1] if len(sys.argv) > 1 else "tests-vim9/ui.vim"],
         cwd=root, env=env, stdin=slave, stdout=slave, stderr=slave,
     )
     os.close(slave)
