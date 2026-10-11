@@ -37,6 +37,7 @@ enddef
 
 export def Hide()
   Core.Hide()
+  hellshake_yano#native#dispatcher#ClearDisplay()
 enddef
 
 export def Enable(enabled: bool)
