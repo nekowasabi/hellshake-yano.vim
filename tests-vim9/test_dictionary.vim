@@ -28,8 +28,8 @@ for f in json_decode(join(readfile('tests-vim9/fixtures/regex.json'), "\n"))
   assert_equal(f.expected, matched[1] < 0 ? v:null : matched[0 : 1], f.pattern .. ' : ' .. f.line)
 endfor
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 dictionary: JSON/text schema, literals, capture metadata and explicit regex limits'], '/dev/stdout')
+writefile(['PASS Vim9 dictionary: JSON/text schema, literals, capture metadata and explicit regex limits'], '/dev/stdout', 'a')
 qa!

@@ -18,8 +18,8 @@ for bad in [{motionTimeout: 0}, {singleCharKeys: ['AA']}, {multiCharKeys: ['!']}
   assert_true(failed, string(bad))
 endfor
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 config: defaults, aliases and rejected invalid values'], '/dev/stdout')
+writefile(['PASS Vim9 config: defaults, aliases and rejected invalid values'], '/dev/stdout', 'a')
 qa!

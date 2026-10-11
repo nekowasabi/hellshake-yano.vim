@@ -1,4 +1,5 @@
 vim9script
+import autoload './yaml.vim' as Yaml
 # Data-only dictionary reader. No writes, external runtime or file evaluation.
 var whitespace = " \t\r\v\f" .. nr2char(0xa0) .. nr2char(0x1680)
 for code in range(0x2000, 0x200a) + [0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]
@@ -77,6 +78,8 @@ export def Parse(source: string, format: string): dict<any>
   var data: any
   if format ==# 'json'
     data = json_decode(source)
+  elseif format ==# 'yaml' || format ==# 'yml'
+    data = Yaml.Decode(source)
   elseif format ==# 'txt'
     data = {customWords: [], preserveWords: [], mergeRules: {}, hintPatterns: []}
     for raw in split(source, "[\r\n]")

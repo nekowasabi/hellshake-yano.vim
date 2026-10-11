@@ -88,8 +88,8 @@ endtry
 assert_true(rejected)
 assert_equal(old_highlights, hlget('HellshakeYanoNativeHint'))
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 core: popup lifecycle, input and stale targets'], '/dev/stdout')
+writefile(['PASS Vim9 core: popup lifecycle, input and stale targets'], '/dev/stdout', 'a')
 qa!

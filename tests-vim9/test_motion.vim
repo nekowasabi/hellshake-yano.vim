@@ -17,8 +17,8 @@ assert_false(Motion.Record(1, 'j', 1, cfg, 200.0))
 assert_false(Motion.Record(1, 'j', 1, cfg, 400.0))
 assert_true(Motion.Record(1, 'j', 1, cfg, 480.0))
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 motion: buffer/key counts, count-prefix bypass, timeout and repeat suppression'], '/dev/stdout')
+writefile(['PASS Vim9 motion: buffer/key counts, count-prefix bypass, timeout and repeat suppression'], '/dev/stdout', 'a')
 qa!

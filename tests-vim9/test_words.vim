@@ -25,8 +25,8 @@ var other = win_getid()
 assert_equal([other, win], Words.Windows({multiWindowMode: true}))
 assert_equal([other], Words.Windows({multiWindowMode: true, multiWindowMaxWindows: 1}))
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 words: 36 reference fixtures, Japanese bytes and visible windows'], '/dev/stdout')
+writefile(['PASS Vim9 words: 36 reference fixtures, Japanese bytes and visible windows'], '/dev/stdout', 'a')
 qa!

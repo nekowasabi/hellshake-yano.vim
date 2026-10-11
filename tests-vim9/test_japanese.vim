@@ -8,8 +8,8 @@ assert_equal([], Segmenter.Process('　', true))
 assert_equal(['(の'], Segmenter.Process('(の', true))
 assert_equal(['2026年', '10月', '11日'], Segmenter.Process('2026年10月11日', true))
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 TinySegmenter: 27 upstream fixtures and postprocessing'], '/dev/stdout')
+writefile(['PASS Vim9 TinySegmenter: 27 upstream fixtures and postprocessing'], '/dev/stdout', 'a')
 qa!

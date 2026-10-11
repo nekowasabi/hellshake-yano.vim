@@ -23,8 +23,8 @@ targets = Hints.Assign(words, ['A', 'B'], {line: 1, col: 2, winid: 1}, {multiWin
 assert_equal([1, 2], map(copy(targets), (_, t) => t.winid))
 assert_equal(['beta', 'alpha'], map(copy(targets), (_, t) => t.text))
 if !empty(v:errors)
-  writefile(v:errors, '/dev/stderr')
+  writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 hints: 64 reference fixtures and byte-coordinate assignment'], '/dev/stdout')
+writefile(['PASS Vim9 hints: 64 reference fixtures and byte-coordinate assignment'], '/dev/stdout', 'a')
 qa!
