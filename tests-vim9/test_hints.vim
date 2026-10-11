@@ -1,7 +1,7 @@
 vim9script
 import autoload '../autoload/hellshake_yano/native/hints.vim' as Hints
 
-for fixture in json_decode(join(readfile('tests-vim9/fixtures/hints.json'), '\n'))
+for fixture in json_decode(join(readfile('tests-vim9/fixtures/hints.json'), "\n"))
   assert_equal(fixture.expected, Hints.Generate(fixture.count, fixture.config))
 endfor
 assert_equal(['/', 'BB', 'BC', 'CB', 'CC', '01', '02'], Hints.Generate(7,
