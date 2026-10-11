@@ -1,12 +1,16 @@
 vim9script
 # Opt-in adapters for the Vim (not Neovim) dispatcher's public result shapes.
 import autoload './runtime.vim' as Runtime
+import autoload './core.vim' as Core
 import autoload './config.vim' as Settings
 import autoload './words.vim' as Words
 import autoload './hints.vim' as Hints
 import autoload './segmenter.vim' as Segmenter
 import autoload './legacy_motion.vim' as Motion
 var displays: list<dict<any>> = []
+var measurements: dict<list<float>> = {}
+const measured = {generateHints: 'hintGeneration', detectWordsVisible: 'wordDetection',
+  detectWordsMultiWindow: 'wordDetection', detectWordsInVisualRange: 'wordDetection'}
 
 def Detect(multi: bool): list<dict<any>>
   var options = Runtime.Config()
@@ -54,7 +58,7 @@ def VisualRange(): dict<any>
     : {mode: kind, start_line: line("'<"), start_col: col("'<"), end_line: line("'>"), end_col: col("'>")}
 enddef
 
-export def Request(method: string, args: list<any>): any
+def Dispatch(method: string, args: list<any>): any
   var cfg = Runtime.Config()
   if method ==# 'getConfig'
     return cfg
@@ -127,9 +131,22 @@ export def Request(method: string, args: list<any>): any
     endif
   elseif method ==# 'reloadDictionary' || method ==# 'validateDictionary'
     Runtime.ReloadDictionary()
+  elseif method ==# 'addToDictionary'
+    if type(get(args, 0, v:null)) == v:t_string
+      Runtime.AddWord(args[0], type(get(args, 1, '')) == v:t_string ? get(args, 1, '') : '',
+        type(get(args, 2, '')) == v:t_string ? get(args, 2, '') : '')
+    endif
+  elseif method ==# 'editDictionary'
+    Runtime.EditDictionary()
+  elseif method ==# 'showDictionary'
+    Runtime.ShowDictionary()
   elseif method ==# 'isInDictionary'
     var dictionary = Runtime.GetDictionary()
     return index(get(dictionary, 'customWords', []) + get(dictionary, 'preserveWords', []), get(args, 0, v:null)) >= 0
+  elseif method ==# 'getStatistics'
+    return Statistics()
+  elseif method ==# 'debug'
+    return Debug()
   elseif method ==# 'getVisualRange'
     return VisualRange()
   elseif method ==# 'detectWordsInVisualRange'
@@ -153,5 +170,63 @@ export def Request(method: string, args: list<any>): any
   else
     throw 'hellshake-yano: unsupported Vim9 dispatcher method: ' .. method
   endif
+  return v:null
+enddef
+
+def Statistics(): dict<any>
+  var metrics: dict<any> = {}
+  for name in ['showHints', 'hideHints', 'wordDetection', 'hintGeneration']
+    var values = get(measurements, name, [])
+    var total = 0.0
+    var maximum = 0.0
+    var minimum = empty(values) ? 0.0 : values[0]
+    for value in values
+      total += value
+      maximum = value > maximum ? value : maximum
+      minimum = value < minimum ? value : minimum
+    endfor
+    metrics[name] = {count: len(values), average: empty(values) ? 0.0 : total / len(values), max: maximum, min: minimum}
+  endfor
+  var state = Core.State()
+  var cache = {size: 0, maxSize: 0, hitRate: 0, hits: 0, misses: 0}
+  return {cacheStats: {words: deepcopy(cache), hints: cache}, performanceStats: metrics,
+    currentState: {initialized: true, hintsVisible: state.visible, currentHintsCount: len(state.targets)}}
+enddef
+
+def Debug(): dict<any>
+  var state = Core.State()
+  var hints: list<dict<any>> = []
+  for target in state.targets
+    var byte_col = get(target, 'wordCol', target.col)
+    var lines = getbufline(target.bufnr, target.line)
+    var prefix = empty(lines) ? '' : strpart(lines[0], 0, byte_col - 1)
+    var column = str2nr(win_execute(target.winid, 'echo strdisplaywidth(' .. string(prefix) .. ')', 'silent')) + 1
+    add(hints, {hint: target.hint, hintCol: target.col, hintByteCol: target.col,
+      word: {text: target.text, line: target.line, col: column, byteCol: byte_col, winid: target.winid, bufnr: target.bufnr}})
+  endfor
+  var metrics: dict<any> = {}
+  for name in ['showHints', 'hideHints', 'wordDetection', 'hintGeneration']
+    metrics[name] = copy(get(measurements, name, []))
+  endfor
+  return {config: Runtime.Config(), hintsVisible: state.visible, currentHints: hints,
+    metrics: metrics, timestamp: localtime() * 1000}
+enddef
+
+export def Request(method: string, args: list<any>): any
+  var started = reltime()
+  try
+    return Dispatch(method, args)
+  finally
+    var name = get(measured, method, '')
+    if !empty(name)
+      if !has_key(measurements, name)
+        measurements[name] = []
+      endif
+      add(measurements[name], reltimefloat(reltime(started)) * 1000)
+      if len(measurements[name]) > 100
+        remove(measurements[name], 0)
+      endif
+    endif
+  endtry
   return v:null
 enddef

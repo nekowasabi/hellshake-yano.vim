@@ -59,7 +59,7 @@ def ReadInput(): string
       return 'timeout'
     endif
     var input = getchar(0)
-    if input != 0
+    if type(input) == v:t_string || input != 0
       var key = type(input) == v:t_number ? nr2char(input) : input
       var result = Core.Input(key)
       if result.status !=# 'partial'
@@ -168,6 +168,13 @@ export def Activate()
   Command('HellshakeYanoDisable', 'Enable(v:false)')
   Command('HellshakeYanoToggle', 'Toggle()')
   Command('HellshakeYanoReloadDict', 'ReloadDictionary()')
+  Command('HellshakeYanoValidateDict', 'ReloadDictionary()')
+  Command('HellshakeYanoEditDict', 'EditDictionary()')
+  Command('HellshakeYanoShowDict', 'ShowDictionary()')
+  if exists(':HellshakeYanoAddWord') != 2
+    command -nargs=+ HellshakeYanoAddWord call hellshake_yano#native#runtime#AddWord(<f-args>)
+    owned_commands.HellshakeYanoAddWord = execute('silent command HellshakeYanoAddWord')
+  endif
   var motions = copy(settings.countedMotions)
   if empty(motions) && settings.triggerOnHjkl
     motions = ['h', 'j', 'k', 'l']
@@ -254,4 +261,36 @@ export def DisableBridge()
   g:hellshake_yano_vim_native_bridge = false
   hellshake_yano_vim#backend#cancel_pending()
   hellshake_yano#native#dispatcher#ClearDisplay()
+enddef
+
+export def AddWord(word: string, meaning: string = '', kind: string = '')
+  var path = get(Config(), 'dictionaryPath', '.hellshake-yano/dictionary.json')
+  var loaded = Dictionary.Add(path, word, meaning, kind)
+  if !has_key(config, 'dictionaryPath')
+    Update({dictionaryPath: path})
+  endif
+  dictionary = loaded
+  Hide()
+  if get(g:, 'hellshake_yano_vim_native_bridge', false)
+    SyncBridge()
+  endif
+enddef
+
+export def EditDictionary()
+  var path = expand(get(Config(), 'dictionaryPath', '.hellshake-yano/dictionary.json'))
+  execute 'edit ' .. fnameescape(path)
+enddef
+
+export def ShowDictionary()
+  var data = GetDictionary()
+  for pattern in get(data, 'hintPatterns', [])
+    if has_key(pattern, 'vimPattern')
+      remove(pattern, 'vimPattern')
+    endif
+  endfor
+  new
+  setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+  execute 'file [HellshakeYano Dictionary ' .. bufnr() .. ']'
+  setline(1, json_encode(data))
+  setlocal filetype=json nomodifiable
 enddef

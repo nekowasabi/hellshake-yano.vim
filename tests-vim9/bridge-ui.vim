@@ -18,6 +18,33 @@ def Run()
     assert_true(first > 0)
     assert_true(second > 0)
     assert_equal(2, Dispatcher.Request('displayGetPopupCount', []))
+    assert_equal(true, Dispatcher.Request('validateConfig', [{}]).valid)
+    assert_equal(false, Dispatcher.Request('validateConfig', [{motionTimeout: 0}]).valid)
+    assert_equal('invalid_params', Dispatcher.Request('motionDetect', [0, 1]).skipReason)
+    Dispatcher.Request('motionSetThreshold', [4])
+    Dispatcher.Request('motionSetTimeout', [400])
+    assert_equal(4, Dispatcher.Request('motionGetState', []).threshold)
+    assert_equal(400, Dispatcher.Request('motionGetState', []).timeoutMs)
+    Dispatcher.Request('motionResetState', [])
+    assert_equal(0, Dispatcher.Request('motionGetState', []).motionCount)
+    assert_equal('none', Dispatcher.Request('getVisualRange', []).mode)
+    assert_equal(3, len(Dispatcher.Request('detectWordsInVisualRange', [])))
+    assert_equal('HintMarker', Dispatcher.Request('getHighlightGroup', ['normal']))
+    Dispatcher.Request('healthCheck', [])
+    var rejected = false
+    try
+      Dispatcher.Request('notARealMethod', [])
+    catch /^hellshake-yano:/
+      rejected = true
+    endtry
+    assert_true(rejected)
+
+    var stats = Dispatcher.Request('getStatistics', [])
+    assert_true(stats.performanceStats.wordDetection.count > 0)
+    assert_equal(0, stats.cacheStats.words.size)
+    var debug = Dispatcher.Request('debug', [])
+    assert_equal(Runtime.Config(), debug.config)
+    assert_true(debug.timestamp > 0)
     hellshake_yano_vim#display#highlight_partial_matches(['AB'])
     assert_equal(1, Dispatcher.Request('displayGetPopupCount', []))
     assert_equal({}, popup_getpos(second))
@@ -30,6 +57,30 @@ def Run()
     sleep 20m
     assert_true(Runtime.Config().enabled)
     assert_false(hellshake_yano_vim#backend#is_native())
+    var dir = tempname()
+    mkdir(dir, 'p')
+    try
+      var path = dir .. '/dictionary % # | safe.json'
+      writefile(['{"customWords":["old"]}'], path)
+      Runtime.Setup({dictionaryPath: path})
+      Runtime.EnableBridge()
+      assert_true(hellshake_yano_vim#dictionary#add('newword', 'meaning', 'noun'))
+      assert_true(hellshake_yano_vim#dictionary#is_in_dictionary('newword'))
+      assert_equal(['old', 'newword'], Runtime.GetDictionary().customWords)
+      # The UI commands do not interpret %, # or | from the file path.
+      set nomodified
+      Runtime.EditDictionary()
+      assert_equal(fnamemodify(path, ':p'), expand('%:p'))
+      Runtime.ShowDictionary()
+      assert_equal('nofile', &buftype)
+      assert_false(&modifiable)
+      assert_equal(['old', 'newword'], json_decode(getline(1)).customWords)
+      close
+    finally
+      Runtime.DisableBridge()
+      delete(dir, 'rf')
+    endtry
+
   catch
     add(v:errors, v:exception .. ' at ' .. v:throwpoint)
   finally
