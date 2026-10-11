@@ -35,6 +35,9 @@ let s:visual_state = copy(s:initial_visual_state)
 "
 " @return Boolean Denops利用可能ならv:true
 function! s:has_denops() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   try
     return denops#plugin#is_loaded('hellshake-yano')
   catch
@@ -114,7 +117,7 @@ function! hellshake_yano_vim#visual#show() abort
   let l:range = {}
   if s:has_denops()
     try
-      let l:range = denops#request('hellshake-yano', 'getVisualRange', [])
+      let l:range = hellshake_yano_vim#backend#request('hellshake-yano', 'getVisualRange', [])
     catch
       let l:range = {}
     endtry
@@ -175,7 +178,7 @@ function! s:detect_words_in_range(start_line, end_line) abort
   " Denops優先
   if s:has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'detectWordsInVisualRange', [])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'detectWordsInVisualRange', [])
       if type(l:result) == v:t_list && !empty(l:result)
         return l:result
       endif

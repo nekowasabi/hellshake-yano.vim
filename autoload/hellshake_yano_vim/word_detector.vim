@@ -46,6 +46,9 @@ let s:cache_max_size = 10  " キャッシュエントリ上限
 "
 " @return v:true: Denops利用可能 / v:false: 利用不可
 function! hellshake_yano_vim#word_detector#has_denops() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   if !exists('*denops#plugin#is_loaded')
     return v:false
   endif
@@ -116,7 +119,7 @@ function! hellshake_yano_vim#word_detector#detect_visible() abort
   let l:result = []
   if hellshake_yano_vim#word_detector#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'detectWordsVisible', [])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'detectWordsVisible', [])
       if type(l:result) != v:t_list
         let l:result = []
       endif
@@ -191,7 +194,7 @@ function! hellshake_yano_vim#word_detector#get_min_length(key) abort
   " Denops優先
   if hellshake_yano_vim#word_detector#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'getMinWordLength', [a:key])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'getMinWordLength', [a:key])
       if type(l:result) == v:t_number && l:result > 0
         let s:min_length_cache[a:key] = l:result
         return l:result
@@ -239,7 +242,7 @@ function! hellshake_yano_vim#word_detector#detect_multi_window(windows) abort
   " Denops優先
   if hellshake_yano_vim#word_detector#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'detectWordsMultiWindow', [a:windows])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'detectWordsMultiWindow', [a:windows])
       if type(l:result) == v:t_list
         return l:result
       endif

@@ -71,8 +71,8 @@ function! hellshake_yano_vim#core#init() abort
 
   " Phase 1集約: Denops側に enable を通知
   " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
-  if hellshake_yano#utils#is_denops_ready()
-    silent! call denops#notify('hellshake-yano', 'enable', [])
+  if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
+    silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'enable', [])
   endif
 endfunction
 
@@ -241,6 +241,9 @@ endfunction
 "
 " @return Boolean Denopsが利用可能な場合 v:true、そうでなければ v:false
 function! hellshake_yano_vim#core#is_denops_ready() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   " denops#plugin#is_loaded() が存在しない場合は未初期化
   if !exists('*denops#plugin#is_loaded')
     return v:false
@@ -629,8 +632,8 @@ function! hellshake_yano_vim#core#hide() abort
 
   " Phase 1集約: Denops側にも hide を同期
   " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
-  if hellshake_yano#utils#is_denops_ready()
-    silent! call denops#notify('hellshake-yano', 'displayHideAll', [])
+  if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
+    silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'displayHideAll', [])
   endif
 endfunction
 

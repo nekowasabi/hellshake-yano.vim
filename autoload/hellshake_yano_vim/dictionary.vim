@@ -42,6 +42,9 @@ endfunction
 " Denops利用可能チェック
 " @return v:true: Denops利用可能 / v:false: 利用不可
 function! hellshake_yano_vim#dictionary#has_denops() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   if !exists('*denops#plugin#is_loaded')
     return v:false
   endif
@@ -61,7 +64,7 @@ function! hellshake_yano_vim#dictionary#reload() abort
   endif
 
   try
-    call denops#request('hellshake-yano', 'reloadDictionary', [])
+    call hellshake_yano_vim#backend#request('hellshake-yano', 'reloadDictionary', [])
     let s:cache.loaded = v:true
     let s:cache.last_reload = localtime()
     echo '[Dictionary] Reloaded successfully'
@@ -87,7 +90,7 @@ function! hellshake_yano_vim#dictionary#add(word, ...) abort
   let l:type = a:0 >= 2 ? a:2 : 'custom'
 
   try
-    call denops#request('hellshake-yano', 'addToDictionary', [a:word, l:meaning, l:type])
+    call hellshake_yano_vim#backend#request('hellshake-yano', 'addToDictionary', [a:word, l:meaning, l:type])
     " キャッシュに追加（即時反映）
     let s:cache.words[a:word] = {'meaning': l:meaning, 'type': l:type}
     echo '[Dictionary] Added: ' . a:word
@@ -107,7 +110,7 @@ function! hellshake_yano_vim#dictionary#show() abort
   endif
 
   try
-    let l:result = denops#request('hellshake-yano', 'showDictionary', [])
+    let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'showDictionary', [])
     " 結果をエコー表示（Denops側で整形済み）
     echo l:result
     return v:true
@@ -126,7 +129,7 @@ function! hellshake_yano_vim#dictionary#validate() abort
   endif
 
   try
-    let l:result = denops#request('hellshake-yano', 'validateDictionary', [])
+    let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'validateDictionary', [])
     echo '[Dictionary] Validation: ' . (l:result ? 'OK' : 'FAILED')
     return l:result
   catch
@@ -156,7 +159,7 @@ function! hellshake_yano_vim#dictionary#is_in_dictionary(word) abort
 
   " Denops経由でチェック（遅いパス）
   try
-    let l:result = denops#request('hellshake-yano', 'isInDictionary', [a:word])
+    let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'isInDictionary', [a:word])
     if l:result
       " キャッシュに追加（次回からO(1)）
       let s:cache.words[a:word] = {'cached': 1}

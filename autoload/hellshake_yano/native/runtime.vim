@@ -20,6 +20,9 @@ export def Setup(options: dict<any> = {})
   Deactivate()
   config = resolved
   dictionary = loaded
+  if get(g:, 'hellshake_yano_vim_native_bridge', false)
+    SyncBridge()
+  endif
   if reactivate
     Activate()
   endif
@@ -228,4 +231,27 @@ export def ReloadDictionary(): dict<any>
   dictionary = loaded
   Hide()
   return GetDictionary()
+enddef
+
+def SyncBridge()
+  g:hellshake_yano = Config()
+  hellshake_yano_vim#hint_generator#clear_cache()
+  hellshake_yano_vim#word_detector#clear_cache()
+  silent call hellshake_yano_vim#dictionary#clear_cache()
+enddef
+
+export def Update(options: dict<any>)
+  Setup(extend(Config(), Settings.Normalize(options), 'force'))
+enddef
+
+export def EnableBridge()
+  SyncBridge()
+  g:hellshake_yano_vim_native_bridge = true
+enddef
+
+export def DisableBridge()
+  Hide()
+  g:hellshake_yano_vim_native_bridge = false
+  hellshake_yano_vim#backend#cancel_pending()
+  hellshake_yano#native#dispatcher#ClearDisplay()
 enddef

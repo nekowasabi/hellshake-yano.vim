@@ -28,6 +28,9 @@ set cpo&vim
 "
 " @return v:true: Denops利用可能 / v:false: 利用不可
 function! hellshake_yano_vim#hint_generator#has_denops() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   if !exists('*denops#plugin#is_loaded')
     return v:false
   endif
@@ -238,7 +241,7 @@ function! hellshake_yano_vim#hint_generator#generate(count) abort
   let l:result = []
   if hellshake_yano_vim#hint_generator#has_denops()
     try
-      let l:result = denops#request('hellshake-yano', 'generateHints', [a:count])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'generateHints', [a:count])
       if type(l:result) != v:t_list
         let l:result = []
       endif

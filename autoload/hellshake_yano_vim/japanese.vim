@@ -6,6 +6,9 @@ let s:denops_failed_once = v:false
 
 " Denopsが利用可能かチェック
 function! s:is_denops_available() abort
+  if hellshake_yano_vim#backend#is_native()
+    return v:true
+  endif
   return exists('*denops#plugin#is_loaded') && denops#plugin#is_loaded('hellshake-yano')
 endfunction
 
@@ -113,7 +116,7 @@ function! hellshake_yano_vim#japanese#segment(text, ...) abort
   " Denopsが利用可能な場合はDenopsを使用
   if s:is_denops_available()
     try
-      let l:result = denops#request('hellshake-yano', 'segmentJapaneseText', [l:text, l:options])
+      let l:result = hellshake_yano_vim#backend#request('hellshake-yano', 'segmentJapaneseText', [l:text, l:options])
       " 成功時は失敗フラグをリセット（次回から正常動作）
       let s:denops_failed_once = v:false
       return l:result

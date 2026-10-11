@@ -170,7 +170,7 @@ function! hellshake_yano_vim#config#set(key, value) abort
         let l:ts_value = split(a:value, '\zs')
       endif
 
-      call denops#request('hellshake-yano', 'updateConfig', [{l:ts_key: l:ts_value}])
+      call hellshake_yano_vim#backend#request('hellshake-yano', 'updateConfig', [{l:ts_key: l:ts_value}])
     catch
       " エラーは無視（ローカル設定は更新済み）
       " デバッグモード時のみログ出力
@@ -221,7 +221,7 @@ function! hellshake_yano_vim#config#reload() abort
 
   try
     " TypeScript側から設定を取得
-    let l:config = denops#request('hellshake-yano', 'getConfig', [])
+    let l:config = hellshake_yano_vim#backend#request('hellshake-yano', 'getConfig', [])
 
     " VimScript形式に変換して反映
     let g:hellshake_yano_vim_config = s:map_config_from_ts(l:config)
