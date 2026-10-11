@@ -71,8 +71,8 @@ function M.assign(words, labels, cursor, config)
     target.hint = label
     -- The final UTF-8 character's first byte, never a continuation byte.
     if at_end then
-      local last = vim.fn.strcharpart(word.text, vim.fn.strchars(word.text) - 1, 1)
-      target.col = word.col + #word.text - #last
+      local last = vim.fn.byteidx(word.text, vim.fn.strchars(word.text, 1) - 1)
+      target.col = word.col + math.max(0, last)
     end
     result[#result + 1] = target
   end

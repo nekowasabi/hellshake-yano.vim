@@ -39,7 +39,7 @@ Tests use `-u NONE` and no downloaded test plugins. Also run
 
 Initial VM validation with official Neovim 0.10.4:
 
-- Lua core: 11 cases pass; word/window and motion suites pass.
+- Lua core: 12 cases pass; word/window and motion suites pass.
 - Existing Neovim gate: PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13.
 - Gate unit tests: 6 pass.
 - Full Vim is unavailable in this VM; `vim.tiny` cannot validate popup/Vim9 parity.
@@ -134,3 +134,9 @@ S3 is deliberately not started: this VM only has `vim.tiny` with `-eval` and
 `-popupwin`. Adding full Vim requires separate approval. The native runtime is
 still opt-in; no plugin entry was switched and no denops files were deleted.
 Full migration completion must not be inferred from the native tests passing.
+
+Cross-window Visual review: both the old `win_gotoid()` route and the native
+`nvim_set_current_win()` route keep Visual mode active when entering another
+buffer. The selection anchor's coordinates carry over. No destructive operator
+was run. Whether this should be blocked or exit Visual mode is a behavior choice
+for review; same-window Visual anchor preservation is regression-tested.

@@ -43,6 +43,12 @@ test('byte coordinates remain correct for Japanese word endings', function()
   eq(7, result[2].col)
 end)
 
+test('end hints use the base character before combining marks', function()
+  local result=hints.assign({{line=1,col=1,text='café',winid=1}}, {'A'},
+    {line=2,col=1,winid=1}, {hintPosition='end'})
+  eq(4,result[1].col)
+end)
+
 test('assignment excludes cursor word only in current window', function()
   local words = {
     {line = 1, col = 1, text = 'alpha', winid = 1},
