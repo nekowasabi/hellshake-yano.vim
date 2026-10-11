@@ -29,5 +29,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 activation: ownership-aware maps and commands'], '/dev/stdout', 'a')
 qa!

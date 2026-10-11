@@ -91,5 +91,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 core: popup lifecycle, input and stale targets'], '/dev/stdout', 'a')
 qa!

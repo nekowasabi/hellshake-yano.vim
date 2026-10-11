@@ -28,5 +28,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 words: 36 reference fixtures, Japanese bytes and visible windows'], '/dev/stdout', 'a')
 qa!

@@ -26,5 +26,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 hints: 64 reference fixtures and byte-coordinate assignment'], '/dev/stdout', 'a')
 qa!

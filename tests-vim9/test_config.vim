@@ -21,5 +21,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 config: defaults, aliases and rejected invalid values'], '/dev/stdout', 'a')
 qa!

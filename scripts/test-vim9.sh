@@ -13,6 +13,7 @@ for test in tests-vim9/test_*.vim; do
     exit 1
   fi
   rm "$log"
+  echo "[PASS] $test"
 done
 for test in tests-vim9/*ui.vim; do
   echo "[UI] $test"

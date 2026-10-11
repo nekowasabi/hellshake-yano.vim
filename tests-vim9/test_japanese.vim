@@ -11,5 +11,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 TinySegmenter: 27 upstream fixtures and postprocessing'], '/dev/stdout', 'a')
 qa!

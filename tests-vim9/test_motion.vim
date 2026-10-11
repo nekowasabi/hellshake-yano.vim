@@ -20,5 +20,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 motion: buffer/key counts, count-prefix bypass, timeout and repeat suppression'], '/dev/stdout', 'a')
 qa!

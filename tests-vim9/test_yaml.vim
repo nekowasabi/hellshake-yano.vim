@@ -42,5 +42,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 YAML: data-only subset, sample dictionary and explicit unsupported syntax'], '/dev/stdout', 'a')
 qa!

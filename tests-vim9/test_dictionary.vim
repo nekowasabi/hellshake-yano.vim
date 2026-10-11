@@ -31,5 +31,4 @@ if !empty(v:errors)
   writefile(v:errors, '/dev/stderr', 'a')
   cquit
 endif
-writefile(['PASS Vim9 dictionary: JSON/text schema, literals, capture metadata and explicit regex limits'], '/dev/stdout', 'a')
 qa!
