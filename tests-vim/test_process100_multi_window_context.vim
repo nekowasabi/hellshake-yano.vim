@@ -1,6 +1,7 @@
 " Test Process 100: Multi-window context passing verification
 " This test verifies that DetectionContext is properly passed in multi-window mode
 
+let s:repo_root = expand('<sfile>:p:h:h')
 let s:test_results = []
 
 function! s:log_result(name, passed, message) abort
@@ -34,7 +35,7 @@ endfunction
 function! s:test_context_created() abort
   " Verify the code contains the context creation
   " This is a static analysis test
-  let core_file = expand('~/.config/nvim/plugged/hellshake-yano.vim/denops/hellshake-yano/neovim/core/core.ts')
+  let core_file = s:repo_root . '/denops/hellshake-yano/neovim/core/core.ts'
   if filereadable(core_file)
     let content = join(readfile(core_file), "\n")
     let has_context = content =~# 'const context: DetectionContext'
@@ -52,7 +53,7 @@ endfunction
 
 " Test 4: Verify minWordLength filter in detectWordsInWindow
 function! s:test_min_length_filter() abort
-  let word_file = expand('~/.config/nvim/plugged/hellshake-yano.vim/denops/hellshake-yano/neovim/core/word.ts')
+  let word_file = s:repo_root . '/denops/hellshake-yano/neovim/core/word.ts'
   if filereadable(word_file)
     let content = join(readfile(word_file), "\n")
     let has_filter = content =~# 'const minWordLength = context?.minWordLength ?? 3'
@@ -70,7 +71,7 @@ endfunction
 
 " Test 5: Verify col validation in processExtmarksForBuffer
 function! s:test_col_validation() abort
-  let display_file = expand('~/.config/nvim/plugged/hellshake-yano.vim/denops/hellshake-yano/neovim/display/extmark-display.ts')
+  let display_file = s:repo_root . '/denops/hellshake-yano/neovim/display/extmark-display.ts'
   if filereadable(display_file)
     let content = join(readfile(display_file), "\n")
     let has_validation = content =~# 'if (col > lineLength)'
@@ -88,7 +89,7 @@ endfunction
 
 " Test 6: Context passed to detectWordsMultiWindow call
 function! s:test_context_passed_to_detect() abort
-  let core_file = expand('~/.config/nvim/plugged/hellshake-yano.vim/denops/hellshake-yano/neovim/core/core.ts')
+  let core_file = s:repo_root . '/denops/hellshake-yano/neovim/core/core.ts'
   if filereadable(core_file)
     let content = join(readfile(core_file), "\n")
     " Check that detectWordsMultiWindow is called with context argument

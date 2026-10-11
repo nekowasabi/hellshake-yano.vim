@@ -90,6 +90,7 @@ function! RunTest(funcname) abort
   echo '  ' . a:funcname
   echohl None
 
+  let l:failed_before = s:test_stats.failed
   try
     execute 'call ' . a:funcname . '()'
   catch
@@ -99,6 +100,8 @@ function! RunTest(funcname) abort
     echo '    EXCEPTION: ' . v:exception
     echohl None
   endtry
+  let l:status = s:test_stats.failed > l:failed_before ? 'FAIL' : 'PASS'
+  echom 'HY_TEST_' . l:status . ' ' . a:funcname
 endfunction
 
 " RunAllTests: 全テストを実行
@@ -130,6 +133,9 @@ function! RunAllTests() abort
 
   " 結果表示
   call s:show_test_results()
+  if s:test_stats.failed > 0
+    cquit 1
+  endif
 endfunction
 
 " テスト関数の検出（内部関数）

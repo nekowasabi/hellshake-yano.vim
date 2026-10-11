@@ -1,0 +1,84 @@
+# selector<TAB>repository-relative file<TAB>test name # reason
+# both / vim-only / nvim-only; exact test names, no whole-file allowances.
+# Baseline: both scripts after fixing repository-relative paths.
+# Native assert failures are included even when legacy tests printed PASS.
+both	tests-vim/hellshake_yano_vim/test_core.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_core.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_core.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_example.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_example.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_example.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_filter.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_filter.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_filter.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_focus_restore.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_focus_restore.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_focus_restore.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_hint_generator.vim	generate() should dynamically calculate maxTotal # expected maxTotal 7, actual 100
+both	tests-vim/hellshake_yano_vim/test_hint_generator.vim	generate() should fallback to g:hellshake_yano_vim_single_char_keys # expected xy, actual as
+both	tests-vim/hellshake_yano_vim/test_hint_generator.vim	generate() should generate hints based on dynamic maxTotal # expected 7 configured hints, actual 100 default hints
+both	tests-vim/hellshake_yano_vim/test_hint_generator.vim	generate() should use g:hellshake_yano.singleCharKeys # expected abc, actual asd
+both	tests-vim/hellshake_yano_vim/test_integration.vim	last hint should be "ll" # expected ll, actual ew
+both	tests-vim/hellshake_yano_vim/test_integration.vim	motion_keys should be [w, b, e] by default # defaults also include h, j, k, l
+vim-only	tests-vim/hellshake_yano_vim/test_integration.vim	should detect 14 words # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_integration.vim	should detect 3 words # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_integration.vim	should detect 7 words # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_integration.vim	should detect 8 words # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_integration.vim	should detect at least 49 words # word detection differs from legacy expectations
+both	tests-vim/hellshake_yano_vim/test_integration.vim	should generate correct hints for 14 words # hint alphabet differs from legacy expected alphabet
+both	tests-vim/hellshake_yano_vim/test_integration.vim	should generate correct hints for 8 words # hint alphabet differs from legacy expected alphabet
+both	tests-vim/hellshake_yano_vim/test_integration.vim	should generate single-char hints for 7 words (Phase A-2 compatibility) # hint alphabet differs from legacy expected alphabet
+both	tests-vim/hellshake_yano_vim/test_jump.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_jump.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_jump.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_jump_multi.vim	s:test_jump_cursor_position # expected column 7, actual column 6
+both	tests-vim/hellshake_yano_vim/test_runner.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_runner.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_runner.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_visual.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_visual.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_visual.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+nvim-only	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_get_visible_excludes_floating_window # floating windows are included in visible windows
+nvim-only	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_get_visible_multiple_floating_windows # floating windows are included in visible windows
+nvim-only	tests-vim/hellshake_yano_vim/test_window_detector.vim	Test_get_visible_normal_window_after_floating # floating windows are included in visible windows
+both	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_AssertEqual_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_AssertFalse_failure # intentional assertion-runner self-test
+both	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_AssertTrue_failure # intentional assertion-runner self-test
+vim-only	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_detect_words_basic # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_detect_words_empty_line # word detection differs from legacy expectations
+both	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_detect_words_multiline # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_detect_words_position_data # word detection differs from legacy expectations
+vim-only	tests-vim/hellshake_yano_vim/test_word_detector.vim	Test_detect_words_visible_area # word detection differs from legacy expectations
+both	tests-vim/test_core_hint_limit_safety.vim	script error: E461: Illegal variable name: l:result # Illegal variable name: l:result
+vim-only	tests-vim/test_display_multi.vim	s:test_hint_with_wrapped_line # native display assertion failed on Vim popup results
+vim-only	tests-vim/test_display_multi.vim	s:test_multiple_hints_same_window # native display assertion failed on Vim popup results
+nvim-only	tests-vim/test_display_multi.vim	s:test_out_of_screen_coordinates # E5555: extmark column is out of range
+vim-only	tests-vim/test_display_multi.vim	s:test_show_hint_in_another_window # native display assertion failed on Vim popup results
+vim-only	tests-vim/test_display_multi.vim	s:test_winid_stored_in_popup_info # native display assertion failed on Vim popup results
+both	tests-vim/test_motion_count_integration.vim	Test_mapping_definition # j mapping is absent with -u NONE
+both	tests-vim/test_motion_fix.vim	script error: E121: Undefined variable: l:b_count # Undefined variable: l:b_count
+both	tests-vim/test_motion_fix.vim	script error: E121: Undefined variable: l:motion_count # Undefined variable: l:motion_count
+both	tests-vim/test_motion_fix.vim	script error: E216: No such group or event: filetypedetect * # No such group or event: filetypedetect *
+both	tests-vim/test_motion_fix.vim	script error: E461: Illegal variable name: l:b_count # Illegal variable name: l:b_count
+both	tests-vim/test_motion_fix.vim	script error: E461: Illegal variable name: l:motion_count # Illegal variable name: l:motion_count
+vim-only	tests-vim/test_phase2_1_integration.vim	s:test_e2e_fallback # fallback detected no words
+vim-only	tests-vim/test_phase2_1_integration.vim	s:test_e2e_multi_window # E445 while closing modified windows
+vim-only	tests-vim/test_phase2_1_integration.vim	s:test_e2e_word_detection # detected no words
+vim-only	tests-vim/test_process100_multi_buffer_extmark.vim	Should have 3 hints before cleanup # hint configuration or count differs from legacy expectations
+vim-only	tests-vim/test_process100_multi_buffer_extmark.vim	Should have 4 hints across 2 buffers # hint configuration or count differs from legacy expectations
+nvim-only	tests-vim/test_process100_multi_buffer_extmark.vim	script error: E117: Unknown function: <SNR>_assert_true # Unknown function: <SNR>_assert_true
+vim-only	tests-vim/test_process100_multi_buffer_extmark.vim	script error: E37: No write since last change (add ! to override) # No write since last change (add ! to override)
+vim-only	tests-vim/test_process100_multi_buffer_extmark.vim	script error: E445: Other window contains changes # Other window contains changes
+both	tests-vim/test_process10_edge_cases.vim	script error: E966: Invalid line number: 100 # Invalid line number: 100
+nvim-only	tests-vim/test_window_detector_floating.vim	Floating window should be excluded # floating windows are included in visible windows
+nvim-only	tests-vim/test_window_detector_floating.vim	Floating window should be excluded from get_visible() # floating windows are included in visible windows
+nvim-only	tests-vim/test_window_detector_floating.vim	Relative cursor window should be excluded # cursor-relative floating window is included
+nvim-only	tests-vim/test_window_detector_floating.vim	Relative win window should be excluded # window-relative floating window is included
+vim-only	tests-vim/word_detector_test.vim	Detects words in buffer # word detection differs from legacy expectations
+nvim-only	tests-vim/word_detector_test.vim	Empty buffer returns empty list # empty buffer returns words
+vim-only	tests-vim/word_detector_test.vim	Word has "col" key # word detection differs from legacy expectations
+vim-only	tests-vim/word_detector_test.vim	Word has "lnum" key # word detection differs from legacy expectations
+vim-only	tests-vim/word_detector_test.vim	Word has "text" key # word detection differs from legacy expectations
