@@ -38,5 +38,5 @@ function! hellshake_yano#utils#log_performance(operation, time_ms, ...) abort
 endfunction
 
 function! hellshake_yano#utils#is_denops_ready() abort
-  return exists('g:hellshake_yano_ready') && g:hellshake_yano_ready
+  return hellshake_yano#backend#is_native() || exists('g:hellshake_yano_ready') && g:hellshake_yano_ready
 endfunction

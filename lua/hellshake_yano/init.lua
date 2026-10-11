@@ -16,15 +16,33 @@ function M.setup(options)
   motion.reset()
   local result = core.setup(resolved)
   dictionary = loaded
+  if vim.g.hellshake_yano_native_bridge then vim.g.hellshake_yano = result end
   if reactivate then M.activate() end
   return result
 end
+function M.enable_bridge()
+  vim.g.hellshake_yano = core.get_config()
+  vim.g.hellshake_yano_native_bridge = true
+end
+function M.disable_bridge()
+  vim.g.hellshake_yano_native_bridge = false
+  require('hellshake_yano.dispatcher').cancel_pending()
+end
+
 function M.hide() core.hide() end
-function M.enable() core.enable() end
-function M.disable() motion.reset(); core.disable() end
+function M.enable()
+  core.enable()
+  if vim.g.hellshake_yano_native_bridge then vim.g.hellshake_yano = core.get_config() end
+end
+function M.disable()
+  motion.reset(); core.disable()
+  if vim.g.hellshake_yano_native_bridge then vim.g.hellshake_yano = core.get_config() end
+end
 function M.toggle()
   motion.reset()
-  return core.toggle()
+  local enabled = core.toggle()
+  if vim.g.hellshake_yano_native_bridge then vim.g.hellshake_yano = core.get_config() end
+  return enabled
 end
 function M.get_config() return core.get_config() end
 function M.update_config(options)
@@ -96,6 +114,8 @@ local function mapping(key)
     return key
   end
 end
+
+function M.motion_expression(key) return mapping(key)() end
 
 local function command(name, callback, options)
   if vim.fn.exists(':' .. name) == 2 then return end

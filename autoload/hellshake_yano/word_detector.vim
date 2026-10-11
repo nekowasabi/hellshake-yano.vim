@@ -4,21 +4,21 @@
 
 function! hellshake_yano#word_detector#detect_visible() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'detectWordsVisible', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'detectWordsVisible', [])
   endif
   return []
 endfunction
 
 function! hellshake_yano#word_detector#detect_multi_window() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'detectWordsMultiWindow', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'detectWordsMultiWindow', [])
   endif
   return []
 endfunction
 
 function! hellshake_yano#word_detector#get_min_length() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'getMinWordLength', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'getMinWordLength', [])
   endif
   return 2
 endfunction
@@ -29,6 +29,6 @@ endfunction
 
 function! hellshake_yano#word_detector#clear_cache() abort
   if hellshake_yano#utils#is_denops_ready()
-    call denops#request('hellshake-yano', 'clearCache', [])
+    call hellshake_yano#backend#request('hellshake-yano', 'clearCache', [])
   endif
 endfunction

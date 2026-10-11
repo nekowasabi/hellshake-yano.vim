@@ -106,6 +106,10 @@ end
 
 -- words: {text, line, col, bufnr?, winid?}; all positions are 1-based bytes.
 -- Detection is a separate module so callers may supply already filtered words.
+function M.refresh()
+  if state.visible then render() end
+end
+
 function M.show(words)
   M.hide()
   if not config.enabled then return {} end

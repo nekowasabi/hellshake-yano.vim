@@ -8,7 +8,7 @@
 " @return List 部分マッチするヒント文字リスト
 function! hellshake_yano#input#get_partial_matches() abort
   if hellshake_yano#utils#is_denops_ready()
-    let result = denops#request('hellshake-yano', 'getPartialMatches', [])
+    let result = hellshake_yano#backend#request('hellshake-yano', 'getPartialMatches', [])
     if type(result) == v:t_list
       return result
     endif

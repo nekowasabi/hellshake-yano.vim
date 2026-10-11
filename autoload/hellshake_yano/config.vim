@@ -76,7 +76,7 @@ function! hellshake_yano#config#notify_denops_config() abort
   if hellshake_yano#utils#is_denops_ready()
     try
       " Why: silent! as belt-and-suspenders with try-catch — denops#notify is fire-and-forget
-      silent! call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
+      silent! call hellshake_yano#backend#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
     catch
       call hellshake_yano#utils#show_error('[hellshake-yano] Error: Failed to update denops config: ' . v:exception)
     endtry
@@ -85,6 +85,11 @@ endfunction
 
 " 移動カウント数を設定
 function! hellshake_yano#config#set_count(count) abort
+  if hellshake_yano#backend#is_native()
+    call hellshake_yano#backend#request('hellshake-yano', 'setCount', [a:count])
+    call hellshake_yano#config#clear_motion_count_cache()
+    return
+  endif
   if a:count > 0
     let g:hellshake_yano.motion_count = a:count
 
@@ -107,6 +112,11 @@ endfunction
 
 " タイムアウト時間を設定
 function! hellshake_yano#config#set_timeout(timeout) abort
+  if hellshake_yano#backend#is_native()
+    call hellshake_yano#backend#request('hellshake-yano', 'setTimeout', [a:timeout])
+    call hellshake_yano#config#clear_motion_count_cache()
+    return
+  endif
   if a:timeout > 0
     let g:hellshake_yano.motion_timeout = a:timeout
 
@@ -138,14 +148,14 @@ endfunction
 " @param value any 設定値
 function! hellshake_yano#config#set(key, value) abort
   if hellshake_yano#utils#is_denops_ready()
-    call denops#request('hellshake-yano', 'updateConfig', [{a:key: a:value}])
+    call hellshake_yano#backend#request('hellshake-yano', 'updateConfig', [{a:key: a:value}])
   endif
 endfunction
 
 " hellshake_yano#config#reload() - Denops側から設定を再取得してg:hellshake_yanoを更新
 function! hellshake_yano#config#reload() abort
   if hellshake_yano#utils#is_denops_ready()
-    let l:config = denops#request('hellshake-yano', 'getConfig', [])
+    let l:config = hellshake_yano#backend#request('hellshake-yano', 'getConfig', [])
     if type(l:config) == v:t_dict
       call extend(g:hellshake_yano, l:config, 'force')
     endif

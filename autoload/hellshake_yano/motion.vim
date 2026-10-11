@@ -51,6 +51,9 @@ endfunction
 
 " モーション処理の統合関数
 function! hellshake_yano#motion#process(key) abort
+  if hellshake_yano#backend#is_native()
+    return luaeval("require('hellshake_yano').motion_expression(_A)", a:key)
+  endif
   let start_time = hellshake_yano#utils#get_elapsed_time()
 
   " プラグインが無効な場合は通常の動作
@@ -131,7 +134,7 @@ endfunction
 " @return Dictionary モーション状態
 function! hellshake_yano#motion#get_state() abort
   if hellshake_yano#utils#is_denops_ready()
-    return denops#request('hellshake-yano', 'motionGetState', [])
+    return hellshake_yano#backend#request('hellshake-yano', 'motionGetState', [])
   endif
   return {}
 endfunction

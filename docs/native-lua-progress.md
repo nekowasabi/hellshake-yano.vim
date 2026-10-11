@@ -3,7 +3,8 @@
 Base: `7ff640a` on `feat/remove-denops`.
 
 The native modules are opt-in while S2 is under construction. The existing plugin
-entry points and denops implementation are unchanged; loading the repository does
+entry points and denops implementation are unchanged; public autoload wrappers
+now use a default-preserving transport, loading the repository does
 not activate the new core. S3 must not delete denops until the remaining parity
 items are verified.
 
@@ -150,3 +151,40 @@ subset. This does not establish full ECMAScript compatibility; complement
 escapes inside a character class are rejected rather than misinterpreted.
 Attached-grid tests also repeat prefix/ESC cancellation ten times and verify
 source text restoration and stable window/buffer counts after every cycle.
+
+## Opt-in legacy API transport
+
+After native `setup()`, call `require('hellshake_yano').enable_bridge()` to route
+`autoload/hellshake_yano/*` requests/notifications to the Lua dispatcher.
+`disable_bridge()` restores ordinary denops forwarding and invalidates queued
+native notifications/delayed displays. This does not switch plugin entry files,
+replace `denops#request`, or intercept other plugins. `activate()` and bridge
+activation are independent, so existing mappings need not be overwritten.
+
+The adapter currently covers 51 of the 61 named Neovim dispatcher methods,
+including configuration, byte-coordinate Vim word records, segmentation result
+objects, windows, hide/redraw, input, diagnostics and motion-state operations.
+Unsupported methods raise an explicit error. Existing Neovim Visual-range and
+partial-match stubs remain stubs rather than acquiring speculative behavior.
+The legacy `showHints` dispatcher redraws existing hints; `showHintsWithKey` and
+`showHintsInternal` enter detection/input. These were distinct in the old code.
+
+Public enable/disable/toggle, count/timeout setters and expr-motion wrappers are
+connected only while the native bridge is enabled. Global configuration and the
+native enabled state stay synchronized; queued motion+hint keys are tested.
+Dispatcher motion detection preserves the old consecutive-key state machine,
+which differs from the native mapping's per-buffer/per-key counter. A 1,000-event
+comparison matched the checked-out TypeScript detector's results and states.
+The public segmentation wrapper's particle/numeric-unit/parenthesis processing
+matched 2,016 comparisons with the old TypeScript wrapper, including merge off.
+
+All 13 native test files pass. Tests cover ordinary denops delegation when opt-in
+is off, other-plugin isolation, public Vimscript return shapes, async ordering,
+cancellation after bridge disable, and delayed-display invalidation. Diagnostic
+performance values measure dispatcher calls (last 100 per operation), not all
+native direct Lua calls; native detection currently has no result cache.
+
+Remaining dispatcher methods: addToDictionary, editDictionary, detectWords,
+displayShowHint, displayShowHintWithWindow, displayHighlightPartialMatches,
+displayGetPopupCount, highlightCandidateHints, getHighlightGroup,
+showHintsMultiWindow. S2 is still not declared complete.

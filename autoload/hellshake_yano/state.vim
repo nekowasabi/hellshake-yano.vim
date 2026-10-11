@@ -39,6 +39,9 @@ endfunction
 
 " ヒント表示状態の取得
 function! hellshake_yano#state#is_hints_visible() abort
+  if hellshake_yano#backend#is_native()
+    return luaeval("require('hellshake_yano.core').get_state().visible")
+  endif
   return g:hellshake_yano_internal.hints_visible
 endfunction
 

@@ -53,4 +53,48 @@ function M.segment(input)
   result[#result + 1] = word
   return result
 end
+-- Public dispatcher postprocessing from the former TinySegmenter wrapper.
+local function blank(text)
+  for _,char in ipairs(vim.fn.split(text,'\\zs')) do
+    local code=vim.fn.char2nr(char)
+    if not (code==32 or (code>=9 and code<=13) or code==0xa0 or code==0x1680
+      or (code>=0x2000 and code<=0x200a) or code==0x2028 or code==0x2029
+      or code==0x202f or code==0x205f or code==0x3000 or code==0xfeff) then return false end
+  end
+  return true
+end
+function M.process(text, merge)
+  if blank(text) then return {} end
+  local segments=M.segment(text)
+  if not merge then return segments end
+  local particles={}
+  for _,value in ipairs({'の','は','が','を','に','へ','と','や','で','も','か','な','よ','ね','ぞ','さ','わ','ば',
+    'から','まで','です','ます','だ','である'}) do particles[value]=true end
+  local units={['%']=true,['％']=true,['年']=true,['月']=true,['日']=true,['時']=true,['分']=true,['秒']=true}
+  local result,index={},1
+  while index<=#segments do
+    local text=segments[index]
+    local next_index=index+1
+    if text:match('^%d+$') then
+      while next_index<=#segments and segments[next_index]:match('^%d+$') do
+        text=text..segments[next_index]; next_index=next_index+1
+      end
+      if units[segments[next_index]] then text=text..segments[next_index]; next_index=next_index+1 end
+    elseif text=='（' or text=='(' then
+      while next_index<=#segments and segments[next_index]~='）' and segments[next_index]~=')' do
+        text=text..segments[next_index]; next_index=next_index+1
+      end
+      if next_index<=#segments then text=text..segments[next_index]; next_index=next_index+1
+      else
+        text=segments[index]; next_index=index+1
+        while particles[segments[next_index]] do text=text..segments[next_index]; next_index=next_index+1 end
+      end
+    elseif not blank(text) then
+      while particles[segments[next_index]] do text=text..segments[next_index]; next_index=next_index+1 end
+    end
+    if not blank(text) then result[#result+1]=text end
+    index=next_index
+  end
+  return result
+end
 return M

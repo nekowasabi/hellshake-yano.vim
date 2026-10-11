@@ -20,6 +20,9 @@ assert(vim.deep_equal({'私の', '名前は', '中野です'}, vim.tbl_map(funct
 cfg.wordDetectionStrategy = 'hybrid'
 found = words.extract('私の名前は中野です', 1, cfg, '')
 assert(#found >= 3)
+assert(vim.deep_equal({},segmenter.process('　',true)))
+assert(vim.deep_equal({'('..'の'},segmenter.process('(の',true)))
+assert(vim.deep_equal({'2026年','10月','11日'},segmenter.process('2026年10月11日',true)))
 print(('PASS: %d TinySegmenter upstream fixtures and UTF-8 preservation'):format(#fixtures))
 assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')
