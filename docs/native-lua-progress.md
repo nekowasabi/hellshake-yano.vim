@@ -28,7 +28,7 @@ callers using display columns must explicitly pass their `byteCol` instead.
 
 ## Not yet complete
 
-Input polling/mapping integration, TinySegmenter, dictionaries, full continuous/visual-mode
+Input polling/mapping integration, dictionaries, full continuous/visual-mode
 behavior, full configuration validation, and dispatcher compatibility remain.
 The complete S2 stage is not yet finished.
 
@@ -50,3 +50,23 @@ normal editing, whereas multi-window input does exact matching and gives
 configured cancel keys precedence. PLAN-memo.md's blanket statement that input
 is case-insensitive is not a reliable specification. Preserve each path until a
 behavior change is intentionally reviewed.
+
+## TinySegmenter port
+
+The Lua segmenter embeds the same model as the former dependency
+`@birchill/tiny-segmenter@1.0.0`, retaining Taku Kudo's copyright and complete
+BSD license in `licenses/TinySegmenter.txt`. There is no runtime network access,
+Deno, Node, or npm dependency.
+
+Source: https://github.com/birchill/tiny-segmenter (npm version 1.0.0).
+Package integrity verified before extracting coefficients:
+`sha512-jcWdeRt8N/PLfqNbXFNXB0YrFr8+KV2EXkM0z5FZvhb0vH8G2Nnz8BME1oF8fdMhtdyX+jFKfoJVzPv1rOwo7g==`.
+Original license: http://chasen.org/~taku/software/TinySegmenter/LICENCE.txt .
+
+The checked-in 27 golden cases were produced with the pinned upstream package.
+An additional 1,000 seeded randomized BMP-input comparisons passed against that
+package in the VM. The Lua port iterates complete UTF-8 codepoints so non-BMP
+characters are preserved rather than split into JavaScript surrogate halves.
+Word extraction supports regex/tinysegmenter/hybrid selection, Japanese minimum
+length, and the existing particle-merging list. Dictionary rules are separate
+and remain to be completed.

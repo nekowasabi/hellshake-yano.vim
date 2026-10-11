@@ -7,7 +7,7 @@ local function japanese(char)
   if (code >= 0x4e00 and code <= 0x9faf) or (code >= 0x3400 and code <= 0x4dbf) then return 'kanji' end
 end
 
-function M.extract(line, number, config, key)
+local function regex_extract(line, number, config, key)
   local result = {}
   local minimum = config_module.min_length(config, key or '')
   local function add(text, col)
@@ -31,6 +31,55 @@ function M.extract(line, number, config, key)
     col = col + #char
   end
   flush()
+  return result
+end
+
+local particles = {}
+for _, word in ipairs({'の', 'が', 'を', 'に', 'へ', 'と', 'から', 'まで', 'より', 'は', 'も',
+  'こそ', 'さえ', 'でも', 'しか', 'だけ', 'ばかり', 'ほど', 'くらい', 'など', 'なり',
+  'やら', 'か', 'のみ', 'ば', 'ても', 'のに', 'ので', 'けど', 'けれど', 'けれども',
+  'し', 'て', 'で', 'ながら', 'つつ', 'たり', 'な', 'よ', 'ね', 'ぞ', 'ぜ', 'さ',
+  'わ', 'です', 'ます', 'だ', 'である', 'や', 'とか', 'だの'}) do particles[word] = true end
+
+function M.extract(line, number, config, key)
+  local regex = regex_extract(line, number, config, key)
+  local has_japanese = false
+  for _, char in ipairs(vim.fn.split(line, '\\zs')) do
+    if japanese(char) then has_japanese = true; break end
+  end
+  if not config.useJapanese or not config.enableTinySegmenter or not has_japanese
+    or config.wordDetectionStrategy == 'regex'
+    or vim.fn.strchars(line) < config.segmenterThreshold then return regex end
+  local segments = require('hellshake_yano.segmenter').segment(line)
+  local segmented, offset, index = {}, 1, 1
+  while index <= #segments do
+    local text = segments[index]
+    local start = offset
+    offset, index = offset + #text, index + 1
+    if config.japaneseMergeParticles and not text:match('^%s*$') then
+      while index <= #segments and particles[segments[index]] do
+        text, offset = text .. segments[index], offset + #segments[index]
+        index = index + 1
+      end
+    end
+    if not text:match('^%s*$') and not (config.japaneseMergeParticles and particles[text])
+      and vim.fn.strchars(text) >= config.japaneseMinWordLength then
+      segmented[#segmented + 1] = {text = text, line = number, col = start}
+    end
+  end
+  if config.wordDetectionStrategy == 'tinysegmenter' then return segmented end
+  -- Match the legacy hybrid strategy: longer word wins at the same position;
+  -- TinySegmenter wins ties. Keep byte columns consistent across both paths.
+  local by_col = {}
+  for _, word in ipairs(regex) do by_col[word.col] = word end
+  for _, word in ipairs(segmented) do
+    local previous = by_col[word.col]
+    if not previous or vim.fn.strchars(word.text) >= vim.fn.strchars(previous.text) then
+      by_col[word.col] = word
+    end
+  end
+  local result = vim.tbl_values(by_col)
+  table.sort(result, function(a, b) return a.col < b.col end)
   return result
 end
 
