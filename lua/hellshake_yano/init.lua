@@ -25,6 +25,7 @@ function M.enable_bridge()
   vim.g.hellshake_yano_native_bridge = true
 end
 function M.disable_bridge()
+  core.hide()
   vim.g.hellshake_yano_native_bridge = false
   require('hellshake_yano.dispatcher').cancel_pending()
 end

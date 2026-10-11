@@ -225,3 +225,30 @@ by a leaked temporary file. No real user dictionary was modified in the VM.
 so `%`, `#`, spaces and `|` in a path are literal. It does not force-discard
 unsaved buffers. `showDictionary` uses a read-only disposable scratch split.
 Membership checks include both custom and preserve words.
+
+## Final bounded review
+
+An opt-out during native input previously waited until timeout. A timer-driven
+regression now proves that `disable_bridge()` hides hints and invalidates the
+active input loop immediately. The dispatcher-name coverage test also fixes its
+substring extraction (Lua's multiple return values had truncated the source).
+The entire 15-file suite was rerun successfully after both fixes, followed by
+the real UI, unchanged Neovim gate and six gate-unit tests.
+
+Specific S4 parity questions, beyond supported-method names:
+
+- Native dictionary loading uses the explicit configured path. The old loader
+  searched its three standard locations before the explicit path.
+- Native visible-window enumeration excludes floating windows, limits itself to
+  the current tab, and prioritizes the current window before the limit. The old
+  helper used `getwininfo()` and applied its limit before current-window sorting.
+- Native multi-window generation honors the configured limits/numeric overflow;
+  the old display-only route initially passed only key sets and markers to its
+  generator. Edge-case label capacity/both-position parity is not established.
+- Native word selection honors the configured segmenter threshold; the old
+  detector's threshold was included in cache keys but not clearly enforced by
+  its strategy-selection path.
+- Dictionary custom/preserve literals become whole targets in the native
+  detector. Complete legacy dictionary merge/compound semantics are not ported.
+
+These are review items, not reasons to switch defaults or remove denops now.
