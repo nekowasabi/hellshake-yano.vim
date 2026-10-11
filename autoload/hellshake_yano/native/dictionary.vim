@@ -199,3 +199,65 @@ export def Apply(words: list<dict<any>>, lines: list<string>, first: number, dic
   endfor
   return result
 enddef
+
+# Internal checked replacement primitive, separately testable for stale writers.
+# The comparison immediately precedes rename; it is not a cross-process CAS.
+export def WriteChecked(path: string, original: any, output: string, permissions: string)
+  Check(strlen(output) <= 1024 * 1024, 'updated dictionary exceeds 1 MiB')
+  var parent = fnamemodify(path, ':h')
+  mkdir(parent, 'p')
+  var staging = parent .. '/.hellshake-yano-' .. getpid() .. '-' .. fnamemodify(tempname(), ':t')
+  Check(mkdir(staging, '', 0o700) == 1, 'could not create private dictionary staging directory')
+  var temporary = staging .. '/dictionary.json'
+  try
+    Check(writefile([output], temporary, 's') == 0, 'dictionary write failed')
+    Check(setfperm(temporary, permissions) == 1, 'could not preserve dictionary permissions')
+    var kind = getftype(path)
+    Check((type(original) == v:t_none && empty(kind)) || (type(original) != v:t_none && kind ==# 'file' && readfile(path, 'b') == original),
+      'dictionary changed while editing; original file was not replaced')
+    Check(rename(temporary, path) == 0, 'dictionary replacement failed')
+  finally
+    if filereadable(temporary)
+      delete(temporary)
+    endif
+    delete(staging, 'd')
+  endtry
+enddef
+
+export def Add(path: string, source_word: string, meaning: string = '', kind: string = ''): dict<any>
+  var word = trim(source_word)
+  Check(!empty(word), 'dictionary word must not be empty')
+  var expanded = fnamemodify(expand(path), ':p')
+  Check(fnamemodify(expanded, ':e') ==# 'json', 'native dictionary addition only supports JSON; edit YAML/text manually')
+  var file_type = getftype(expanded)
+  Check(empty(file_type) || file_type ==# 'file', 'dictionary must be a regular file; symlinks are not rewritten')
+  Check(empty(file_type) || getfsize(expanded) <= 1024 * 1024, 'dictionary exceeds 1 MiB')
+  var original: any = empty(file_type) ? v:null : readfile(expanded, 'b')
+  # ISO-8601 with the editor's explicit UTC offset; no process timezone changes.
+  var timestamp = substitute(strftime('%Y-%m-%dT%H:%M:%S%z'), '\(\d\d\)$', ':\1', '')
+  var data = type(original) == v:t_none ? {customWords: [], words: [], patterns: [],
+    meta: {version: '1.0.0', created: timestamp, description: 'User dictionary for hellshake-yano.vim'}}
+    : json_decode(join(original, "\n"))
+  Parse(json_encode(data), 'json') # Validate a copy, without persisting compiled fields.
+  data.customWords = get(data, 'customWords', [])
+  data.words = get(data, 'words', [])
+  Check(type(data.words) == v:t_list, 'dictionary words must be a list')
+  if index(data.customWords, word) < 0
+    add(data.customWords, word)
+  endif
+  var entry = {word: word, meaning: empty(trim(meaning)) ? word : trim(meaning),
+    type: empty(trim(kind)) ? 'unknown' : trim(kind), added: timestamp}
+  var found = false
+  for i in range(len(data.words))
+    if type(data.words[i]) == v:t_dict && get(data.words[i], 'word', '') ==# word
+      data.words[i] = entry
+      found = true
+      break
+    endif
+  endfor
+  if !found
+    add(data.words, entry)
+  endif
+  WriteChecked(expanded, original, json_encode(data), empty(file_type) ? 'rw-------' : getfperm(expanded))
+  return Load(expanded)
+enddef
