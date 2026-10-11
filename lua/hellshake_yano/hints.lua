@@ -23,7 +23,11 @@ function M.generate(count, config)
   local single, multi = keys(config.singleCharKeys), keys(config.multiCharKeys)
   if #single == 0 and #multi == 0 then
     single = keys(config.markers or 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-    multi = single
+    for _, key in ipairs(single) do add(key) end
+    for _, first in ipairs(single) do
+      for _, second in ipairs(single) do add(first .. second) end
+    end
+    return result
   end
   for i = 1, math.min(#single, config.maxSingleCharHints or #single) do add(single[i]) end
   local numeric_only = #multi > 0
@@ -52,6 +56,8 @@ function M.assign(words, labels, cursor, config)
     end
   end
   table.sort(sorted, function(a, b)
+    local pa, pb = a.word.hintPriority or 0, b.word.hintPriority or 0
+    if pa ~= pb then return pa > pb end
     if a.distance ~= b.distance then return a.distance < b.distance end
     if a.word.line ~= b.word.line then return a.word.line < b.word.line end
     if a.word.col ~= b.word.col then return a.word.col < b.word.col end

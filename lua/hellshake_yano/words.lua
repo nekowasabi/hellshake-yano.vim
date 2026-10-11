@@ -102,7 +102,7 @@ function M.windows(config)
   return result
 end
 
-function M.detect(config, key)
+function M.detect(config, key, dictionary)
   local result = {}
   local current = vim.api.nvim_get_current_win()
   local cursor = vim.api.nvim_win_get_cursor(current)
@@ -121,7 +121,9 @@ function M.detect(config, key)
       for offset, line in ipairs(lines) do
         local number = first + offset - 1
         if vim.fn.foldclosed(number) == -1 then
-          for _, word in ipairs(M.extract(line, number, config, key)) do
+          local detected = M.extract(line, number, config, key)
+          if dictionary then detected = require('hellshake_yano.dictionary').apply(detected, {line}, number, dictionary) end
+          for _, word in ipairs(detected) do
             word.winid, word.bufnr = win, buffer
             local directional = config.directionalHintFilter and win == current
             local after = number > cursor[1] or (number == cursor[1] and word.col > cursor[2] + 1)

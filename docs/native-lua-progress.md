@@ -28,7 +28,7 @@ callers using display columns must explicitly pass their `byteCol` instead.
 
 ## Not yet complete
 
-Dictionaries, full continuous/visual-mode
+Advanced dictionary compatibility, full continuous/visual-mode
 behavior, full configuration validation, and dispatcher compatibility remain.
 The complete S2 stage is not yet finished.
 
@@ -88,3 +88,28 @@ Additional UI check (Python `msgpack` is required):
 This attaches an actual Neovim grid UI and checks visible Japanese hint positions,
 horizontal scrolling, two views of one buffer, and cleanup. Headless word tests
 alone do not validate rendered viewport coordinates.
+
+## Dictionary scope and review limits
+
+JSON, text, and a data-only YAML subset are loaded without Deno. Supported YAML:
+indented mappings/sequences, flow collections, quoted/plain scalars, and comments.
+Aliases, tags, block scalars and duplicate keys are rejected explicitly. Files
+larger than 1 MiB are rejected. Failed setup/reload retains the previous dictionary.
+
+`customWords` and `preserveWords` provide literal whole-word targets; `hintPatterns`
+support start/end/capture positions and a checked common ECMAScript regex subset.
+Lookarounds, lazy quantifiers, multiline regexes and unsupported escapes are
+rejected rather than silently translated. Native hint assignment now honors
+`hintPriority` before distance; the old TypeScript assignment's distance sort
+could discard the dictionary ordering. This intentional behavior improvement
+needs review. `mergeRules` and `compoundPatterns` are retained as data but their
+runtime semantics, dictionary writing, and full YAML/ECMAScript compatibility
+remain S4 gaps. Do not remove denops while those requirements are unresolved.
+
+Config validation covers booleans, integer ranges, per-key values, hint keys,
+colors, enums and collection types; snake_case aliases are accepted. Invalid
+configuration is rejected before an active native runtime is deactivated.
+
+A differential check against the checked-out TypeScript hint generator passed
+500 seeded configurations. It caught and fixed the marker-fallback case where
+`maxSingleCharHints` and numeric overflow must not apply.

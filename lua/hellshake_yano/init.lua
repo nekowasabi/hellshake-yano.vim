@@ -6,12 +6,16 @@ local M = {}
 local active = false
 local owned_maps, owned_commands = {}, {}
 local group
+local dictionary
 
 function M.setup(options)
+  local resolved = require('hellshake_yano.config').resolve(options or vim.g.hellshake_yano)
+  local loaded = resolved.dictionaryPath and require('hellshake_yano.dictionary').load(resolved.dictionaryPath) or nil
   local reactivate = active
   if reactivate then M.deactivate() end
   motion.reset()
-  local result = core.setup(options)
+  local result = core.setup(resolved)
+  dictionary = loaded
   if reactivate then M.activate() end
   return result
 end
@@ -26,6 +30,15 @@ function M.get_config() return core.get_config() end
 function M.update_config(options)
   return M.setup(vim.tbl_extend('force', core.get_config(), options))
 end
+
+function M.reload_dictionary()
+  local path = core.get_config().dictionaryPath
+  local loaded = path and require('hellshake_yano.dictionary').load(path) or nil
+  dictionary = loaded
+  core.hide()
+  return vim.deepcopy(dictionary)
+end
+function M.get_dictionary() return vim.deepcopy(dictionary) end
 
 local function read_input(config)
   local generation = core.get_generation()
@@ -53,7 +66,7 @@ function M.show(key)
   if not config.enabled then return 'disabled' end
   local jumps, last_buffer = 0, nil
   while true do
-    local targets = core.show(words.detect(config, key or ''))
+    local targets = core.show(words.detect(config, key or '', dictionary))
     if #targets == 0 then return 'empty' end
     vim.cmd('redraw')
     local ok, status = pcall(read_input, config)
@@ -99,6 +112,9 @@ function M.activate()
   command('HellshakeYanoEnable', M.enable)
   command('HellshakeYanoDisable', M.disable)
   command('HellshakeYanoToggle', M.toggle)
+  command('HellshakeYanoReloadDict', M.reload_dictionary)
+  command('HellshakeYanoShowDict', function() print(vim.inspect(dictionary)) end)
+  command('HellshakeYanoValidateDict', function() M.reload_dictionary(); print('Dictionary valid') end)
   command('HellshakeYanoDebugConfig', function() print(vim.inspect(core.get_config())) end)
   command('HellshakeYanoSetCount', function(args)
     local count = tonumber(args.args)

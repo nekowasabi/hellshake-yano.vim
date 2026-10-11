@@ -41,8 +41,9 @@ local function highlight(name, value)
 end
 
 function M.setup(options)
+  local resolved = config_module.resolve(options or vim.g.hellshake_yano)
   M.hide()
-  config = config_module.resolve(options or vim.g.hellshake_yano)
+  config = resolved
   highlight('HellshakeYanoNativeHint', config.highlightHintMarker)
   highlight('HellshakeYanoNativeCurrent', config.highlightHintMarkerCurrent)
   return M.get_config()
@@ -131,7 +132,7 @@ end
 -- No global key interception: the caller owns input and replays returned keys.
 function M.input(key)
   if not state.visible then return 'inactive', key end
-  if key == '\27' or key == '' then M.hide(); return 'cancelled' end
+  if key == '\27' or key == '\3' or key == '' then M.hide(); return 'cancelled' end
   -- Preserve the legacy single-window contract: lowercase remains normal motion.
   if not config.multiWindowMode and key:match('^[a-z]$') then M.hide(); return 'cancelled', key end
   local normalized = key == '\r' and '<CR>' or key:upper()
@@ -150,8 +151,10 @@ function M.input(key)
     M.hide()
     return is_cancel and 'cancelled' or 'unmatched', key
   end
+  local prefer_numeric_pair = not config.multiWindowMode and config.useHintGroups
+    and config.useNumericMultiCharHints and prefix:match('^%d$') and #matches > 1
   for _, target in ipairs(matches) do
-    if target.hint == prefix then
+    if target.hint == prefix and not prefer_numeric_pair then
       if not valid(target) or vim.api.nvim_buf_get_changedtick(target.bufnr) ~= target.changedtick then
         M.hide(); return 'stale'
       end

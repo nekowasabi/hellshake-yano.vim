@@ -4,7 +4,7 @@ local core = require('hellshake_yano.core')
 local function eq(a,b) assert(vim.deep_equal(a,b),vim.inspect({expected=a,actual=b})) end
 vim.api.nvim_buf_set_lines(0,0,-1,false,{'alpha beta gamma'})
 vim.api.nvim_win_set_cursor(0,{1,0})
-runtime.setup({singleCharKeys='AS',motionTimeout=30})
+runtime.setup({singleCharKeys='AS',motionTimeout=100})
 vim.api.nvim_feedkeys('A','t',false)
 eq('jumped',runtime.show())
 eq({1,6},vim.api.nvim_win_get_cursor(0))
@@ -25,6 +25,14 @@ eq(false,core.get_config().enabled)
 runtime.enable()
 vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>',true,false,true),'t',false)
 eq('cancelled',runtime.show())
+
+-- Continuous mode stops at the configured bound, with no recursive stack growth.
+runtime.setup({continuousHintMode=true,maxContinuousJumps=2,singleCharKeys='A',motionTimeout=100})
+vim.api.nvim_win_set_cursor(0,{1,0})
+vim.api.nvim_feedkeys('AA','t',false)
+eq('jumped',runtime.show())
+eq({1,11},vim.api.nvim_win_get_cursor(0))
+eq(false,core.get_state().visible)
 
 -- Explicit activation is idempotent and does not overwrite an unrelated map.
 vim.keymap.set('n','w',':echo "user-map"<CR>',{desc='user map'})
