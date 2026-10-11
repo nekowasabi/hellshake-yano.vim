@@ -106,7 +106,7 @@ try:
       core.show(require('hellshake_yano.words').detect(core.get_config(),''))
     """)
     screen = nvim.screen()
-    assert "Alpha" in screen and "Blpha" in screen, screen
+    assert "Alpha" in screen and "CCpha" in screen, screen  # Current-window words receive earlier labels.
     nvim.lua("require('hellshake_yano.core').hide()")
     assert nvim.lua("return #vim.api.nvim_list_wins()") == 2, "hint windows leaked"
     # Exercise real redraw after repeated prefix cancellation, not only API counts.

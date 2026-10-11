@@ -20,11 +20,12 @@ end
 assert(floats[first] and floats[second], 'each window must have its own label')
 eq(0,#vim.api.nvim_buf_get_extmarks(buf,core.namespace,0,-1,{}))
 eq('jumped',core.input('A'))
-eq(first,vim.api.nvim_get_current_win())
-eq({1,6},vim.api.nvim_win_get_cursor(first))
+eq(second,vim.api.nvim_get_current_win())
+eq({1,6},vim.api.nvim_win_get_cursor(second))
 for _, win in pairs(floats) do assert(not vim.api.nvim_win_is_valid(win), 'hint float leaked') end
 
 -- Closed windows are stale, not reassigned to a different window.
+vim.api.nvim_set_current_win(first)
 vim.api.nvim_win_set_cursor(first,{1,0})
 core.show({{line=1,col=7,text='beta',winid=second,bufnr=buf}})
 vim.api.nvim_win_close(second,true)
@@ -38,6 +39,11 @@ local status,replay=core.input('A')
 eq('cancelled',status)
 eq('A',replay)
 eq({1,0},vim.api.nvim_win_get_cursor(first))
+core.setup({multiWindowMode=true,singleCharKeys='A',cancelKeys={}})
+core.show({{line=1,col=7,text='beta'}})
+local unmatched,unmatched_replay=core.input('z')
+eq('unmatched',unmatched)
+eq(nil,unmatched_replay) -- Old multi-window input discards unmatched input.
 -- Repeated display/prefix/hide cycles must release scratch buffers too.
 core.setup({multiWindowMode=true,singleCharKeys='/',multiCharKeys='BC'})
 local before_buffers=#vim.api.nvim_list_bufs()

@@ -42,6 +42,28 @@ methods.generateHints=function(count)
 end
 methods.detectWordsVisible=function() return detected(false) end
 methods.detectWordsMultiWindow=function() return detected(true) end
+local function legacy_word(word)
+  local byte_col=word.wordCol or word.col
+  local line=vim.api.nvim_buf_get_lines(word.bufnr,word.line-1,word.line,false)[1] or ''
+  local display=vim.api.nvim_win_call(word.winid,function() return vim.fn.strdisplaywidth(line:sub(1,byte_col-1)) end)
+  return {text=word.text,line=word.line,col=display+1,byteCol=byte_col,winid=word.winid,bufnr=word.bufnr}
+end
+local function legacy_hints(targets)
+  local result={}
+  for _,target in ipairs(targets) do
+    result[#result+1]={word=legacy_word(target),hint=target.hint,hintCol=target.col,hintByteCol=target.col}
+  end
+  return result
+end
+methods.detectWords=function()
+  -- The legacy optimized dispatcher ignored bufnr and used visible default detection.
+  return vim.tbl_map(legacy_word,words.detect(config_module.resolve(),''))
+end
+methods.showHintsMultiWindow=function()
+  local options=config(); options.multiWindowMode=true
+  local targets=core.show(words.detect(options,'',runtime().get_dictionary()),{multiWindowMode=true})
+  return legacy_hints(targets)
+end
 methods.getMinWordLength=function(key)
   -- Preserve the legacy missing-key result, which is not the configured default.
   return type(key)=='string' and config_module.min_length(config(),key) or 3
@@ -81,6 +103,17 @@ methods.showHints=function() core.refresh() end
 methods.hideHints=function() runtime().hide() end
 methods.displayHideAll=methods.hideHints
 methods.hideHintsMultiWindow=methods.hideHints
+methods.displayShowHint=function(line,col,hint) return core.display_hint(vim.api.nvim_get_current_win(),line,col,hint) end
+methods.displayShowHintWithWindow=function(win,line,col,hint) return core.display_hint(win,line,col,hint) end
+methods.displayGetPopupCount=function() return #core.get_state().targets end
+methods.highlightCandidateHints=function(prefix) core.highlight_prefix(prefix) end
+methods.displayHighlightPartialMatches=function(matches)
+  if type(matches)=='table' then
+    local input=table.concat(vim.tbl_filter(function(value) return type(value)=='string' end,matches))
+    if input~='' then core.highlight_prefix(input) end
+  end
+end
+methods.getHighlightGroup=function() return 'HellshakeYanoMarker' end
 methods.getFixedPositions=function() return {} end -- Legacy Neovim fallback.
 methods.getPartialMatches=function() return {} end -- Legacy Neovim stub.
 methods.getVisualRange=function() return {mode='none',start_line=0,start_col=0,end_line=0,end_col=0} end
@@ -132,11 +165,7 @@ methods.getStatistics=function()
 end
 methods.getDebugInfo=function()
   local state=core.get_state()
-  local hints={}
-  for _,target in ipairs(state.targets) do
-    hints[#hints+1]={word={text=target.text,line=target.line,col=target.col,byteCol=target.col,
-      winid=target.winid,bufnr=target.bufnr},hint=target.hint,hintCol=target.col,hintByteCol=target.col}
-  end
+  local hints=legacy_hints(state.targets)
   local metrics={}
   for _,name in ipairs({'showHints','hideHints','wordDetection','hintGeneration'}) do
     metrics[name]=vim.deepcopy(measurements[name] or {})

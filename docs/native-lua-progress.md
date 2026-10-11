@@ -161,7 +161,7 @@ native notifications/delayed displays. This does not switch plugin entry files,
 replace `denops#request`, or intercept other plugins. `activate()` and bridge
 activation are independent, so existing mappings need not be overwritten.
 
-The adapter currently covers 51 of the 61 named Neovim dispatcher methods,
+The adapter currently covers 59 of the 61 named Neovim dispatcher methods,
 including configuration, byte-coordinate Vim word records, segmentation result
 objects, windows, hide/redraw, input, diagnostics and motion-state operations.
 Unsupported methods raise an explicit error. Existing Neovim Visual-range and
@@ -178,13 +178,21 @@ comparison matched the checked-out TypeScript detector's results and states.
 The public segmentation wrapper's particle/numeric-unit/parenthesis processing
 matched 2,016 comparisons with the old TypeScript wrapper, including merge off.
 
-All 13 native test files pass. Tests cover ordinary denops delegation when opt-in
+All 14 native test files pass. Tests cover ordinary denops delegation when opt-in
 is off, other-plugin isolation, public Vimscript return shapes, async ordering,
 cancellation after bridge disable, and delayed-display invalidation. Diagnostic
 performance values measure dispatcher calls (last 100 per operation), not all
 native direct Lua calls; native detection currently has no result cache.
 
-Remaining dispatcher methods: addToDictionary, editDictionary, detectWords,
-displayShowHint, displayShowHintWithWindow, displayHighlightPartialMatches,
-displayGetPopupCount, highlightCandidateHints, getHighlightGroup,
-showHintsMultiWindow. S2 is still not declared complete.
+Remaining dispatcher methods: addToDictionary and editDictionary (dictionary
+mutation/UI are still outside the completed native scope). Low-level display
+methods preserve byte coordinates and do not consume selection input. The
+multi-window display call is non-blocking and does not change global mode.
+`detectWords` carries both display-column `col` and byte-column `byteCol`, unlike
+the public Vim record adapter whose `col` is a byte offset.
+
+Further source comparison restored the old non-current-window distance penalty
+(10000 lines) and the old multi-window behavior of discarding unmatched input.
+Configured cancel keys still replay their key. Tests check this distinction and
+the attached UI confirms current-window labels precede the other window's labels.
+S2 is still not declared complete: routing coverage alone is not full parity.

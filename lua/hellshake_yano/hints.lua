@@ -51,14 +51,16 @@ function M.assign(words, labels, cursor, config)
     local inside = same_window and word.line == cursor.line
       and cursor.col >= word.col and cursor.col < word.col + #word.text
     if not inside then
-      sorted[#sorted + 1] = {word = word, index = i,
-        distance = math.abs(word.line - cursor.line) * 1000 + math.abs(word.col - cursor.col)}
+      -- Legacy multi-buffer assignment adds 10000 lines outside the current window.
+      local sort_line = word.line + ((config.multiWindowMode and not same_window) and 10000 or 0)
+      sorted[#sorted + 1] = {word = word, index = i, sort_line = sort_line,
+        distance = math.abs(sort_line - cursor.line) * 1000 + math.abs(word.col - cursor.col)}
     end
   end
   table.sort(sorted, function(a, b)
     -- Preserve the legacy assignment contract: distance precedes dictionary priority.
     if a.distance ~= b.distance then return a.distance < b.distance end
-    if a.word.line ~= b.word.line then return a.word.line < b.word.line end
+    if a.sort_line ~= b.sort_line then return a.sort_line < b.sort_line end
     if a.word.col ~= b.word.col then return a.word.col < b.word.col end
     return a.index < b.index
   end)
@@ -68,6 +70,7 @@ function M.assign(words, labels, cursor, config)
     if not label then return end
     local target = vim.deepcopy(word)
     target.hint = label
+    target.wordCol = word.col
     -- The final UTF-8 character's first byte, never a continuation byte.
     if at_end then
       local last = vim.fn.byteidx(word.text, vim.fn.strchars(word.text, 1) - 1)
