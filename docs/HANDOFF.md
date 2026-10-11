@@ -25,3 +25,28 @@ remaining public bridges. S3 needs approved full Vim in the VM (`vim.tiny` has
 `-eval`/`-popupwin`), then Vim9/entry routing and removal. Do not install full Vim,
 publish, or use the user's computer based on this handoff alone. The current user
 request restricts all execution to the dot VM.
+
+### Extended S2 checkpoint (2026-10-11, dot VM)
+
+The native bridge now routes all 61 named Neovim dispatcher APIs when explicitly
+opted in. `autoload/hellshake_yano/*` uses a transport which still forwards to
+real denops by default; other plugins are never intercepted. Native activation
+and bridge activation are separate. Tests use a clean `-u NONE` session. Existing
+plugin commands and `autoload/hellshake_yano_vim/*` have not been cut over.
+
+Verification now includes 15 Lua suites, real-grid UI, 36 checked-in regex-word
+fixtures, 3,042 extra word-extraction comparisons, 1,000 dispatcher-motion events,
+and 2,016 Japanese postprocessing comparisons. A 10-cycle/336-target rendering
+stress check leaves window/buffer counts stable. The old gate remains unchanged
+at PASS 21 / KNOWN 20 / FAIL 0 / SKIP 13.
+
+JSON AddWord preserves fields and rejects corrupt/concurrently changed files;
+YAML/text writes are explicitly rejected unchanged. This intentionally fixes the
+old writer's `words` versus reader's `customWords` mismatch. Full YAML/ECMAScript,
+mergeRules/compoundPatterns execution and dictionary search-path precedence are
+still compatibility limits, not validated completion. See native-lua-progress.md.
+
+Next executable boundary is S3's full-Vim implementation/testing and entry
+cutover, requiring the full-Vim installation approval already identified. The
+final real-init check also needs an authorized copy of that init in this VM.
+Neither blocker is a reason to describe S2 parity or the denops removal as done.
