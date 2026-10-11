@@ -25,6 +25,8 @@ eq({'に','は'},parsed.preserveWords)
 eq({"don't"},dictionary.parse("customWords: [don't] # comment",'yaml').customWords)
 eq('capture:1',parsed.hintPatterns[1].hintPosition)
 eq('quoted # value',parsed.metadata.description)
+eq({"it's # safe"},dictionary.parse("customWords: ['it''s # safe'] # outside",'yaml').customWords)
+eq("it's: safe, too",require('hellshake_yano.yaml').decode("data: {text: 'it''s: safe, too'}").data.text)
 local words={{text='function',line=1,col=1},{text='hello',line=1,col=10},{text='world',line=1,col=16}}
 local result=dictionary.apply(words,{'function hello world'},1,parsed)
 eq(20,result[2].hintPriority)

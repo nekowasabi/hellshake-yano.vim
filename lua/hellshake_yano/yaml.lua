@@ -14,6 +14,7 @@ local function scan(text, separator)
     local char = text:sub(i, i)
     if escaped then escaped = false
     elseif quote == '"' and char == '\\' then escaped = true
+    elseif quote == "'" and char == "'" and text:sub(i + 1, i + 1) == "'" then escaped = true
     elseif quote then if char == quote then quote = nil end
     elseif starts_quote(text, i) then quote = char
     elseif char == '[' or char == '{' then depth = depth + 1
@@ -77,6 +78,7 @@ function M.decode(source)
       local char = raw:sub(i, i)
       if escaped then escaped = false
       elseif quote == '"' and char == '\\' then escaped = true
+      elseif quote == "'" and char == "'" and raw:sub(i + 1, i + 1) == "'" then escaped = true
       elseif quote then if char == quote then quote = nil end
       elseif starts_quote(raw, i) then quote = char
       elseif char == '#' and (i == 1 or raw:sub(i - 1, i - 1):match('%s')) then stop = i - 1; break end
