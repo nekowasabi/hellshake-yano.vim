@@ -65,11 +65,13 @@ function! hellshake_yano#hint#show_hints_with_key(key) abort
   if hellshake_yano#core#is_focus_just_restored()
     let s:delay_in_progress = v:true
     let l:delay_ms = hellshake_yano#config#get('multiWindowRestoreDelay', 50)
-    " フラグはクリアしない（5000msタイマーに任せる）
-    " キー情報を保持してタイマーで呼び出し
-    let l:key = a:key
-    call timer_start(l:delay_ms, {-> hellshake_yano#hint#delayed_show_hints_with_key(l:key)})
-    return
+    try
+      if l:delay_ms > 0
+        execute printf('sleep %dm', l:delay_ms)
+      endif
+    finally
+      let s:delay_in_progress = v:false
+    endtry
   endif
   call hellshake_yano#hint#show_hints_with_key_internal(a:key)
 endfunction
@@ -89,8 +91,7 @@ function! hellshake_yano#hint#show_hints_with_key_internal(key) abort
 
     " 現在のモードを検出
     let current_mode = hellshake_yano#hint#detect_current_mode()
-    " Denops側のshowHintsWithKeyメソッドを呼び出し（モード情報付き）
-    silent! call hellshake_yano#backend#notify('hellshake-yano', 'showHintsWithKey', [a:key, current_mode])
+    call hellshake_yano#backend#request('hellshake-yano', 'showHintsWithKey', [a:key, current_mode])
   catch
     call hellshake_yano#utils#show_error('show_hints_with_key', v:exception)
   endtry
