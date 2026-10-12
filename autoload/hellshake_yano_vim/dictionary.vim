@@ -42,17 +42,7 @@ endfunction
 " Denops利用可能チェック
 " @return v:true: Denops利用可能 / v:false: 利用不可
 function! hellshake_yano_vim#dictionary#has_denops() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " 辞書再読み込み

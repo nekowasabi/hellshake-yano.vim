@@ -112,17 +112,7 @@ endfunction
 "
 " @return Boolean Denopsが利用可能な場合v:true
 function! hellshake_yano_vim#motion#has_denops() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " ============================================================================
@@ -191,7 +181,7 @@ endfunction
 function! hellshake_yano_vim#motion#set_threshold(count) abort
   let s:motion_state.threshold = a:count
   " Phase 1集約: Denops側に同期
-  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+  " Why: silent! instead of try-catch — native backend notification
   if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
     silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'updateConfig', [{'threshold': a:count}])
   endif
@@ -214,7 +204,7 @@ endfunction
 function! hellshake_yano_vim#motion#set_timeout(ms) abort
   let s:motion_state.timeout_ms = a:ms
   " Phase 1集約: Denops側に同期
-  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+  " Why: silent! instead of try-catch — native backend notification
   if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
     silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'updateConfig', [{'motionTimeout': a:ms}])
   endif

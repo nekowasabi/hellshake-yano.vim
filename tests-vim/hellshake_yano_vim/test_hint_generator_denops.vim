@@ -7,9 +7,6 @@ let s:suite = themis#suite('hint_generator_denops')
 let s:assert = themis#helper('assert')
 
 " テスト用のヘルパー関数
-function! s:skip(msg) abort
-  call themis#log('SKIP: ' . a:msg)
-endfunction
 
 " ========================================
 " Test: has_denops() 関数の存在と動作
@@ -58,17 +55,6 @@ endfunction
 " ========================================
 " Test: Denops経由の生成（Denops起動時のみ）
 " ========================================
-function! s:suite.test_generate_via_denops() abort
-  " Denopsが利用可能な場合のテスト
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  let l:hints = hellshake_yano_vim#hint_generator#generate(5)
-  call s:assert.equals(len(l:hints), 5, 'generate(5) via Denops should return 5 hints')
-  call s:assert.equals(l:hints[0], 'a', 'First hint should be "a"')
-endfunction
 
 " ========================================
 " Test: エッジケース

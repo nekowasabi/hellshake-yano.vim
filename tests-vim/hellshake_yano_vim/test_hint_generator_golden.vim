@@ -71,47 +71,7 @@ endfunction
 " ========================================
 " Test: Denops版のゴールデンテスト（Denops起動時のみ）
 " ========================================
-function! s:suite.test_golden_denops() abort
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call themis#log('SKIP: Denops not available')
-    return
-  endif
-
-  for l:case in s:golden_test_cases
-    if exists('*hellshake_yano_vim#hint_generator#clear_cache')
-      call hellshake_yano_vim#hint_generator#clear_cache()
-    endif
-
-    let l:result = hellshake_yano_vim#hint_generator#generate(l:case.count)
-    call s:assert.equals(l:result, l:case.expected,
-      \ 'Denops: count=' . l:case.count . ' mismatch')
-  endfor
-endfunction
 
 " ========================================
 " Test: ローカル実装とDenops版の出力一致（Denops起動時のみ）
 " ========================================
-function! s:suite.test_golden_unified() abort
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call themis#log('SKIP: Denops not available')
-    return
-  endif
-
-  " 複数のcountでテスト
-  for l:count in [1, 5, 7, 10, 20]
-    " キャッシュクリアしてDenops経由で取得
-    if exists('*hellshake_yano_vim#hint_generator#clear_cache')
-      call hellshake_yano_vim#hint_generator#clear_cache()
-    endif
-    let l:denops_result = hellshake_yano_vim#hint_generator#generate(l:count)
-
-    " ゴールデンテストケースと比較
-    for l:case in s:golden_test_cases
-      if l:case.count == l:count
-        call s:assert.equals(l:denops_result, l:case.expected,
-          \ 'Unified: count=' . l:count . ' should match expected')
-        break
-      endif
-    endfor
-  endfor
-endfunction

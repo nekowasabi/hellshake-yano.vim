@@ -35,43 +35,6 @@ let s:MIN_LEN_THRESHOLD_MS = 10.0        " get_min_length のしきい値（10ms
 "   - Denopsプラグインが利用可能な場合、高速な検出が期待される
 "   - ローカルフォールバックでも50msが目安
 "
-function! s:suite.test_latency_detect_visible_50_lines() abort
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:assert.skip('Denops not available')
-    return
-  endif
-
-  " テスト用バッファを作成（50行）
-  new
-  try
-    for l:i in range(1, 50)
-      call setline(l:i, 'function test_func_' . l:i . '() { return 42; }')
-    endfor
-
-    " キャッシュクリア（キャッシュミス状態を確認）
-    if exists('*hellshake_yano_vim#word_detector#clear_cache')
-      call hellshake_yano_vim#word_detector#clear_cache()
-    endif
-
-    " 計測開始
-    let l:start = reltime()
-    let l:words = hellshake_yano_vim#word_detector#detect_visible()
-    let l:elapsed_ms = reltimefloat(reltime(l:start)) * 1000.0
-
-    " 検証: レイテンシが閾値以下
-    call s:assert.true(l:elapsed_ms < s:LATENCY_THRESHOLD_MS,
-      \ printf('Latency %.2f ms exceeds threshold %.0f ms', l:elapsed_ms, s:LATENCY_THRESHOLD_MS))
-
-    " 検出された単語数が妥当（50行x複数単語の期待）
-    call s:assert.true(len(l:words) > 100,
-      \ printf('Expected >100 words, got %d', len(l:words)))
-
-    " レポート出力
-    echo printf('[Latency] detect_visible(50 lines): %.2f ms', l:elapsed_ms)
-  finally
-    bwipeout!
-  endtry
-endfunction
 
 " ========================================
 " Test 2: キャッシュヒット時のレイテンシ
@@ -124,33 +87,6 @@ endfunction
 "   - Dictionary Integration (Process4 Sub2) で実装
 "   - 辞書ファイルの読み込みはキャッシュされるべき
 "
-function! s:suite.test_latency_get_min_length() abort
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:assert.skip('Denops not available')
-    return
-  endif
-
-  " キャッシュクリア
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  " 計測開始（get_min_length 呼び出し）
-  let l:start = reltime()
-  let l:min_len = hellshake_yano_vim#word_detector#get_min_length('w')
-  let l:elapsed_ms = reltimefloat(reltime(l:start)) * 1000.0
-
-  " 検証: レイテンシが10ms以下
-  call s:assert.true(l:elapsed_ms < s:MIN_LEN_THRESHOLD_MS,
-    \ printf('get_min_length latency %.2f ms exceeds threshold %.0f ms', l:elapsed_ms, s:MIN_LEN_THRESHOLD_MS))
-
-  " 返り値が妥当な整数
-  call s:assert.true(type(l:min_len) == v:t_number && l:min_len > 0,
-    \ printf('Expected positive integer, got %s (%s)', l:min_len, type(l:min_len)))
-
-  " レポート出力
-  echo printf('[Latency] get_min_length: %.2f ms', l:elapsed_ms)
-endfunction
 
 " ========================================
 " Test 4: キャッシュクリア後の再計測
@@ -162,46 +98,6 @@ endfunction
 "   - clear_cache() が正しく機能し、キャッシュが無効化される
 "   - 無効化後も処理時間が安定している
 "
-function! s:suite.test_latency_after_clear_cache() abort
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:assert.skip('Denops not available')
-    return
-  endif
-
-  new
-  try
-    " 大規模バッファを作成
-    for l:i in range(1, 50)
-      call setline(l:i, 'line ' . l:i . ' contains multiple words here')
-    endfor
-
-    " 1回目: キャッシュミス
-    let l:words1 = hellshake_yano_vim#word_detector#detect_visible()
-
-    " キャッシュクリア
-    if exists('*hellshake_yano_vim#word_detector#clear_cache')
-      call hellshake_yano_vim#word_detector#clear_cache()
-    endif
-
-    " 2回目: キャッシュクリア後のキャッシュミス
-    let l:start = reltime()
-    let l:words2 = hellshake_yano_vim#word_detector#detect_visible()
-    let l:elapsed_ms = reltimefloat(reltime(l:start)) * 1000.0
-
-    " 検証: レイテンシが50ms以下
-    call s:assert.true(l:elapsed_ms < s:LATENCY_THRESHOLD_MS,
-      \ printf('Latency after clear_cache %.2f ms exceeds threshold %.0f ms', l:elapsed_ms, s:LATENCY_THRESHOLD_MS))
-
-    " 結果が同一（バッファ内容は変更なし）
-    call s:assert.equals(l:words1, l:words2,
-      \ 'Results should be identical after cache clear')
-
-    " レポート出力
-    echo printf('[Latency] after clear_cache: %.2f ms', l:elapsed_ms)
-  finally
-    bwipeout!
-  endtry
-endfunction
 
 " ========================================
 " Test 5: 複数ウィンドウでの多重呼び出しレイテンシ

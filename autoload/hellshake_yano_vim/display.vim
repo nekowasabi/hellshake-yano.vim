@@ -38,17 +38,7 @@ let s:highlight_initialized = v:false
 
 " Denops 利用可能性チェック（Phase 2.2 統合）
 function! hellshake_yano_vim#display#has_denops() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " hellshake_yano_vim#display#get_highlight_group(type) - ハイライトグループ名の取得

@@ -1,4 +1,4 @@
-" Explicit Vim9 transport; default and other-plugin calls retain real Denops.
+" Explicit Vim9 transport; unavailable backends and other plugins fail visibly.
 let s:epoch = 0
 let s:timers = []
 function! hellshake_yano_vim#backend#is_native() abort
@@ -8,7 +8,7 @@ function! hellshake_yano_vim#backend#request(plugin, method, args) abort
   if a:plugin ==# 'hellshake-yano' && hellshake_yano_vim#backend#is_native()
     return hellshake_yano#native#dispatcher#Request(a:method, a:args)
   endif
-  return denops#request(a:plugin, a:method, a:args)
+  throw '[hellshake-yano] Native backend unavailable or unsupported plugin: ' . a:plugin
 endfunction
 function! s:notify(epoch, method, args, timer) abort
   call filter(s:timers, 'v:val != a:timer')
@@ -21,7 +21,7 @@ function! hellshake_yano_vim#backend#notify(plugin, method, args) abort
     call add(s:timers, timer_start(0, function('s:notify', [s:epoch, a:method, deepcopy(a:args)])))
     return
   endif
-  call denops#notify(a:plugin, a:method, a:args)
+  throw '[hellshake-yano] Native backend unavailable or unsupported plugin: ' . a:plugin
 endfunction
 function! hellshake_yano_vim#backend#cancel_pending() abort
   let s:epoch += 1

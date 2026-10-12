@@ -201,7 +201,7 @@ endfunction
 "
 " アルゴリズム:
 "   1. Denops が初期化されていない場合は警告を表示して終了
-"   2. denops#request() で TypeScript側の getConfig API を呼び出し
+"   2. hellshake_yano_vim#backend#request() で TypeScript側の getConfig API を呼び出し
 "   3. 取得した設定を s:map_config_from_ts() で VimScript形式に変換
 "   4. g:hellshake_yano_vim_config を更新
 "

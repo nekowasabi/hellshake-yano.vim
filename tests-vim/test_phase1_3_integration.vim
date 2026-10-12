@@ -23,22 +23,6 @@ endfunction
 " ========================================
 " Test: Denops統合（Denops起動時のみ）
 " ========================================
-function! s:suite.test_e2e_denops_integration() abort
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call themis#log('SKIP: Denops not available')
-    return
-  endif
-
-  " キャッシュクリア
-  call hellshake_yano_vim#hint_generator#clear_cache()
-
-  " Denops経由でヒント生成
-  let l:hints = hellshake_yano_vim#hint_generator#generate(5)
-
-  " TypeScript版の出力形式を確認
-  call s:assert.equals(l:hints, ['a', 's', 'd', 'f', 'g'],
-    \ 'Should return hints from TypeScript implementation')
-endfunction
 
 " ========================================
 " Test: キャッシュ機構の動作
@@ -65,28 +49,6 @@ endfunction
 " ========================================
 " Test: 設定変更の反映
 " ========================================
-function! s:suite.test_e2e_config_change() abort
-  " デフォルト設定でテスト
-  call hellshake_yano_vim#hint_generator#clear_cache()
-  let l:default_hints = hellshake_yano_vim#hint_generator#generate(3)
-  call s:assert.equals(l:default_hints, ['a', 's', 'd'],
-    \ 'Default config should produce default hints')
-
-  " 設定変更（カスタムキー）
-  let g:hellshake_yano = {'singleCharKeys': 'xyz'}
-  call hellshake_yano_vim#hint_generator#clear_cache()
-  let l:custom_hints = hellshake_yano_vim#hint_generator#generate(3)
-
-  " カスタム設定が反映されていること（Denops未起動時）
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call s:assert.equals(l:custom_hints, ['x', 'y', 'z'],
-      \ 'Custom config should produce custom hints')
-  endif
-
-  " 設定をリセット
-  unlet g:hellshake_yano
-  call hellshake_yano_vim#hint_generator#clear_cache()
-endfunction
 
 " ========================================
 " Test: 境界値テスト

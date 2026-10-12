@@ -71,32 +71,6 @@ endfunction
 " ========================================
 " Test: detect_visible() via Denops
 " ========================================
-function! s:suite.test_detect_visible_via_denops() abort
-  " RED PHASE: Denops経由の検出テスト (WILL FAIL - wrapper not implemented)
-  if !exists('*hellshake_yano_vim#word_detector#has_denops')
-    call s:skip('has_denops() not implemented yet')
-    return
-  endif
-
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  new
-  call setline(1, ['test denops integration', 'multiple words here'])
-
-  let l:words = hellshake_yano_vim#word_detector#detect_visible()
-  call s:assert.true(type(l:words) == v:t_list,
-    \ 'detect_visible() via Denops should return list')
-
-  if !empty(l:words)
-    call s:assert.true(has_key(l:words[0], 'text'),
-      \ 'Word dict via Denops should have text key')
-  endif
-
-  bdelete!
-endfunction
 
 " ========================================
 " Test: detect_multi_window() の基本動作（フォールバック）
@@ -136,36 +110,6 @@ endfunction
 " ========================================
 " Test: detect_multi_window() via Denops
 " ========================================
-function! s:suite.test_detect_multi_window_via_denops() abort
-  " RED PHASE: Denops経由の検出テスト (WILL FAIL - wrapper not implemented)
-  if !exists('*hellshake_yano_vim#word_detector#has_denops')
-    call s:skip('has_denops() not implemented yet')
-    return
-  endif
-
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  new
-  call setline(1, ['denops multi window test'])
-  let l:winid = win_getid()
-  let l:bufnr = bufnr('%')
-
-  let l:windows = [{
-    \ 'winid': l:winid,
-    \ 'bufnr': l:bufnr,
-    \ 'topline': 1,
-    \ 'botline': 1
-  \ }]
-
-  let l:words = hellshake_yano_vim#word_detector#detect_multi_window(l:windows)
-  call s:assert.true(type(l:words) == v:t_list,
-    \ 'detect_multi_window() via Denops should return list')
-
-  bdelete!
-endfunction
 
 " ========================================
 " Test: get_min_length() の基本動作（フォールバック）
@@ -195,24 +139,6 @@ endfunction
 " ========================================
 " Test: get_min_length() via Denops
 " ========================================
-function! s:suite.test_get_min_length_via_denops() abort
-  " RED PHASE: Denops経由の取得テスト (WILL FAIL - wrapper not implemented)
-  if !exists('*hellshake_yano_vim#word_detector#has_denops')
-    call s:skip('has_denops() not implemented yet')
-    return
-  endif
-
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  let l:min_length = hellshake_yano_vim#word_detector#get_min_length('w')
-  call s:assert.true(type(l:min_length) == v:t_number,
-    \ 'get_min_length() via Denops should return number')
-  call s:assert.true(l:min_length > 0,
-    \ 'get_min_length() via Denops should return positive number')
-endfunction
 
 " ========================================
 " Test: エッジケース

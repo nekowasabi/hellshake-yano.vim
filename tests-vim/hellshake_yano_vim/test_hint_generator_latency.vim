@@ -15,27 +15,6 @@ let s:CACHE_HIT_THRESHOLD_MS = 1.0
 " ========================================
 " Test: Denops経由のレイテンシ（キャッシュミス時）
 " ========================================
-function! s:suite.test_latency_denops_cache_miss() abort
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call themis#log('SKIP: Denops not available')
-    return
-  endif
-
-  " キャッシュクリア
-  if exists('*hellshake_yano_vim#hint_generator#clear_cache')
-    call hellshake_yano_vim#hint_generator#clear_cache()
-  endif
-
-  " 計測（キャッシュミス時）
-  let l:start = reltime()
-  let l:hints = hellshake_yano_vim#hint_generator#generate(100)
-  let l:elapsed_ms = reltimefloat(reltime(l:start)) * 1000.0
-
-  call s:assert.true(l:elapsed_ms < s:LATENCY_THRESHOLD_MS,
-    \ 'Latency ' . printf('%.2f', l:elapsed_ms) . 'ms exceeds threshold ' . s:LATENCY_THRESHOLD_MS . 'ms')
-
-  call themis#log('[Latency] generate(100) cache miss: ' . printf('%.2f', l:elapsed_ms) . 'ms')
-endfunction
 
 " ========================================
 " Test: キャッシュヒット時のレイテンシ

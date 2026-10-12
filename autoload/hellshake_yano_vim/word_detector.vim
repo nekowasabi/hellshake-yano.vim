@@ -46,17 +46,7 @@ let s:cache_max_size = 10  " キャッシュエントリ上限
 "
 " @return v:true: Denops利用可能 / v:false: 利用不可
 function! hellshake_yano_vim#word_detector#has_denops() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano') ? v:true : v:false
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " hellshake_yano_vim#word_detector#detect_visible() - 画面内の単語検出
@@ -75,7 +65,7 @@ endfunction
 "
 " 処理フロー:
 "   1. has_denops() で Denops 利用可否をチェック
-"   2. 利用可能 → denops#request('detectWordsVisible') を呼び出し
+"   2. 利用可能 → native backend request
 "   3. 利用不可 → s:detect_visible_local() でローカル処理
 "
 " エラーハンドリング:
@@ -222,7 +212,7 @@ endfunction
 "   - Denops利用不可の場合はローカル実装にフォールバック
 "
 " アルゴリズム:
-"   1. Denops経由で denops#request('detectWordsMultiWindow', [windows]) を呼び出し
+"   1. Denops経由で native backend request
 "   2. または s:detect_multi_window_local() でローカル処理
 "   3. 各ウィンドウの topline ～ botline の行を走査
 "   4. 日本語/英数字判定して単語を検出

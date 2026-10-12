@@ -20,63 +20,12 @@ let s:suite = themis#suite('word_detector_fallback')
 let s:assert = themis#helper('assert')
 
 " テスト用のヘルパー関数
-function! s:skip(msg) abort
-  call themis#log('SKIP: ' . a:msg)
-endfunction
 
 " ========================================
 " Test Case 1: 正常系 - Denops利用可能時
 " ========================================
 " 目的: Denops利用可能時は正常に単語が検出されることを確認
 "
-function! s:suite.test_fallback_case1_normal() abort
-  " 前提: Denopsが利用可能かチェック
-  let l:has_denops = hellshake_yano_vim#word_detector#has_denops()
-
-  if !l:has_denops
-    call s:skip('Denops not available in current environment')
-    return
-  endif
-
-  " テスト用バッファを作成
-  new
-  call setline(1, 'test word hello')
-
-  " Denops経由または正常系での単語検出を実行
-  let l:words = hellshake_yano_vim#word_detector#detect_visible()
-
-  " 戻り値の型チェック: リストであること
-  call s:assert.true(type(l:words) == v:t_list,
-    \ 'detect_visible() should return list')
-
-  " 基本的な検出確認: 3つ以上の単語が検出されるはず
-  call s:assert.true(len(l:words) >= 2,
-    \ printf('should detect at least 2 words, got: %d', len(l:words)))
-
-  " 各単語の構造チェック
-  if !empty(l:words)
-    let l:first_word = l:words[0]
-    call s:assert.true(has_key(l:first_word, 'text'),
-      \ 'Word dict should have text key')
-    call s:assert.true(has_key(l:first_word, 'lnum'),
-      \ 'Word dict should have lnum key')
-    call s:assert.true(has_key(l:first_word, 'col'),
-      \ 'Word dict should have col key')
-    call s:assert.true(has_key(l:first_word, 'end_col'),
-      \ 'Word dict should have end_col key')
-
-    " テキスト値の型チェック
-    call s:assert.true(type(l:first_word.text) == v:t_string,
-      \ 'word.text should be string')
-    call s:assert.true(type(l:first_word.lnum) == v:t_number,
-      \ 'word.lnum should be number')
-    call s:assert.true(type(l:first_word.col) == v:t_number,
-      \ 'word.col should be number')
-  endif
-
-  " テストバッファをクリーンアップ
-  bwipeout!
-endfunction
 
 " ========================================
 " Test Case 2: 異常系 - Denops未起動時

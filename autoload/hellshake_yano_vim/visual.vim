@@ -35,14 +35,7 @@ let s:visual_state = copy(s:initial_visual_state)
 "
 " @return Boolean Denops利用可能ならv:true
 function! s:has_denops() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  try
-    return denops#plugin#is_loaded('hellshake-yano')
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " hellshake_yano_vim#visual#init() - 状態変数の初期化

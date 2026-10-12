@@ -70,7 +70,7 @@ function! hellshake_yano_vim#core#init() abort
   call s:setup_focus_gained_autocmd()
 
   " Phase 1集約: Denops側に enable を通知
-  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+  " Why: silent! instead of try-catch — native backend notification
   if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
     silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'enable', [])
   endif
@@ -235,26 +235,11 @@ endfunction
 "   - config.vim がDenops APIを呼び出せるかの判定に使用
 "
 " アルゴリズム:
-"   1. denops#plugin#is_loaded() が存在するか確認
-"   2. 存在する場合、'hellshake-yano' プラグインがロード済みか確認
-"   3. 存在しない場合は v:false を返す
+"   Native bridge readiness determines whether backend calls are available.
 "
 " @return Boolean Denopsが利用可能な場合 v:true、そうでなければ v:false
 function! hellshake_yano_vim#core#is_denops_ready() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  " denops#plugin#is_loaded() が存在しない場合は未初期化
-  if !exists('*denops#plugin#is_loaded')
-    return v:false
-  endif
-
-  " hellshake-yano プラグインがロードされているか確認
-  try
-    return denops#plugin#is_loaded('hellshake-yano')
-  catch
-    return v:false
-  endtry
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " hellshake_yano_vim#core#get_fixed_positions() - 固定座標の取得
@@ -631,7 +616,7 @@ function! hellshake_yano_vim#core#hide() abort
   let s:state.hints_visible = v:false
 
   " Phase 1集約: Denops側にも hide を同期
-  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
+  " Why: silent! instead of try-catch — native backend notification
   if hellshake_yano_vim#backend#is_native() || hellshake_yano#utils#is_denops_ready()
     silent! call hellshake_yano_vim#backend#notify('hellshake-yano', 'displayHideAll', [])
   endif

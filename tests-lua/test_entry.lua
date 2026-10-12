@@ -1,8 +1,5 @@
-vim.opt.rtp:prepend(vim.fn.getcwd())
-vim.cmd('runtime plugin/hellshake-yano-native.vim')
-assert(vim.g.loaded_hellshake_yano_native == nil)
-assert(vim.fn.exists(':HellshakeYanoShow') == 0)
-vim.g.hellshake_yano_native = true
+vim.opt.rtp = {vim.fn.getcwd(), vim.env.VIMRUNTIME}
+assert(vim.g.hellshake_yano_native == nil)
 vim.g.hellshake_yano = {motionTimeout=0}
 local ok = pcall(vim.cmd, 'runtime plugin/hellshake-yano-native.vim')
 assert(not ok, 'invalid setup must fail visibly')
@@ -17,6 +14,7 @@ assert(vim.g.hellshake_yano_native_bridge)
 assert(vim.g.loaded_hellshake_yano_unified == nil)
 assert(vim.g.loaded_hellshake_yano == nil)
 assert(vim.fn.exists('*denops#request') == 0)
+assert(vim.v.errmsg == '', vim.v.errmsg)
 -- The user's plain noremap stays the motion; native only wraps it with hints.
 assert(vim.fn.maparg('h','n',false,true).callback ~= nil)
 assert(vim.fn.maparg('j','n',false,true).callback ~= nil)
@@ -35,5 +33,5 @@ assert(vim.api.nvim_win_get_cursor(0)[2] == 6)
 require('hellshake_yano').disable_bridge()
 require('hellshake_yano').deactivate()
 assert(vim.fn.maparg('h','n') == 'gh')
-print('PASS: explicit native plugin startup, visible failed setup, guarded legacy entries and commands')
+print('PASS: default native plugin startup, visible failed setup, guarded legacy entries and commands')
 vim.cmd('qa!')

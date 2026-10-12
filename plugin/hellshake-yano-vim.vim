@@ -13,7 +13,7 @@ endif
 " Unlike the denops version (hellshake-yano), this implementation does not
 " require external dependencies and uses the hellshake_yano_vim namespace.
 "
-" Note: For Neovim, use the denops implementation (hellshake-yano.vim) instead.
+" Note: Neovim uses the Lua native entry point.
 
 "=============================================================================
 " Editor Guard - Vim 8.0+ only (Neovim uses denops implementation)

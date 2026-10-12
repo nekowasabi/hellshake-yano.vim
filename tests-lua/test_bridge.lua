@@ -50,15 +50,27 @@ local state=call('hellshake_yano#motion#get_state')
 eq(150,state.timeoutMs)
 eq('',state.lastMotion)
 local dispatcher=require('hellshake_yano.dispatcher')
-local source=table.concat(vim.fn.readfile('denops/hellshake-yano/main.ts'),'\n')
-local dispatcher_start=assert(source:find('async function initializeNeovimLayer',1,true))
-source=source:sub(dispatcher_start)
-local count=0
-for name in source:gmatch('      async ([%w_]+)%(') do
+local methods={
+  'enable','disable','toggle','setCount','setTimeout','showHints','hideHints',
+  'displayHideAll','highlightCandidateHints','detectWords','generateHints',
+  'getDebugInfo','clearDebugInfo','getConfig','validateConfig','healthCheck',
+  'getStatistics','getHighlightGroup','showDelayed','getFixedPositions','shouldRedraw',
+  'reloadDictionary','addToDictionary','editDictionary','showDictionary',
+  'validateDictionary','isInDictionary','getPartialMatches','getVisualRange',
+  'detectWordsInVisualRange','visualInit','visualGetState','showHintsWithKey',
+  'showHintsInternal','updateConfig','clearCache','invalidateBufferCache','debug',
+  'clearPerformanceLog','segmentJapaneseText','showHintsMultiWindow',
+  'hideHintsMultiWindow','toggleMultiWindowMode','getVisibleWindows',
+  'isMultiWindowModeActive','updateMultiWindowConfig','enableMultiWindowMode',
+  'disableMultiWindowMode','isMultiWindowModeEnabled','detectWordsVisible',
+  'detectWordsMultiWindow','getMinWordLength','displayShowHint','displayShowHintWithWindow',
+  'displayHighlightPartialMatches','displayGetPopupCount','motionDetect',
+  'motionResetState','motionSetThreshold','motionSetTimeout','motionGetState',
+}
+for _,name in ipairs(methods) do
   assert(dispatcher.supports(name),'missing legacy dispatcher method: '..name)
-  count=count+1
 end
-eq(61,count)
+eq(61,#methods)
 assert(statistics.performanceStats.hintGeneration.count>=1)
 assert(dispatcher.request('getDebugInfo',{}).timestamp>0)
 dispatcher.request('clearDebugInfo',{})

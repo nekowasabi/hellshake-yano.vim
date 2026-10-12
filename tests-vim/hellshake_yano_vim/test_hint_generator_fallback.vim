@@ -9,21 +9,6 @@ let s:assert = themis#helper('assert')
 " ========================================
 " ケース1: 正常系 - Denops利用可能時はDenops経由
 " ========================================
-function! s:suite.test_fallback_case1_normal_denops_available() abort
-  if !hellshake_yano_vim#hint_generator#has_denops()
-    call themis#log('SKIP: Denops not available')
-    return
-  endif
-
-  " キャッシュクリア
-  if exists('*hellshake_yano_vim#hint_generator#clear_cache')
-    call hellshake_yano_vim#hint_generator#clear_cache()
-  endif
-
-  let l:hints = hellshake_yano_vim#hint_generator#generate(5)
-  call s:assert.equals(len(l:hints), 5, 'Should return 5 hints via Denops')
-  call s:assert.equals(l:hints[0], 'a', 'First hint should be "a"')
-endfunction
 
 " ========================================
 " ケース2: 異常系 - Denops未起動時はローカル実装

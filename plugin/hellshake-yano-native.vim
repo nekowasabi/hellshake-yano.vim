@@ -1,6 +1,5 @@
-" Native startup is deliberately opt-in; legacy startup remains the default.
-" Set g:hellshake_yano_native before plugins are loaded.
-if !get(g:, 'hellshake_yano_native', v:false) || exists('g:loaded_hellshake_yano_native')
+" Neovim starts natively by default; Vim9 remains opt-in.
+if exists('g:loaded_hellshake_yano_native') || (!has('nvim') && !get(g:, 'hellshake_yano_native', v:false))
   finish
 endif
 let s:save_cpo = &cpo

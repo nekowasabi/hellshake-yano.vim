@@ -38,9 +38,6 @@ let s:golden_test_cases = [
   \ ]
 
 " テスト用ヘルパー関数
-function! s:skip(msg) abort
-  call themis#log('SKIP: ' . a:msg)
-endfunction
 
 " 期待された単語テキストがresult内に含まれているか検証
 function! s:contains_words(result, expected_texts) abort
@@ -131,179 +128,14 @@ endfunction
 " ========================================
 " Test: Denops版のゴールデンテスト
 " ========================================
-function! s:suite.test_golden_denops_basic() abort
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
 
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  new
-  call setline(1, 'hello world test')
-
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-  call s:assert.true(type(l:result) == v:t_list,
-    \ 'detect_visible() via Denops should return list')
-  call s:assert.true(s:contains_words(l:result, ['hello', 'world', 'test']),
-    \ 'Denops should detect expected words')
-
-  bdelete!
-endfunction
-
-function! s:suite.test_golden_denops_english() abort
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  new
-  call setline(1, 'function test_func() { return 42; }')
-
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-  call s:assert.true(s:contains_words(l:result, ['function', 'test', 'func', 'return']),
-    \ 'Denops: English text should contain expected words')
-
-  bdelete!
-endfunction
 
 " ========================================
 " Test: ローカル実装とDenops版の出力一致（統合テスト）
 " ========================================
-function! s:suite.test_golden_unified_structure() abort
-  " VimScript版とDenops版の構造が一致することを検証
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
 
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
 
-  new
-  call setline(1, 'Hello World test')
 
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-
-  " すべての要素が必須フィールドを持つか検証
-  for l:word in l:result
-    call s:assert.true(has_key(l:word, 'text'),
-      \ 'Unified: Word dict should have text key')
-    call s:assert.true(has_key(l:word, 'lnum'),
-      \ 'Unified: Word dict should have lnum key')
-    call s:assert.true(has_key(l:word, 'col'),
-      \ 'Unified: Word dict should have col key')
-    call s:assert.true(has_key(l:word, 'end_col'),
-      \ 'Unified: Word dict should have end_col key')
-  endfor
-
-  bdelete!
-endfunction
-
-function! s:suite.test_golden_unified_word_count() abort
-  " 同じコンテンツで検出される単語数が一致することを検証
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  new
-  call setline(1, 'function test hello world')
-
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-  " 同じバッファで複数回呼び出すと一致することを検証
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  let l:result2 = hellshake_yano_vim#word_detector#detect_visible()
-  call s:assert.equals(len(l:result), len(l:result2),
-    \ 'Word count should be consistent')
-
-  bdelete!
-endfunction
-
-function! s:suite.test_golden_unified_word_texts() abort
-  " 検出される単語テキストが一致することを検証
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  new
-  call setline(1, 'hello world test')
-
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  let l:result2 = hellshake_yano_vim#word_detector#detect_visible()
-
-  " テキストの一覧を比較（順序は保証しないためソート）
-  let l:texts1 = sort(map(copy(l:result), 'v:val.text'))
-  let l:texts2 = sort(map(copy(l:result2), 'v:val.text'))
-  call s:assert.equals(l:texts1, l:texts2,
-    \ 'Word texts should match exactly')
-
-  bdelete!
-endfunction
-
-function! s:suite.test_golden_unified_lnum_col() abort
-  " 検出される単語の行番号と列番号が一致することを検証
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  new
-  call setline(1, 'hello world')
-  call setline(2, 'test function')
-
-  let l:result = hellshake_yano_vim#word_detector#detect_visible()
-  if exists('*hellshake_yano_vim#word_detector#clear_cache')
-    call hellshake_yano_vim#word_detector#clear_cache()
-  endif
-
-  let l:result2 = hellshake_yano_vim#word_detector#detect_visible()
-
-  " テキスト → 位置情報マップを作成して比較
-  let l:map1 = {}
-  for l:word in l:result
-    let l:key = l:word.text . '@' . l:word.lnum
-    let l:map1[l:key] = [l:word.col, l:word.end_col]
-  endfor
-
-  let l:map2 = {}
-  for l:word in l:result2
-    let l:key = l:word.text . '@' . l:word.lnum
-    let l:map2[l:key] = [l:word.col, l:word.end_col]
-  endfor
-
-  call s:assert.equals(l:map1, l:map2,
-    \ 'Word positions (lnum, col, end_col) should match exactly')
-
-  bdelete!
-endfunction
 
 " ========================================
 " Test: 設定連動テスト（get_min_length）

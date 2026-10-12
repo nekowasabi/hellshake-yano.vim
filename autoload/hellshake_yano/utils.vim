@@ -38,5 +38,6 @@ function! hellshake_yano#utils#log_performance(operation, time_ms, ...) abort
 endfunction
 
 function! hellshake_yano#utils#is_denops_ready() abort
-  return hellshake_yano#backend#is_native() || exists('g:hellshake_yano_ready') && g:hellshake_yano_ready
+  " Why: Keep the legacy name instead of renaming callers across about 29 files.
+  return hellshake_yano#backend#is_native() ? 1 : 0
 endfunction

@@ -12,11 +12,6 @@ function! s:assert_true(condition, ...) abort
   endif
 endfunction
 
-function! s:skip(msg) abort
-  echohl WarningMsg
-  echo 'SKIP: ' . a:msg
-  echohl None
-endfunction
 
 " ========================================
 " Test 1: 基本的な単語検出（E2E）
@@ -56,38 +51,6 @@ endfunction
 " ========================================
 " Test 2: Denops統合確認（E2E）
 " ========================================
-function! s:test_e2e_denops_integration() abort
-  echo 'Running: test_e2e_denops_integration'
-
-  if !exists('*hellshake_yano_vim#word_detector#has_denops')
-    call s:skip('has_denops() not available')
-    return
-  endif
-
-  if !hellshake_yano_vim#word_detector#has_denops()
-    call s:skip('Denops not available')
-    return
-  endif
-
-  " Denops経由で単語検出が行われることを確認
-  new
-  call setline(1, 'test word detection denops')
-  call hellshake_yano_vim#word_detector#clear_cache()
-  let l:words = hellshake_yano_vim#word_detector#detect_visible()
-
-  " TypeScript版の出力形式を確認
-  call s:assert_true(type(l:words) == v:t_list, 'detect_visible() should return list')
-
-  if !empty(l:words)
-    call s:assert_true(has_key(l:words[0], 'text'), 'Word dict should have text key')
-    call s:assert_true(has_key(l:words[0], 'lnum'), 'Word dict should have lnum key')
-    call s:assert_true(has_key(l:words[0], 'col'), 'Word dict should have col key')
-  endif
-
-  bwipeout!
-
-  echo '  PASS: test_e2e_denops_integration'
-endfunction
 
 " ========================================
 " Test 3: マルチウィンドウ統合（E2E）
@@ -209,7 +172,6 @@ function! TestPhase21Integration() abort
 
   let l:tests = [
     \ 's:test_e2e_word_detection',
-    \ 's:test_e2e_denops_integration',
     \ 's:test_e2e_multi_window',
     \ 's:test_e2e_cache_integration',
     \ 's:test_e2e_config_integration',

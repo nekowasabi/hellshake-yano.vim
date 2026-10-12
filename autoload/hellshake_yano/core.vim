@@ -34,7 +34,6 @@ function! hellshake_yano#core#init() abort
   call s:setup_focus_gained_autocmd()
 
   " Denops側コアを有効化（enable dispatcher: 共通）
-  " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
   if hellshake_yano#utils#is_denops_ready()
     silent! call hellshake_yano#backend#notify('hellshake-yano', 'enable', [])
   endif
@@ -239,7 +238,6 @@ endfunction
 " @param delay Number 遅延ミリ秒
 function! hellshake_yano#core#show_delayed(delay) abort
   if hellshake_yano#utils#is_denops_ready()
-    " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
     silent! call hellshake_yano#backend#notify('hellshake-yano', 'showDelayed', [a:delay])
   else
     call timer_start(a:delay, {-> hellshake_yano#core#show()})

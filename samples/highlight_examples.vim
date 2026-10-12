@@ -87,8 +87,8 @@ function! SetHellshakeYanoColors()
   endif
 
   " 設定を再適用
-  if exists('g:hellshake_yano_ready')
-    call denops#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
+  if hellshake_yano#backend#is_native()
+    call hellshake_yano#backend#notify('hellshake-yano', 'updateConfig', [g:hellshake_yano])
   endif
 endfunction
 
@@ -118,7 +118,7 @@ augroup END
 " ==============
 
 " デバッグ情報を表示
-" :call denops#notify('hellshake-yano', 'debug', [])
+" :call hellshake_yano#backend#notify('hellshake-yano', 'debug', [])
 
 " 現在の設定を表示
 " :echo g:hellshake_yano

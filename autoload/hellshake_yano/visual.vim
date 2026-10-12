@@ -5,7 +5,6 @@
 " hellshake_yano#visual#init() - ビジュアルモード初期化 (Process 64)
 function! hellshake_yano#visual#init() abort
   if hellshake_yano#utils#is_denops_ready()
-    " Why: silent! instead of try-catch — denops#notify is fire-and-forget, silent! suppresses errors when denops is unavailable or function not yet registered
     silent! call hellshake_yano#backend#notify('hellshake-yano', 'visualInit', [])
   endif
 endfunction

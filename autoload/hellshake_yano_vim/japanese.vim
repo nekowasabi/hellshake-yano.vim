@@ -6,10 +6,7 @@ let s:denops_failed_once = v:false
 
 " Denopsが利用可能かチェック
 function! s:is_denops_available() abort
-  if hellshake_yano_vim#backend#is_native()
-    return v:true
-  endif
-  return exists('*denops#plugin#is_loaded') && denops#plugin#is_loaded('hellshake-yano')
+  return hellshake_yano_vim#backend#is_native() ? v:true : v:false
 endfunction
 
 " 日本語文字かどうかを文字コードで判定（Vim/Neovim互換）
