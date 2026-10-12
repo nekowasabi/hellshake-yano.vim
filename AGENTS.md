@@ -13,9 +13,9 @@
 
 ## Build, Test, and Development Commands
 
-- `sh scripts/test-lua.sh`: Neovim (Lua) tests.
-- `sh scripts/test-vim9.sh`: Vim9 native tests.
-- `sh scripts/test-vim.sh`: pure VimScript tests.
+- `bash scripts/test-lua.sh`: Neovim (Lua) tests.
+- `bash scripts/test-vim9.sh`: Vim9 native tests.
+- `bash scripts/test-vim.sh`: pure VimScript tests.
 - Neovim local run: add repo to `runtimepath` (Neovim >=0.10 starts automatically).
 
 ## Coding Style & Naming Conventions

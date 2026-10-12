@@ -58,9 +58,9 @@ Plug 'nekowasabi/hellshake-yano.vim'
 ## テスト
 
 ```sh
-sh scripts/test-lua.sh    # Neovim (Lua)
-sh scripts/test-vim9.sh   # Vim9 native
-sh scripts/test-vim.sh    # pure VimScript
+bash scripts/test-lua.sh    # Neovim (Lua)
+bash scripts/test-vim9.sh   # Vim9 native
+bash scripts/test-vim.sh    # pure VimScript
 ```
 
 ## 設定
