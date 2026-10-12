@@ -44,6 +44,7 @@ logs/
 
 # Temporary files
 tmp/
+verification/evidence/
 temp/
 *.tmp
 
