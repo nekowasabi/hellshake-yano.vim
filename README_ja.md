@@ -8,9 +8,8 @@ hellshake-yano.vim は、単語間のカーソル移動を滑らかにする Neo
 
 ### 実装
 
-現在は以下の実装を提供しています:
-
-- **Denops 版** (Neovim + Denops): TypeScript で実装されたフル機能版
+- **Neovim (0.10 以上)**: Lua native 実装を既定で有効化。Denops / Deno は不要です。
+- **Vim**: 既定は pure VimScript。`g:hellshake_yano_native = 1` で Vim9 native 実装を使います。
 
 ### デモ
 
@@ -50,35 +49,18 @@ Plug 'nekowasabi/hellshake-yano.vim'
 }
 ```
 
-## Denops 版 (フル機能実装)
+## 必須要件
 
-### 必須要件
+- Neovim 0.10 以上 (Lua native、自動で起動) または Vim 8.2+ (pure VimScript。`g:hellshake_yano_native = 1` で Vim9 native)
+- Denops / Deno は不要です。
+- Neovim 0.10 未満は非対応です。
 
-- Neovim もしくは Vim 8.2+
-- Deno ランタイム
-- Denops runtime: https://github.com/vim-denops/denops.vim
+## テスト
 
-**denops.vim のインストール例:**
-
-vim-plug を使用:
-```vim
-Plug 'vim-denops/denops.vim'
-Plug 'nekowasabi/hellshake-yano.vim'
-```
-
-lazy.nvim を使用:
-```lua
-{
-  'vim-denops/denops.vim',
-  lazy = false,
-},
-{
-  'nekowasabi/hellshake-yano.vim',
-  dependencies = { 'vim-denops/denops.vim' },
-  config = function()
-    -- 設定をここに追加
-  end
-}
+```sh
+sh scripts/test-lua.sh    # Neovim (Lua)
+sh scripts/test-vim9.sh   # Vim9 native
+sh scripts/test-vim.sh    # pure VimScript
 ```
 
 ## 設定

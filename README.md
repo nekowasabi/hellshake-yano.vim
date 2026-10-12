@@ -10,9 +10,8 @@ It fully supports UTF-8 encoding and properly handles Japanese characters, makin
 
 ### Implementation
 
-This plugin currently ships with one implementation:
-
-- **Denops Edition** (Neovim + Denops): Full-featured TypeScript implementation
+- **Neovim (>= 0.10)**: Lua native implementation, enabled by default. No Denops or Deno required.
+- **Vim**: pure VimScript by default. Set `g:hellshake_yano_native = 1` to use the Vim9 native implementation.
 
 ### Demo
 
@@ -55,35 +54,18 @@ Plug 'nekowasabi/hellshake-yano.vim'
 }
 ```
 
-## Denops Edition (Full-Featured Implementation)
+## Requirements
 
-### Requirements
+- Neovim 0.10+ (Lua native, starts automatically), or Vim 8.2+ (pure VimScript; `g:hellshake_yano_native = 1` enables Vim9 native)
+- Denops and Deno are not required.
+- Neovim older than 0.10 is not supported.
 
-- Neovim or Vim 8.2+
-- Deno runtime
-- Denops runtime: https://github.com/vim-denops/denops.vim
+## Testing
 
-**Installation of denops.vim:**
-
-Using vim-plug:
-```vim
-Plug 'vim-denops/denops.vim'
-Plug 'nekowasabi/hellshake-yano.vim'
-```
-
-Using lazy.nvim:
-```lua
-{
-  'vim-denops/denops.vim',
-  lazy = false,
-},
-{
-  'nekowasabi/hellshake-yano.vim',
-  dependencies = { 'vim-denops/denops.vim' },
-  config = function()
-    -- Configuration here
-  end
-}
+```sh
+sh scripts/test-lua.sh    # Neovim (Lua)
+sh scripts/test-vim9.sh   # Vim9 native
+sh scripts/test-vim.sh    # pure VimScript
 ```
 
 ## Configuration
