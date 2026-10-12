@@ -7,16 +7,37 @@ local session_config = config
 local state = {visible = false, targets = {}, prefix = ''}
 local buffers = {}
 local floats = {}
+-- Hint floats are hidden and reused, never closed per render: Neovim's redraw
+-- cost grows with every float window ever opened, so open/close per hint made
+-- each repeated display slower until the editor froze.
+local pool = {}
 local generation = 0
+
+local function close_float(float)
+  if vim.api.nvim_win_is_valid(float.win) then vim.api.nvim_win_close(float.win, true) end
+  if vim.api.nvim_buf_is_valid(float.buf) then vim.api.nvim_buf_delete(float.buf, {force = true}) end
+end
+
+local function pooled_float(index)
+  local float = pool[index]
+  if float and vim.api.nvim_win_is_valid(float.win) and vim.api.nvim_buf_is_valid(float.buf) then return float end
+  if float then close_float(float) end
+  local buf = vim.api.nvim_create_buf(false, true)
+  float = {buf = buf, win = -1}
+  pool[index] = float
+  float.win = vim.api.nvim_open_win(buf, false, {
+    relative = 'editor', row = 0, col = 0, width = 1, height = 1, hide = true,
+    style = 'minimal', focusable = false, noautocmd = true, zindex = 200,
+  })
+  return float
+end
 
 local function clear_display()
   local old_floats = floats
   floats = {}
   for _, float in ipairs(old_floats) do
-    if vim.api.nvim_win_is_valid(float.win) then vim.api.nvim_win_close(float.win, true) end
-    if vim.api.nvim_buf_is_valid(float.buf) then vim.api.nvim_buf_delete(float.buf, {force = true}) end
+    if vim.api.nvim_win_is_valid(float.win) then vim.api.nvim_win_set_config(float.win, {hide = true}) end
   end
-  floats = {}
   for buffer in pairs(buffers) do
     if vim.api.nvim_buf_is_valid(buffer) then
       vim.api.nvim_buf_clear_namespace(buffer, M.namespace, 0, -1)
@@ -30,6 +51,13 @@ function M.hide()
   generation = generation + 1
   state = {visible = false, targets = {}, prefix = ''}
   clear_display()
+end
+
+-- Closes the hidden float pool; for deactivate and tests, not per display.
+function M.release()
+  M.hide()
+  for _, float in pairs(pool) do close_float(float) end
+  pool = {}
 end
 
 local function highlight(name, value)
@@ -85,16 +113,27 @@ local function render()
         if session_config.multiWindowMode then
           -- Extmarks belong to buffers, so they cannot distinguish two views of
           -- one buffer. Window-relative floats keep each target's label unique.
-          local buf = vim.api.nvim_create_buf(false, true)
-          local item = {buf = buf, win = -1}
-          floats[#floats + 1] = item
-          vim.api.nvim_buf_set_lines(buf, 0, -1, false, {target.hint})
-          item.win = vim.api.nvim_open_win(buf, false, {
+          local index = #floats + 1
+          local item = pooled_float(index)
+          floats[index] = item
+          vim.api.nvim_buf_set_lines(item.buf, 0, -1, false, {target.hint})
+          local placement = {
             relative = 'win', win = target.winid, bufpos = {target.line - 1, target.col - 1},
-            row = 0, col = 0, width = math.max(1, vim.fn.strdisplaywidth(target.hint)), height = 1,
-            style = 'minimal', focusable = false, noautocmd = true, zindex = 200,
-          })
-          vim.wo[item.win].winhighlight = 'Normal:' .. group
+            row = 0, col = 0, width = math.max(1, vim.fn.strdisplaywidth(target.hint)), height = 1, hide = false,
+          }
+          -- A pooled float left in another tabpage cannot always be moved; replace it.
+          if not pcall(vim.api.nvim_win_set_config, item.win, placement) then
+            close_float(item)
+            pool[index] = nil
+            item = pooled_float(index)
+            floats[index] = item
+            vim.api.nvim_buf_set_lines(item.buf, 0, -1, false, {target.hint})
+            vim.api.nvim_win_set_config(item.win, placement)
+          end
+          if item.group ~= group then
+            vim.wo[item.win].winhighlight = 'Normal:' .. group
+            item.group = group
+          end
         else
           vim.api.nvim_buf_set_extmark(target.bufnr, M.namespace, target.line - 1, target.col - 1, {
             virt_text = {{target.hint, group}}, virt_text_pos = 'overlay',

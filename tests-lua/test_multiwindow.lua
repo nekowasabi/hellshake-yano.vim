@@ -22,7 +22,8 @@ eq(0,#vim.api.nvim_buf_get_extmarks(buf,core.namespace,0,-1,{}))
 eq('jumped',core.input('A'))
 eq(second,vim.api.nvim_get_current_win())
 eq({1,6},vim.api.nvim_win_get_cursor(second))
-for _, win in pairs(floats) do assert(not vim.api.nvim_win_is_valid(win), 'hint float leaked') end
+-- Floats are pooled for reuse (closing them slows later redraws); they must be hidden.
+for _, win in pairs(floats) do assert(vim.api.nvim_win_get_config(win).hide, 'hint float left visible') end
 
 -- Closed windows are stale, not reassigned to a different window.
 vim.api.nvim_set_current_win(first)
@@ -53,6 +54,16 @@ for _=1,20 do
   core.hide()
 end
 eq(before_buffers,#vim.api.nvim_list_bufs())
+local before_windows=#vim.api.nvim_list_wins()
+for _=1,20 do
+  core.show({{line=1,col=7,text='beta'},{line=1,col=12,text='gamma'}})
+  core.hide()
+end
+eq(before_windows,#vim.api.nvim_list_wins()) -- the float pool does not grow per display
+core.release()
+for _, win in ipairs(vim.api.nvim_list_wins()) do
+  assert(vim.api.nvim_win_get_config(win).relative=='','release must close pooled floats')
+end
 print('PASS: same-buffer multi-window rendering, jumping, cleanup, stale windows, cancel precedence')
 assert(vim.v.errmsg == '', vim.v.errmsg)
 vim.cmd('qa!')

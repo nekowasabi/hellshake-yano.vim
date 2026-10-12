@@ -225,7 +225,7 @@ function M.activate()
 end
 
 function M.deactivate()
-  core.hide()
+  core.release()
   motion.reset()
   active = false
   for _, map in ipairs(owned_maps) do
