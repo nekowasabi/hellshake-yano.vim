@@ -26,7 +26,8 @@ def Run()
     assert_false(exists('g:loaded_hellshake_yano_unified'))
     assert_false(exists('g:loaded_hellshake_yano_vim'))
     assert_equal(0, exists('*denops#request'))
-    assert_equal('gh', maparg('h', 'n'))
+    # The user's plain noremap stays the motion; native only wraps it with hints.
+    assert_match("native#runtime#Expression('h', 'gh')", maparg('h', 'n'))
     assert_match('native#runtime#Expression', maparg('j', 'n'))
     runtime! plugin/hellshake-yano*.vim
     execute 'HellshakeYanoSetCount 4'

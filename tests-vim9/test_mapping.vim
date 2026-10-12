@@ -4,7 +4,9 @@ nnoremap j gj
 command HellshakeYanoShow echo 'user command'
 Runtime.Setup({suppressOnKeyRepeat: false, defaultMotionCount: 2})
 Runtime.Activate()
-assert_equal('gj', maparg('j', 'n'))
+# A user's plain noremap motion is wrapped (hints + gj), restored on Deactivate.
+assert_match("runtime#Expression('j', 'gj')", maparg('j', 'n'))
+assert_equal('gj', Runtime.Expression('j', 'gj'))
 assert_match('runtime#Expression', maparg('k', 'n'))
 assert_match('user command', execute('command HellshakeYanoShow'))
 assert_equal(2, exists(':HellshakeYanoHide'))
@@ -17,6 +19,15 @@ assert_equal('', maparg('h', 'n'))
 assert_equal('', maparg('j', 'x'))
 assert_match('replacement', execute('command HellshakeYanoHide'))
 assert_equal(0, exists(':HellshakeYanoEnable'))
+# Command mappings are not motions and are left alone.
+nnoremap l :echo 'user'<CR>
+Runtime.Setup({})
+Runtime.Activate()
+assert_equal(":echo 'user'<CR>", maparg('l', 'n'))
+Runtime.Deactivate()
+nunmap l
+nunmap j
+nunmap k
 Runtime.Setup({countedMotions: ['<Down>', '|'], triggerOnHjkl: false})
 Runtime.Activate()
 assert_match('Expression', maparg('<Down>', 'n'))

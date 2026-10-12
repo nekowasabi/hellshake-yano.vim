@@ -132,16 +132,28 @@ function M.show(key)
   end
 end
 
-local function mapping(key)
+-- rhs: the user's own noremap rhs for key (e.g. j -> gj), kept as the motion.
+local function mapping(key, rhs)
+  rhs = rhs or key
   return function()
     if motion.record(vim.api.nvim_get_current_buf(), key, vim.v.count1, core.get_config()) then
       -- A scheduled callback can lose a queued hint key to normal mode. A <Cmd>
       -- suffix runs after this motion but before the next queued key, outside
       -- expr-map textlock, and preserves Visual mode.
-      return key .. '<Cmd>lua require("hellshake_yano").show(' .. vim.inspect(key) .. ')<CR>'
+      return rhs .. '<Cmd>lua require("hellshake_yano").show(' .. vim.inspect(key) .. ')<CR>'
     end
-    return key
+    return rhs
   end
+end
+
+-- Only plain global noremap motions (j -> gj) are wrapped; command maps stay the user's.
+-- ponytail: rhs heuristic, not a parser; widen if users need other wrapped forms.
+local function wrappable(existing)
+  if existing.noremap ~= 1 or existing.expr ~= 0 or existing.buffer ~= 0
+    or existing.callback ~= nil or type(existing.rhs) ~= 'string' or existing.rhs == '' then return false end
+  local rhs = existing.rhs:lower()
+  return not (rhs:find('^:') or rhs:find('<cr>', 1, true) or rhs:find('<cmd>', 1, true)
+    or rhs:find('<sid>', 1, true) or rhs:find('<snr>', 1, true) or rhs:find('<plug>', 1, true))
 end
 
 function M.motion_expression(key) return mapping(key)() end
@@ -193,10 +205,12 @@ function M.activate()
   if config.motionCounterEnabled then
     for _, key in ipairs(keys) do
       for _, mode in ipairs({'n', 'x'}) do
-        if vim.fn.maparg(key, mode) == '' then
-          local callback = mapping(key)
+        local existing = vim.fn.maparg(key, mode, false, true)
+        local original = not vim.tbl_isempty(existing) and wrappable(existing) and existing or nil
+        if vim.tbl_isempty(existing) or original then
+          local callback = mapping(key, original and original.rhs)
           vim.keymap.set(mode, key, callback, {expr = true, silent = true, desc = 'hellshake-yano native motion'})
-          owned_maps[#owned_maps + 1] = {mode = mode, key = key, callback = callback}
+          owned_maps[#owned_maps + 1] = {mode = mode, key = key, callback = callback, original = original}
         end
       end
     end
@@ -216,7 +230,10 @@ function M.deactivate()
   active = false
   for _, map in ipairs(owned_maps) do
     local current = vim.fn.maparg(map.key, map.mode, false, true)
-    if current.callback == map.callback then vim.keymap.del(map.mode, map.key) end
+    if current.callback == map.callback then
+      vim.keymap.del(map.mode, map.key)
+      if map.original then vim.fn.mapset(map.mode, false, map.original) end
+    end
   end
   local commands = vim.api.nvim_get_commands({})
   for name, definition in pairs(owned_commands) do

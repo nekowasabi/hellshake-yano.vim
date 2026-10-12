@@ -129,11 +129,24 @@ def KeyCodes(key: string): string
   return eval('"' .. substitute(escape(key, '"\'), '<', '\\<', 'g') .. '"')
 enddef
 
-export def Expression(key: string): string
+# rhs: the user's own noremap rhs for key (e.g. j -> gj), kept as the motion.
+export def Expression(key: string, rhs: string = ''): string
+  var motion = KeyCodes(empty(rhs) ? key : rhs)
   if Motion.Record(bufnr(), key, v:count1, Config())
-    return KeyCodes(key) .. "\<Cmd>call hellshake_yano#native#runtime#Show(" .. string(key) .. ")\<CR>"
+    return motion .. "\<Cmd>call hellshake_yano#native#runtime#Show(" .. string(key) .. ")\<CR>"
   endif
-  return KeyCodes(key)
+  return motion
+enddef
+
+# Only plain global noremap motions (j -> gj) are wrapped; command maps stay the user's.
+# ponytail: rhs heuristic, not a parser; widen if users need other wrapped forms.
+def Wrappable(existing: dict<any>): bool
+  if get(existing, 'noremap', 0) != 1 || get(existing, 'expr', 1) != 0
+      || get(existing, 'buffer', 1) != 0 || empty(get(existing, 'rhs', ''))
+    return false
+  endif
+  var rhs = tolower(existing.rhs)
+  return rhs !~# '^:' && rhs !~# '<\%(cr\|cmd\|sid\|snr\|plug\)>\?'
 enddef
 
 export def Toggle()
@@ -197,11 +210,14 @@ export def Activate()
   if settings.motionCounterEnabled
     for key in motions
       for mode in ['n', 'x']
-        if empty(maparg(key, mode))
-          var rhs = 'hellshake_yano#native#runtime#Expression(' .. string(key) .. ')'
+        var existing = maparg(key, mode, false, true)
+        var original = !empty(existing) && Wrappable(existing) ? existing : {}
+        if empty(existing) || !empty(original)
+          var rhs = 'hellshake_yano#native#runtime#Expression(' .. string(key)
+            .. (empty(original) ? '' : ', ' .. string(original.rhs)) .. ')'
           mapset(mode, false, {lhs: key, lhsraw: KeyCodes(key), rhs: rhs, noremap: 1, silent: 1, expr: 1,
             buffer: 0, nowait: 0, sid: 0, lnum: 0, script: 0})
-          add(owned_maps, {key: key, mode: mode, mapping: maparg(key, mode, false, true)})
+          add(owned_maps, {key: key, mode: mode, mapping: maparg(key, mode, false, true), original: original})
         endif
       endfor
     endfor
@@ -224,6 +240,9 @@ export def Deactivate()
     if maparg(item.key, item.mode, false, true) == item.mapping
       # mapset has no remove operation. Escape separators in the Ex LHS.
       execute item.mode .. 'unmap ' .. escape(keytrans(item.mapping.lhsraw), ' |')
+      if !empty(item.original)
+        mapset(item.mode, false, item.original)
+      endif
     endif
   endfor
   for [name, definition] in items(owned_commands)
