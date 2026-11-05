@@ -40,6 +40,14 @@ local status,replay=core.input('A')
 eq('cancelled',status)
 eq('A',replay)
 eq({1,0},vim.api.nvim_win_get_cursor(first))
+-- Key notation in cancelKeys matches the key getchar() delivers.
+core.setup({multiWindowMode=true,singleCharKeys='A',cancelKeys={'<C-d>','<CR>'}})
+for _, key in ipairs({'\4','\r'}) do
+  core.show({{line=1,col=7,text='beta'}})
+  local notation,notation_replay=core.input(key)
+  eq('cancelled',notation)
+  eq(key,notation_replay)
+end
 core.setup({multiWindowMode=true,singleCharKeys='A',cancelKeys={}})
 core.show({{line=1,col=7,text='beta'}})
 local unmatched,unmatched_replay=core.input('z')

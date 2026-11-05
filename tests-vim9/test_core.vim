@@ -52,6 +52,12 @@ Core.Show(words)
 assert_equal({status: 'replay', key: 'A'}, Core.Input('A'))
 Core.Show(words)
 assert_equal('cancelled', Core.Input('z').status)
+# Key notation in cancelKeys matches the key getchar() delivers.
+Core.Setup({singleCharKeys: 'AS', multiCharKeys: '', multiWindowMode: true, cancelKeys: ['<C-d>', '<CR>']})
+for key in ["\<C-d>", "\r"]
+  Core.Show(words)
+  assert_equal({status: 'replay', key: key}, Core.Input(key))
+endfor
 Core.Setup({singleCharKeys: '0', multiCharKeys: '', useNumericMultiCharHints: true})
 Core.Show(words)
 assert_equal('partial', Core.Input('0').status)
