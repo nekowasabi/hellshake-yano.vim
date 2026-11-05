@@ -201,10 +201,10 @@ function M.input(key)
   if key == '\27' or key == '\3' or key == '' then M.hide(); return 'cancelled' end
   -- Preserve the legacy single-window contract: lowercase remains normal motion.
   if not input_config.multiWindowMode and key:match('^[a-z]$') then M.hide(); return 'cancelled', key end
-  local normalized = key == '\r' and '<CR>' or key:upper()
+  local normalized = key:upper()
   local is_cancel = false
   for _, cancel in ipairs(input_config.cancelKeys) do
-    is_cancel = is_cancel or normalized == (cancel == '\r' and '<CR>' or cancel:upper())
+    is_cancel = is_cancel or normalized == vim.api.nvim_replace_termcodes(cancel, true, true, true):upper()
   end
   if input_config.multiWindowMode and is_cancel then M.hide(); return 'cancelled', key end
   local prefix = state.prefix .. key

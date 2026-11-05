@@ -142,10 +142,11 @@ export def Input(key: string): dict<any>
     return {status: 'replay', key: key}
   endif
   var cancel = get(config, 'cancelKeys', [])
-  var normalized = key ==# "\r" ? '<CR>' : toupper(key)
+  var normalized = toupper(key)
   var is_cancel = false
   for item in cancel
-    is_cancel = is_cancel || normalized ==# (item ==# "\r" ? '<CR>' : toupper(item))
+    var code = item =~# '^<.\+>$' ? eval('"\' .. item .. '"') : item
+    is_cancel = is_cancel || normalized ==# toupper(code)
   endfor
   if multi && is_cancel
     Hide()
