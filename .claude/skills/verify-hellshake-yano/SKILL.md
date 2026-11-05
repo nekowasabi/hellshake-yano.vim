@@ -112,6 +112,29 @@ The script terminates (then kills) only the nvim processes it spawned, in a
 worktree for a before/after comparison, remove it with
 `git worktree remove --force <path>`.
 
+## cancelKeys (`cancel_keys.py`)
+
+Second helper, same harness (imports `verify.py`). For every key in the
+user's `cancelKeys` (read from init.vim, or `--keys ...`), it plays
+`w w <key> j` twice in one `-u NONE` nvim with the init.vim settings and a
+vsplit: once with hints disabled (control), once with hints shown before
+`<key>` (test). PASS = hints hidden and mode, cursor, topline and buffer text
+equal the control. The trailing `j` exposes a key whose effect is pending
+(count, operator, `f` target).
+
+```sh
+uv run --no-project --with msgpack .claude/skills/verify-hellshake-yano/cancel_keys.py
+uv run --no-project --with msgpack .claude/skills/verify-hellshake-yano/cancel_keys.py --keys '<C-d>' y
+```
+
+Doctor is the same as above (exit 2). Exit 1 when any key differs. Evidence:
+`tmp/verify-evidence/cancel-<YYYYmmdd-HHMMSS>/cancel-keys.json` (every key's
+control/test state) and `screen-<key>.txt` (the grid with hints, for each
+FAIL). The nvim it spawned is closed in a `finally`.
+
+If system `python3` has no `msgpack`, run either helper through
+`uv run --no-project --with msgpack` as shown; nothing is installed globally.
+
 ## Features
 
 See `features/README.md` for what to drive and what proves it.
